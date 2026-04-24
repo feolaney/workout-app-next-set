@@ -2862,23 +2862,32 @@ function buildQueue(exercises, mode, cfg) {
   const getReps = (ex) => (cfg.exerciseSets && cfg.exerciseSets[ex.id]) || ex.default || ex.defaultReps || 10;
 
   if (mode === 'manual') {
-    return (cfg.manualQueue || []).map((item, i) => ({
-      ...item, round: 1, setNum: i + 1, totalSets: cfg.manualQueue.length,
+    const manualQueue = cfg.manualQueue || [];
+    return manualQueue.map((item, i) => ({
+      ...item, round: 1, setNum: i + 1, totalSets: manualQueue.length, positionLabel: `SET ${i + 1}/${manualQueue.length}`,
     }));
   }
 
   if (mode === 'focus') {
     exercises.forEach(ex => {
-      for (let s = 0; s < (cfg.sets || 3); s++) {
-        q.push({ exId: ex.id, name: ex.name, reps: getReps(ex), unit: ex.unit, equipment: ex.equipment, round: s + 1, setNum: q.length + 1 });
+      const sets = cfg.sets || 3;
+      for (let s = 0; s < sets; s++) {
+        q.push({
+          exId: ex.id, name: ex.name, reps: getReps(ex), unit: ex.unit, equipment: ex.equipment,
+          round: s + 1, setNum: q.length + 1, positionLabel: `SET ${s + 1}/${sets}`,
+        });
       }
     });
   }
 
   if (mode === 'circuit') {
-    for (let r = 0; r < (cfg.sets || 3); r++) {
+    const rounds = cfg.sets || 3;
+    for (let r = 0; r < rounds; r++) {
       exercises.forEach(ex => {
-        q.push({ exId: ex.id, name: ex.name, reps: getReps(ex), unit: ex.unit, equipment: ex.equipment, round: r + 1, setNum: q.length + 1 });
+        q.push({
+          exId: ex.id, name: ex.name, reps: getReps(ex), unit: ex.unit, equipment: ex.equipment,
+          round: r + 1, setNum: q.length + 1, positionLabel: `ROUND ${r + 1}/${rounds}`,
+        });
       });
     }
   }
@@ -2896,6 +2905,7 @@ function buildQueue(exercises, mode, cfg) {
           q.push({
             exId: ex.id, name: ex.name, reps: getReps(ex), unit: ex.unit, equipment: ex.equipment,
             round: s + 1, setNum: q.length + 1, groupLabel: 'Group ' + (gi + 1),
+            positionLabel: `ROUND ${s + 1}/${sets} GROUP ${gi + 1}/${groups.length}`,
           });
         });
       }
@@ -2903,10 +2913,14 @@ function buildQueue(exercises, mode, cfg) {
   }
 
   if (mode === 'addon') {
-    for (let round = 1; round <= exercises.length; round++) {
+    const rounds = exercises.length;
+    for (let round = 1; round <= rounds; round++) {
       for (let i = 0; i < round; i++) {
         const ex = exercises[i];
-        q.push({ exId: ex.id, name: ex.name, reps: getReps(ex), unit: ex.unit, equipment: ex.equipment, round, setNum: q.length + 1 });
+        q.push({
+          exId: ex.id, name: ex.name, reps: getReps(ex), unit: ex.unit, equipment: ex.equipment,
+          round, setNum: q.length + 1, positionLabel: `ROUND ${round}/${rounds}`,
+        });
       }
     }
   }
@@ -3246,7 +3260,7 @@ function ExerciseView({ current, next }) {
     <>
       <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '12px', flexWrap: 'wrap' }}>
         <div className="mono" style={{ fontSize: '11px', color: 'var(--accent)' }}>
-          // NOW {current.round ? '· ROUND ' + current.round : ''} {current.groupLabel ? '· ' + current.groupLabel.toUpperCase() : ''}
+          // NOW {current.positionLabel ? '· ' + current.positionLabel : ''}
         </div>
         <span className="mono" style={{
           fontSize: '10px', padding: '2px 7px', background: equip.color + '22',

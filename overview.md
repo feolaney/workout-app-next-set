@@ -119,7 +119,7 @@ The selected mode determines how `buildQueue(exercises, mode, cfg)` expands sele
 - `addon`: round 1 includes exercise 1, round 2 includes exercises 1 and 2, and so on
 - `manual`: use the user-edited `modeConfig.manualQueue`
 
-Each queue item carries enough display data for the active workout: exercise id/name, reps or seconds, unit, equipment, round/set metadata, and total set count.
+Each queue item carries enough display data for the active workout: exercise id/name, reps or seconds, unit, equipment, round/set metadata, total set count, and a `positionLabel` used to show the current set/round/group with totals.
 
 ## Active Workout Behavior
 
