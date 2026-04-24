@@ -117,9 +117,18 @@ const MODES = [
 
 const MODE_LABELS = MODES.reduce((acc, m) => ({ ...acc, [m.key]: m.label }), {});
 
-const APP_VERSION = '2.5';
+const APP_VERSION = '2.6';
 
 const APP_VERSION_HISTORY = [
+  {
+    version: '2.6',
+    date: '2026-04-24',
+    type: 'Feature / UI',
+    changes: [
+      'Expanded the active workout upcoming preview to show as many smaller upcoming items as fit below the primary up-next card.',
+      'Showed the smaller upcoming preview during exercises, short rests, and long rests, including long-rest markers while omitting short rests.',
+    ],
+  },
   {
     version: '2.5',
     date: '2026-04-24',
@@ -171,6 +180,8 @@ const APP_VERSION_HISTORY = [
 const SAFE_TOP_16 = 'calc(16px + env(safe-area-inset-top, 0px))';
 const SAFE_TOP_20 = 'calc(20px + env(safe-area-inset-top, 0px))';
 const SAFE_TOP_24 = 'calc(24px + env(safe-area-inset-top, 0px))';
+const UPCOMING_PREVIEW_GAP = 6;
+const UPCOMING_PREVIEW_ROW_HEIGHT = 26;
 
 // ============ COLOR PALETTES ============
 // Each palette defines 6 key colors that get applied as CSS variables across the app.
@@ -3135,6 +3146,27 @@ function buildQueue(exercises, mode, cfg) {
   return q.map((item, i) => ({ ...item, totalSets: q.length }));
 }
 
+function isLongRestAfterIndex(queueIndex, queueLength, restConfig) {
+  const longEvery = Number(restConfig?.longEvery) || 0;
+  return (
+    restConfig?.type === 'interval' &&
+    longEvery > 0 &&
+    queueIndex < queueLength - 1 &&
+    (queueIndex + 1) % longEvery === 0
+  );
+}
+
+function buildUpcomingTimeline(queue, startIdx, restConfig) {
+  const items = [];
+  for (let i = startIdx; i < queue.length; i++) {
+    items.push({ type: 'exercise', item: queue[i], queueIndex: i, key: `exercise-${i}` });
+    if (isLongRestAfterIndex(i, queue.length, restConfig)) {
+      items.push({ type: 'longRest', duration: restConfig.long, queueIndex: i, key: `long-rest-${i}` });
+    }
+  }
+  return items;
+}
+
 function WorkoutMenu({ onClose, currentEntry, findMatchingFavorite, onFavoriteToggle, onEdit }) {
   const isFavorited = currentEntry && findMatchingFavorite && !!findMatchingFavorite(currentEntry);
 
@@ -3218,13 +3250,13 @@ function ActiveWorkout({ queue, idx, setIdx, restConfig, onExit, onEdit, onCompl
   const [namingEntry, setNamingEntry] = useState(null);
   const startRef = useRef(Date.now());
   const intervalRef = useRef(null);
+  const contentRef = useRef(null);
 
   const current = queue[idx];
   const next = queue[idx + 1];
-  // The 2 items after "next" — only shown during long rest
-  const afterNext = [queue[idx + 2], queue[idx + 3]].filter(Boolean);
+  const upcomingAfterNext = buildUpcomingTimeline(queue, idx + 1, restConfig).slice(1);
   // Is the current/pending rest a long rest?
-  const isLongRest = restConfig.type === 'interval' && (idx + 1) % restConfig.longEvery === 0;
+  const isLongRest = isLongRestAfterIndex(idx, queue.length, restConfig);
 
   useEffect(() => {
     const t = setInterval(() => setElapsed(Math.floor((Date.now() - startRef.current) / 1000)), 1000);
@@ -3273,7 +3305,7 @@ function ActiveWorkout({ queue, idx, setIdx, restConfig, onExit, onEdit, onCompl
       advance();
       return;
     }
-    const isLong = restConfig.type === 'interval' && (idx + 1) % restConfig.longEvery === 0;
+    const isLong = isLongRestAfterIndex(idx, queue.length, restConfig);
     const duration = isLong ? restConfig.long : restConfig.short;
     setRestRemaining(duration);
     setPhase('rest');
@@ -3363,11 +3395,11 @@ function ActiveWorkout({ queue, idx, setIdx, restConfig, onExit, onEdit, onCompl
         />
       )}
 
-      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center', padding: 'var(--active-content-y) var(--active-content-x)' }}>
+      <div ref={contentRef} style={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center', padding: 'var(--active-content-y) var(--active-content-x)', position: 'relative' }}>
         {phase === 'exercise' ? (
-          <ExerciseView current={current} next={next} />
+          <ExerciseView current={current} next={next} upcomingItems={upcomingAfterNext} contentRef={contentRef} />
         ) : (
-          <RestView remaining={restRemaining} next={next} afterNext={afterNext} isLongRest={isLongRest} />
+          <RestView remaining={restRemaining} next={next} upcomingItems={upcomingAfterNext} contentRef={contentRef} isLongRest={isLongRest} />
         )}
       </div>
 
@@ -3410,9 +3442,8 @@ function ActiveWorkout({ queue, idx, setIdx, restConfig, onExit, onEdit, onCompl
   );
 }
 
-function ExerciseView({ current, next }) {
+function ExerciseView({ current, next, upcomingItems = [], contentRef }) {
   const equip = EQUIP[current.equipment] || EQUIP.bodyweight;
-  const nextEquip = next ? (EQUIP[next.equipment] || EQUIP.bodyweight) : null;
   const isTimed = current.unit === 'sec';
 
   // Timer state: 'idle' (pre-start), 'prep' (3-2-1 countdown), 'running' (counting down), 'overtime' (counting up after 0)
@@ -3501,19 +3532,147 @@ function ExerciseView({ current, next }) {
         </div>
       )}
 
-      {next && (
-        <div style={{ padding: '14px 16px', background: 'var(--surface)', border: '1px solid #222', borderRadius: '2px' }}>
-          <div className="mono" style={{ fontSize: '10px', color: '#666', marginBottom: '4px' }}>// UP NEXT</div>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '8px' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', minWidth: 0, flex: 1 }}>
-              <span className="mono" style={{
-                fontSize: '9px', padding: '2px 5px', background: nextEquip.color + '22',
-                color: nextEquip.color, borderRadius: '2px', fontWeight: 700, flexShrink: 0,
-              }}>{nextEquip.label}</span>
-              <div style={{ fontSize: '14px', color: '#AAA', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{next.name}</div>
-            </div>
-            <div className="mono" style={{ fontSize: '12px', color: 'var(--accent)', flexShrink: 0 }}>{next.reps} {next.unit}</div>
+      <UpNextStack
+        next={next}
+        upcomingItems={upcomingItems}
+        contentRef={contentRef}
+        label="// UP NEXT"
+        labelColor="#666"
+        borderColor="#222"
+        nameColor="#AAA"
+      />
+    </>
+  );
+}
+
+function formatPreviewDuration(totalSeconds) {
+  const seconds = Number(totalSeconds) || 0;
+  const mins = Math.floor(seconds / 60);
+  const secs = seconds % 60;
+  return mins > 0 ? `${mins}:${String(secs).padStart(2, '0')}` : `${secs}s`;
+}
+
+function UpNextStack({ next, upcomingItems = [], contentRef, label, labelColor, borderColor, nameColor, nameWeight = 400 }) {
+  const cardRef = React.useRef(null);
+  const [layout, setLayout] = React.useState({ top: 0, left: 0, width: 0, count: 0 });
+  const nextEquip = next ? (EQUIP[next.equipment] || EQUIP.bodyweight) : EQUIP.bodyweight;
+
+  const measureLayout = React.useCallback(() => {
+    const card = cardRef.current;
+    const content = contentRef?.current;
+    if (!card || !content || upcomingItems.length === 0) {
+      setLayout(prev => prev.count === 0 ? prev : { ...prev, count: 0 });
+      return;
+    }
+
+    const cardRect = card.getBoundingClientRect();
+    const contentRect = content.getBoundingClientRect();
+    const available = contentRect.bottom - cardRect.bottom - UPCOMING_PREVIEW_GAP - 2;
+    const count = Math.max(0, Math.min(upcomingItems.length, Math.floor(available / UPCOMING_PREVIEW_ROW_HEIGHT)));
+    const nextLayout = {
+      top: Math.round(cardRect.bottom - contentRect.top + UPCOMING_PREVIEW_GAP),
+      left: Math.round(cardRect.left - contentRect.left),
+      width: Math.round(cardRect.width),
+      count,
+    };
+
+    setLayout(prev => (
+      prev.top === nextLayout.top &&
+      prev.left === nextLayout.left &&
+      prev.width === nextLayout.width &&
+      prev.count === nextLayout.count
+        ? prev
+        : nextLayout
+    ));
+  }, [contentRef, next?.exId, next?.setNum, next?.name, upcomingItems.length]);
+
+  React.useLayoutEffect(() => {
+    measureLayout();
+  });
+
+  React.useEffect(() => {
+    if (typeof window === 'undefined') return undefined;
+    const card = cardRef.current;
+    const content = contentRef?.current;
+    let frame = window.requestAnimationFrame(measureLayout);
+    const onResize = () => measureLayout();
+    window.addEventListener('resize', onResize);
+
+    let observer = null;
+    if (typeof ResizeObserver !== 'undefined') {
+      observer = new ResizeObserver(measureLayout);
+      if (content) observer.observe(content);
+      if (card) observer.observe(card);
+    }
+
+    return () => {
+      window.cancelAnimationFrame(frame);
+      window.removeEventListener('resize', onResize);
+      if (observer) observer.disconnect();
+    };
+  }, [contentRef, measureLayout]);
+
+  if (!next) return null;
+
+  const visibleItems = upcomingItems.slice(0, layout.count);
+
+  return (
+    <>
+      <div ref={cardRef} style={{ padding: '14px 16px', background: 'var(--surface)', border: `1px solid ${borderColor}`, borderRadius: '2px' }}>
+        <div className="mono" style={{ fontSize: '10px', color: labelColor, marginBottom: '4px' }}>{label}</div>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '8px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', minWidth: 0, flex: 1 }}>
+            <span className="mono" style={{
+              fontSize: '9px', padding: '2px 5px', background: nextEquip.color + '22',
+              color: nextEquip.color, borderRadius: '2px', fontWeight: 700, flexShrink: 0,
+            }}>{nextEquip.label}</span>
+            <div style={{ fontSize: '14px', color: nameColor, fontWeight: nameWeight, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{next.name}</div>
           </div>
+          <div className="mono" style={{ fontSize: '12px', color: 'var(--accent)', flexShrink: 0 }}>{next.reps} {next.unit}</div>
+        </div>
+      </div>
+
+      {visibleItems.length > 0 && layout.width > 0 && (
+        <div
+          style={{
+            position: 'absolute',
+            top: `${layout.top}px`,
+            left: `${layout.left}px`,
+            width: `${layout.width}px`,
+            height: `${visibleItems.length * UPCOMING_PREVIEW_ROW_HEIGHT}px`,
+            overflow: 'hidden',
+            pointerEvents: 'none',
+          }}
+        >
+          {visibleItems.map((upcoming, i) => {
+            const isRest = upcoming.type === 'longRest';
+            const item = upcoming.item;
+            const eq = item ? (EQUIP[item.equipment] || EQUIP.bodyweight) : null;
+            const tagColor = isRest ? 'var(--accent2)' : eq.color;
+            const opacity = Math.max(0.18, 0.56 - i * 0.07);
+            return (
+              <div key={upcoming.key} style={{
+                height: `${UPCOMING_PREVIEW_ROW_HEIGHT}px`,
+                display: 'flex', alignItems: 'center', gap: '6px',
+                padding: '3px 12px', opacity,
+              }}>
+                <span className="mono" style={{ fontSize: '9px', color: '#666', width: '14px', flexShrink: 0 }}>
+                  {i + 2}
+                </span>
+                <span className="mono" style={{
+                  fontSize: '8px', padding: '1px 4px', background: isRest ? 'rgba(255,255,255,0.06)' : tagColor + '22',
+                  color: tagColor, borderRadius: '2px', fontWeight: 700, flexShrink: 0,
+                }}>{isRest ? 'REST' : eq.label}</span>
+                <div style={{
+                  flex: 1, fontSize: '11px', color: isRest ? 'var(--accent2)' : '#888', minWidth: 0,
+                  overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+                }}>{isRest ? 'Long rest' : item.name}</div>
+                <div className="mono" style={{ fontSize: '10px', color: '#666', flexShrink: 0 }}>
+                  {isRest ? formatPreviewDuration(upcoming.duration) : `${item.reps} ${item.unit}`}
+                </div>
+              </div>
+            );
+          })}
         </div>
       )}
     </>
@@ -3589,12 +3748,9 @@ function TimedDisplay({ phase, prepValue, timerValue, target, onStart }) {
   );
 }
 
-function RestView({ remaining, next, afterNext = [], isLongRest = false }) {
+function RestView({ remaining, next, upcomingItems = [], contentRef, isLongRest = false }) {
   const mins = Math.floor(remaining / 60);
   const secs = remaining % 60;
-  const nextEquip = next ? (EQUIP[next.equipment] || EQUIP.bodyweight) : null;
-  // Only show the additional peek during long rests
-  const showExtras = isLongRest && afterNext.length > 0;
 
   return (
     <>
@@ -3613,49 +3769,16 @@ function RestView({ remaining, next, afterNext = [], isLongRest = false }) {
           {mins > 0 ? mins + ':' + String(secs).padStart(2, '0') : secs}
         </div>
       </div>
-      {next && (
-        <div style={{ padding: '14px 16px', background: 'var(--surface)', border: '1px solid var(--accent2)', borderRadius: '2px' }}>
-          <div className="mono" style={{ fontSize: '10px', color: 'var(--accent2)', marginBottom: '4px' }}>// COMING UP</div>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '8px' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', minWidth: 0, flex: 1 }}>
-              <span className="mono" style={{
-                fontSize: '9px', padding: '2px 5px', background: nextEquip.color + '22',
-                color: nextEquip.color, borderRadius: '2px', fontWeight: 700, flexShrink: 0,
-              }}>{nextEquip.label}</span>
-              <div style={{ fontSize: '14px', color: 'var(--fg)', fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{next.name}</div>
-            </div>
-            <div className="mono" style={{ fontSize: '12px', color: 'var(--accent)', flexShrink: 0 }}>{next.reps} {next.unit}</div>
-          </div>
-        </div>
-      )}
-      {showExtras && (
-        <div style={{ marginTop: '6px', paddingLeft: '4px' }}>
-          {afterNext.map((item, i) => {
-            const eq = EQUIP[item.equipment] || EQUIP.bodyweight;
-            return (
-              <div key={i} style={{
-                display: 'flex', alignItems: 'center', gap: '6px',
-                padding: '4px 12px', opacity: 0.5 - i * 0.1,
-              }}>
-                <span className="mono" style={{ fontSize: '9px', color: '#666', width: '14px', flexShrink: 0 }}>
-                  {i + 2}
-                </span>
-                <span className="mono" style={{
-                  fontSize: '8px', padding: '1px 4px', background: eq.color + '22',
-                  color: eq.color, borderRadius: '2px', fontWeight: 700, flexShrink: 0,
-                }}>{eq.label}</span>
-                <div style={{
-                  flex: 1, fontSize: '11px', color: '#888', minWidth: 0,
-                  overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
-                }}>{item.name}</div>
-                <div className="mono" style={{ fontSize: '10px', color: '#666', flexShrink: 0 }}>
-                  {item.reps} {item.unit}
-                </div>
-              </div>
-            );
-          })}
-        </div>
-      )}
+      <UpNextStack
+        next={next}
+        upcomingItems={upcomingItems}
+        contentRef={contentRef}
+        label="// COMING UP"
+        labelColor="var(--accent2)"
+        borderColor="var(--accent2)"
+        nameColor="var(--fg)"
+        nameWeight={600}
+      />
     </>
   );
 }

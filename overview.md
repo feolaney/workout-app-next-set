@@ -125,6 +125,8 @@ The selected mode determines how `buildQueue(exercises, mode, cfg)` expands sele
 
 Each queue item carries enough display data for the active workout: exercise id/name, reps or seconds, unit, equipment, round/set metadata, total set count, and a `positionLabel` used to show the current set/round/group with totals.
 
+The active workout preview derives an upcoming timeline from the queue at render time. The persisted queue remains exercise-only, but the preview inserts long-rest markers for interval workouts when the rest would occur after a future exercise. Short rests are intentionally omitted from this preview.
+
 ## Active Workout Behavior
 
 `ActiveWorkout` owns the live workout phase:
@@ -143,6 +145,8 @@ Rest modes:
 - `interval`: use short rest normally and long rest every `longEvery` sets
 
 Completing the final item writes a workout entry into `history` and moves to `done`.
+
+Exercise, short-rest, and long-rest views all show the primary next exercise plus a smaller upcoming preview when space allows. The smaller rows are measured against the remaining active content area so they fill available space without making the screen scroll.
 
 ## Favorites And History
 
