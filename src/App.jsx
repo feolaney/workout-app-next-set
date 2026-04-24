@@ -3576,7 +3576,7 @@ function BottomBar({ disabled, onNext, label, primary }) {
       window.removeEventListener('resize', checkScroll);
       resizeObserver.disconnect();
     };
-  }, []);
+  }, [disabled]);
 
   const bgColor = disabled ? '#1A1A1A' : (primary ? 'var(--accent2)' : 'var(--accent)');
   const fgColor = disabled ? '#444' : '#0A0A0A';
