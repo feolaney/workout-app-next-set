@@ -117,9 +117,18 @@ const MODES = [
 
 const MODE_LABELS = MODES.reduce((acc, m) => ({ ...acc, [m.key]: m.label }), {});
 
-const APP_VERSION = '2.6';
+const APP_VERSION = '2.7';
 
 const APP_VERSION_HISTORY = [
+  {
+    version: '2.7',
+    date: '2026-04-24',
+    type: 'UI',
+    changes: [
+      'Kept up-next reps and long-rest times close to workout names on wide screens.',
+      'Aligned up-next values in a compact fixed column across the preview rows.',
+    ],
+  },
   {
     version: '2.6',
     date: '2026-04-24',
@@ -182,6 +191,9 @@ const SAFE_TOP_20 = 'calc(20px + env(safe-area-inset-top, 0px))';
 const SAFE_TOP_24 = 'calc(24px + env(safe-area-inset-top, 0px))';
 const UPCOMING_PREVIEW_GAP = 6;
 const UPCOMING_PREVIEW_ROW_HEIGHT = 26;
+const UPCOMING_TAG_COL_WIDTH = '34px';
+const UPCOMING_NAME_COL_WIDTH = 'clamp(140px, 24vw, 300px)';
+const UPCOMING_VALUE_COL_WIDTH = '70px';
 
 // ============ COLOR PALETTES ============
 // Each palette defines 6 key colors that get applied as CSS variables across the app.
@@ -3615,20 +3627,20 @@ function UpNextStack({ next, upcomingItems = [], contentRef, label, labelColor, 
   if (!next) return null;
 
   const visibleItems = upcomingItems.slice(0, layout.count);
+  const primaryGridColumns = `${UPCOMING_TAG_COL_WIDTH} minmax(0, ${UPCOMING_NAME_COL_WIDTH}) ${UPCOMING_VALUE_COL_WIDTH}`;
+  const previewGridColumns = `14px ${UPCOMING_TAG_COL_WIDTH} minmax(0, ${UPCOMING_NAME_COL_WIDTH}) ${UPCOMING_VALUE_COL_WIDTH}`;
 
   return (
     <>
       <div ref={cardRef} style={{ padding: '14px 16px', background: 'var(--surface)', border: `1px solid ${borderColor}`, borderRadius: '2px' }}>
         <div className="mono" style={{ fontSize: '10px', color: labelColor, marginBottom: '4px' }}>{label}</div>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '8px' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', minWidth: 0, flex: 1 }}>
-            <span className="mono" style={{
-              fontSize: '9px', padding: '2px 5px', background: nextEquip.color + '22',
-              color: nextEquip.color, borderRadius: '2px', fontWeight: 700, flexShrink: 0,
-            }}>{nextEquip.label}</span>
-            <div style={{ fontSize: '14px', color: nameColor, fontWeight: nameWeight, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{next.name}</div>
-          </div>
-          <div className="mono" style={{ fontSize: '12px', color: 'var(--accent)', flexShrink: 0 }}>{next.reps} {next.unit}</div>
+        <div style={{ display: 'grid', gridTemplateColumns: primaryGridColumns, alignItems: 'center', columnGap: '8px', width: 'fit-content', maxWidth: '100%' }}>
+          <span className="mono" style={{
+            width: '100%', fontSize: '9px', padding: '2px 5px', background: nextEquip.color + '22',
+            color: nextEquip.color, borderRadius: '2px', fontWeight: 700, textAlign: 'center',
+          }}>{nextEquip.label}</span>
+          <div style={{ fontSize: '14px', color: nameColor, fontWeight: nameWeight, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{next.name}</div>
+          <div className="mono" style={{ fontSize: '12px', color: 'var(--accent)', textAlign: 'right', whiteSpace: 'nowrap' }}>{next.reps} {next.unit}</div>
         </div>
       </div>
 
@@ -3653,21 +3665,21 @@ function UpNextStack({ next, upcomingItems = [], contentRef, label, labelColor, 
             return (
               <div key={upcoming.key} style={{
                 height: `${UPCOMING_PREVIEW_ROW_HEIGHT}px`,
-                display: 'flex', alignItems: 'center', gap: '6px',
+                display: 'grid', gridTemplateColumns: previewGridColumns, alignItems: 'center', columnGap: '6px', width: 'fit-content', maxWidth: '100%',
                 padding: '3px 12px', opacity,
               }}>
                 <span className="mono" style={{ fontSize: '9px', color: '#666', width: '14px', flexShrink: 0 }}>
                   {i + 2}
                 </span>
                 <span className="mono" style={{
-                  fontSize: '8px', padding: '1px 4px', background: isRest ? 'rgba(255,255,255,0.06)' : tagColor + '22',
-                  color: tagColor, borderRadius: '2px', fontWeight: 700, flexShrink: 0,
+                  width: '100%', fontSize: '8px', padding: '1px 4px', background: isRest ? 'rgba(255,255,255,0.06)' : tagColor + '22',
+                  color: tagColor, borderRadius: '2px', fontWeight: 700, textAlign: 'center',
                 }}>{isRest ? 'REST' : eq.label}</span>
                 <div style={{
-                  flex: 1, fontSize: '11px', color: isRest ? 'var(--accent2)' : '#888', minWidth: 0,
+                  fontSize: '11px', color: isRest ? 'var(--accent2)' : '#888', minWidth: 0,
                   overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
                 }}>{isRest ? 'Long rest' : item.name}</div>
-                <div className="mono" style={{ fontSize: '10px', color: '#666', flexShrink: 0 }}>
+                <div className="mono" style={{ fontSize: '10px', color: '#666', textAlign: 'right', whiteSpace: 'nowrap' }}>
                   {isRest ? formatPreviewDuration(upcoming.duration) : `${item.reps} ${item.unit}`}
                 </div>
               </div>

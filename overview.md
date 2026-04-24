@@ -146,7 +146,7 @@ Rest modes:
 
 Completing the final item writes a workout entry into `history` and moves to `done`.
 
-Exercise, short-rest, and long-rest views all show the primary next exercise plus a smaller upcoming preview when space allows. The smaller rows are measured against the remaining active content area so they fill available space without making the screen scroll.
+Exercise, short-rest, and long-rest views all show the primary next exercise plus a smaller upcoming preview when space allows. The smaller rows are measured against the remaining active content area so they fill available space without making the screen scroll. Up-next rows use a compact grid with fixed tag and value columns so reps and rest times stay near the names and line up vertically on wide screens.
 
 ## Favorites And History
 
