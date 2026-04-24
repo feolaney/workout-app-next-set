@@ -1,0 +1,3618 @@
+import React, { useState, useEffect, useRef } from 'react';
+import { ChevronLeft, ChevronDown, ChevronRight, Play, SkipForward, SkipBack, Check, Plus, Minus, X, Dumbbell, Hexagon, GripVertical, History, Shuffle, Target, Layers, TrendingUp, Info, Weight, ArrowUpToLine, Star, Settings, Palette, Trash2, Pencil } from 'lucide-react';
+
+// ============ EQUIPMENT TAGS ============
+const EQUIP = {
+  bodyweight: { key: 'bodyweight', label: 'BW', color: '#888', name: 'BODYWEIGHT' },
+  weights: { key: 'weights', label: 'WT', color: '#FF4D8F', icon: Weight, name: 'WEIGHTS' },
+  pullup: { key: 'pullup', label: 'BAR', color: '#7C5CFF', icon: ArrowUpToLine, name: 'PULL-UP BAR' },
+};
+
+// ============ DEFAULT EXERCISE LIBRARY ============
+const DEFAULT_EXERCISES = {
+  upper: [
+    { id: 'u1', name: 'Push-ups', category: 'upper', equipment: 'bodyweight', unit: 'reps', min: 10, max: 50, default: 20 },
+    { id: 'u2', name: 'Diamond Push-ups', category: 'upper', equipment: 'bodyweight', unit: 'reps', min: 10, max: 30, default: 12 },
+    { id: 'u3', name: 'Pike Push-ups', category: 'upper', equipment: 'bodyweight', unit: 'reps', min: 10, max: 30, default: 12 },
+    { id: 'u4', name: 'Decline Push-ups', category: 'upper', equipment: 'bodyweight', unit: 'reps', min: 10, max: 30, default: 15 },
+    { id: 'u5', name: 'Wide Push-ups', category: 'upper', equipment: 'bodyweight', unit: 'reps', min: 10, max: 40, default: 15 },
+    { id: 'u6', name: 'Dips (Chair/Bench)', category: 'upper', equipment: 'bodyweight', unit: 'reps', min: 10, max: 30, default: 15 },
+    { id: 'u7', name: 'Shoulder Taps', category: 'upper', equipment: 'bodyweight', unit: 'reps', min: 10, max: 30, default: 20 },
+    { id: 'u8', name: 'Pseudo Planche Push-ups', category: 'upper', equipment: 'bodyweight', unit: 'reps', min: 10, max: 25, default: 10 },
+    { id: 'u9', name: 'Archer Push-ups', category: 'upper', equipment: 'bodyweight', unit: 'reps', min: 10, max: 20, default: 10 },
+    { id: 'u10', name: 'Plank to Push-up', category: 'upper', equipment: 'bodyweight', unit: 'reps', min: 10, max: 30, default: 15 },
+    { id: 'u-w1', name: 'Dumbbell Curls', category: 'upper', equipment: 'weights', unit: 'reps', min: 5, max: 20, default: 12 },
+    { id: 'u-w2', name: 'Hammer Curls', category: 'upper', equipment: 'weights', unit: 'reps', min: 5, max: 20, default: 12 },
+    { id: 'u-w3', name: 'Overhead Press', category: 'upper', equipment: 'weights', unit: 'reps', min: 5, max: 20, default: 10 },
+    { id: 'u-w4', name: 'Lateral Raises', category: 'upper', equipment: 'weights', unit: 'reps', min: 5, max: 20, default: 12 },
+    { id: 'u-w5', name: 'Front Raises', category: 'upper', equipment: 'weights', unit: 'reps', min: 5, max: 20, default: 12 },
+    { id: 'u-w6', name: 'Bent-Over Rows', category: 'upper', equipment: 'weights', unit: 'reps', min: 5, max: 20, default: 12 },
+    { id: 'u-w7', name: 'Single-Arm Row', category: 'upper', equipment: 'weights', unit: 'reps', min: 5, max: 20, default: 10 },
+    { id: 'u-w8', name: 'Tricep Kickbacks', category: 'upper', equipment: 'weights', unit: 'reps', min: 5, max: 20, default: 12 },
+    { id: 'u-w9', name: 'Dumbbell Floor Press', category: 'upper', equipment: 'weights', unit: 'reps', min: 5, max: 20, default: 10 },
+    { id: 'u-w10', name: 'Upright Rows', category: 'upper', equipment: 'weights', unit: 'reps', min: 5, max: 20, default: 12 },
+    { id: 'u-w11', name: 'Arnold Press', category: 'upper', equipment: 'weights', unit: 'reps', min: 5, max: 20, default: 10 },
+    { id: 'u-w12', name: 'Renegade Rows', category: 'upper', equipment: 'weights', unit: 'reps', min: 5, max: 20, default: 12 },
+    { id: 'u-p1', name: 'Pull-ups', category: 'upper', equipment: 'pullup', unit: 'reps', min: 5, max: 20, default: 8 },
+    { id: 'u-p2', name: 'Chin-ups', category: 'upper', equipment: 'pullup', unit: 'reps', min: 5, max: 20, default: 8 },
+    { id: 'u-p3', name: 'Wide-Grip Pull-ups', category: 'upper', equipment: 'pullup', unit: 'reps', min: 5, max: 15, default: 6 },
+    { id: 'u-p4', name: 'Commando Pull-ups', category: 'upper', equipment: 'pullup', unit: 'reps', min: 5, max: 15, default: 6 },
+    { id: 'u-p5', name: 'Dead Hang', category: 'upper', equipment: 'pullup', unit: 'sec', min: 15, max: 90, default: 30 },
+    { id: 'u-p6', name: 'Negative Pull-ups', category: 'upper', equipment: 'pullup', unit: 'reps', min: 5, max: 15, default: 6 },
+    { id: 'u-p7', name: 'Scapular Pull-ups', category: 'upper', equipment: 'pullup', unit: 'reps', min: 5, max: 20, default: 10 },
+    { id: 'u-p8', name: 'Archer Pull-ups', category: 'upper', equipment: 'pullup', unit: 'reps', min: 5, max: 15, default: 5 },
+  ],
+  lower: [
+    { id: 'l1', name: 'Bodyweight Squats', category: 'lower', equipment: 'bodyweight', unit: 'reps', min: 10, max: 30, default: 20 },
+    { id: 'l2', name: 'Lunges', category: 'lower', equipment: 'bodyweight', unit: 'reps', min: 10, max: 30, default: 20 },
+    { id: 'l3', name: 'Reverse Lunges', category: 'lower', equipment: 'bodyweight', unit: 'reps', min: 10, max: 30, default: 16 },
+    { id: 'l4', name: 'Bulgarian Split Squats', category: 'lower', equipment: 'bodyweight', unit: 'reps', min: 10, max: 30, default: 12 },
+    { id: 'l5', name: 'Jump Squats', category: 'lower', equipment: 'bodyweight', unit: 'reps', min: 10, max: 30, default: 15 },
+    { id: 'l6', name: 'Pistol Squats', category: 'lower', equipment: 'bodyweight', unit: 'reps', min: 10, max: 20, default: 10 },
+    { id: 'l7', name: 'Calf Raises', category: 'lower', equipment: 'bodyweight', unit: 'reps', min: 10, max: 30, default: 25 },
+    { id: 'l8', name: 'Wall Sit', category: 'lower', equipment: 'bodyweight', unit: 'sec', min: 20, max: 120, default: 45 },
+    { id: 'l9', name: 'Glute Bridges', category: 'lower', equipment: 'bodyweight', unit: 'reps', min: 10, max: 30, default: 20 },
+    { id: 'l10', name: 'Single-Leg Glute Bridge', category: 'lower', equipment: 'bodyweight', unit: 'reps', min: 10, max: 25, default: 12 },
+    { id: 'l11', name: 'Step-ups', category: 'lower', equipment: 'bodyweight', unit: 'reps', min: 10, max: 30, default: 16 },
+    { id: 'l12', name: 'Curtsy Lunges', category: 'lower', equipment: 'bodyweight', unit: 'reps', min: 10, max: 30, default: 16 },
+    { id: 'l13', name: 'Broad Jumps', category: 'lower', equipment: 'bodyweight', unit: 'reps', min: 10, max: 25, default: 10 },
+    { id: 'l-w1', name: 'Goblet Squats', category: 'lower', equipment: 'weights', unit: 'reps', min: 5, max: 20, default: 15 },
+    { id: 'l-w2', name: 'Weighted Lunges', category: 'lower', equipment: 'weights', unit: 'reps', min: 5, max: 20, default: 12 },
+    { id: 'l-w3', name: 'Romanian Deadlifts', category: 'lower', equipment: 'weights', unit: 'reps', min: 5, max: 20, default: 12 },
+    { id: 'l-w4', name: 'Sumo Deadlifts', category: 'lower', equipment: 'weights', unit: 'reps', min: 5, max: 20, default: 10 },
+    { id: 'l-w5', name: 'Dumbbell Step-ups', category: 'lower', equipment: 'weights', unit: 'reps', min: 5, max: 20, default: 12 },
+    { id: 'l-w6', name: 'Weighted Calf Raises', category: 'lower', equipment: 'weights', unit: 'reps', min: 5, max: 20, default: 20 },
+    { id: 'l-w7', name: 'Weighted Bulgarian Splits', category: 'lower', equipment: 'weights', unit: 'reps', min: 5, max: 20, default: 10 },
+    { id: 'l-w8', name: 'Farmer Carries', category: 'lower', equipment: 'weights', unit: 'sec', min: 20, max: 90, default: 45 },
+    { id: 'l-w9', name: 'Kettlebell Swings', category: 'lower', equipment: 'weights', unit: 'reps', min: 5, max: 20, default: 15 },
+    { id: 'l-w10', name: 'Front Squats', category: 'lower', equipment: 'weights', unit: 'reps', min: 5, max: 20, default: 10 },
+  ],
+  core: [
+    { id: 'c1', name: 'Plank', category: 'core', equipment: 'bodyweight', unit: 'sec', min: 20, max: 180, default: 60 },
+    { id: 'c2', name: 'Side Plank', category: 'core', equipment: 'bodyweight', unit: 'sec', min: 20, max: 120, default: 45 },
+    { id: 'c3', name: 'Sit-ups', category: 'core', equipment: 'bodyweight', unit: 'reps', min: 10, max: 30, default: 20 },
+    { id: 'c4', name: 'Crunches', category: 'core', equipment: 'bodyweight', unit: 'reps', min: 10, max: 30, default: 25 },
+    { id: 'c5', name: 'Russian Twists', category: 'core', equipment: 'bodyweight', unit: 'reps', min: 10, max: 30, default: 30 },
+    { id: 'c6', name: 'Leg Raises', category: 'core', equipment: 'bodyweight', unit: 'reps', min: 10, max: 25, default: 15 },
+    { id: 'c7', name: 'Mountain Climbers', category: 'core', equipment: 'bodyweight', unit: 'reps', min: 10, max: 30, default: 30 },
+    { id: 'c8', name: 'Dead Bug', category: 'core', equipment: 'bodyweight', unit: 'reps', min: 10, max: 30, default: 16 },
+    { id: 'c9', name: 'Hollow Body Hold', category: 'core', equipment: 'bodyweight', unit: 'sec', min: 15, max: 90, default: 30 },
+    { id: 'c10', name: 'Bicycle Crunches', category: 'core', equipment: 'bodyweight', unit: 'reps', min: 10, max: 30, default: 24 },
+    { id: 'c11', name: 'Flutter Kicks', category: 'core', equipment: 'bodyweight', unit: 'reps', min: 10, max: 30, default: 30 },
+    { id: 'c12', name: 'V-ups', category: 'core', equipment: 'bodyweight', unit: 'reps', min: 10, max: 25, default: 12 },
+    { id: 'c13', name: 'Bird Dog', category: 'core', equipment: 'bodyweight', unit: 'reps', min: 10, max: 25, default: 16 },
+    { id: 'c14', name: 'Superman', category: 'core', equipment: 'bodyweight', unit: 'reps', min: 10, max: 25, default: 15 },
+    { id: 'c-w1', name: 'Weighted Russian Twists', category: 'core', equipment: 'weights', unit: 'reps', min: 5, max: 20, default: 20 },
+    { id: 'c-w2', name: 'Weighted Sit-ups', category: 'core', equipment: 'weights', unit: 'reps', min: 5, max: 20, default: 15 },
+    { id: 'c-w3', name: 'Turkish Get-ups', category: 'core', equipment: 'weights', unit: 'reps', min: 5, max: 15, default: 6 },
+    { id: 'c-w4', name: 'Weighted Plank', category: 'core', equipment: 'weights', unit: 'sec', min: 15, max: 90, default: 30 },
+    { id: 'c-w5', name: 'Woodchoppers', category: 'core', equipment: 'weights', unit: 'reps', min: 5, max: 20, default: 12 },
+    { id: 'c-w6', name: 'Suitcase Carries', category: 'core', equipment: 'weights', unit: 'sec', min: 20, max: 90, default: 45 },
+    { id: 'c-p1', name: 'Hanging Knee Raises', category: 'core', equipment: 'pullup', unit: 'reps', min: 5, max: 20, default: 12 },
+    { id: 'c-p2', name: 'Hanging Leg Raises', category: 'core', equipment: 'pullup', unit: 'reps', min: 5, max: 20, default: 10 },
+    { id: 'c-p3', name: 'Toes-to-Bar', category: 'core', equipment: 'pullup', unit: 'reps', min: 5, max: 15, default: 8 },
+    { id: 'c-p4', name: 'L-Sit Hang', category: 'core', equipment: 'pullup', unit: 'sec', min: 10, max: 60, default: 15 },
+    { id: 'c-p5', name: 'Windshield Wipers', category: 'core', equipment: 'pullup', unit: 'reps', min: 5, max: 15, default: 8 },
+  ],
+};
+
+const CATEGORIES = [
+  { key: 'upper', label: 'UPPER', icon: Dumbbell, color: 'var(--accent)' },
+  { key: 'lower', label: 'LOWER', icon: TrendingUp, color: '#FFB800' },
+  { key: 'core', label: 'CORE', icon: Hexagon, color: 'var(--accent2)' },
+];
+
+const MODIFIERS = [
+  { key: 'weights', label: 'WEIGHTS', icon: Weight, color: '#FF4D8F', desc: 'Unlock dumbbell and kettlebell variants' },
+  { key: 'pullup', label: 'PULL-UP BAR', icon: ArrowUpToLine, color: '#7C5CFF', desc: 'Unlock bar and hanging variants' },
+];
+
+const MODES = [
+  { key: 'focus', label: 'FOCUS SETS', desc: 'Complete all sets of one exercise before moving on', icon: Target },
+  { key: 'circuit', label: 'CIRCUIT', desc: 'Cycle through every exercise, then repeat rounds', icon: Shuffle },
+  { key: 'superset', label: 'SUPERSETS', desc: 'Group 2-10 exercises, repeat each group, then next', icon: Layers },
+  { key: 'addon', label: 'ADD-ON', desc: 'Add one exercise each round until all are included', icon: Plus },
+  { key: 'manual', label: 'MANUAL', desc: 'Hand-pick the exact order and repetitions', icon: GripVertical },
+];
+
+const MODE_LABELS = MODES.reduce((acc, m) => ({ ...acc, [m.key]: m.label }), {});
+
+// ============ COLOR PALETTES ============
+// Each palette defines 6 key colors that get applied as CSS variables across the app.
+// - bg:      main background
+// - surface: card/panel background
+// - fg:      primary text color
+// - accent:  primary action / branding accent
+// - accent2: secondary accent (used for "start workout", rest timer, success)
+// - warn:    tertiary accent (weight tags, hot moments)
+const PALETTES = [
+  { id: 'grind',     name: 'GRIND',      bg: '#0A0A0A', surface: '#121212', fg: '#F5F1E8', accent: '#FF4D2E', accent2: '#00D9B2', warn: '#FF4D8F' },
+  { id: 'midnight',  name: 'MIDNIGHT',   bg: '#0B0F1A', surface: '#141A2B', fg: '#E8EEFF', accent: '#5C8AFF', accent2: '#7C5CFF', warn: '#FF6B9D' },
+  { id: 'blood',     name: 'BLOOD',      bg: '#0F0506', surface: '#1A0A0C', fg: '#F5E6E8', accent: '#E63946', accent2: '#F77F00', warn: '#FFCA3A' },
+  { id: 'forest',    name: 'FOREST',     bg: '#0A1410', surface: '#122019', fg: '#E8F5E9', accent: '#52B788', accent2: '#D4A373', warn: '#E63946' },
+  { id: 'concrete',  name: 'CONCRETE',   bg: '#1A1A1A', surface: '#242424', fg: '#E0E0E0', accent: '#FFAB40', accent2: '#40C4FF', warn: '#FF5252' },
+  { id: 'sunset',    name: 'SUNSET',     bg: '#1A0B1F', surface: '#2A1433', fg: '#FFF0E8', accent: '#FF6B35', accent2: '#FFD23F', warn: '#EE4266' },
+  { id: 'arctic',    name: 'ARCTIC',     bg: '#0E1419', surface: '#172026', fg: '#EAF4FB', accent: '#64DFDF', accent2: '#80FFDB', warn: '#FF8FA3' },
+  { id: 'paper',     name: 'PAPER',      bg: '#F5F1E8', surface: '#EDE8DC', fg: '#1A1A1A', accent: '#C1272D', accent2: '#2E5EAA', warn: '#E67E22' },
+  { id: 'neon',      name: 'NEON',       bg: '#060012', surface: '#100022', fg: '#EEE9FF', accent: '#FF00A8', accent2: '#00F0FF', warn: '#FFFC00' },
+  { id: 'mono',      name: 'MONO',       bg: '#0A0A0A', surface: '#181818', fg: '#F5F5F5', accent: '#FFFFFF', accent2: '#AAAAAA', warn: '#888888' },
+];
+
+// Default is GRIND to keep current look
+const DEFAULT_PALETTE_ID = 'grind';
+
+// Palette slot definitions used in the custom editor
+const PALETTE_SLOTS = [
+  { key: 'bg',      label: 'Background',       desc: 'The main app background' },
+  { key: 'surface', label: 'Surface',          desc: 'Cards, panels, inputs' },
+  { key: 'fg',      label: 'Text',             desc: 'Primary text color' },
+  { key: 'accent',  label: 'Primary accent',   desc: 'Main brand color, buttons' },
+  { key: 'accent2', label: 'Secondary accent', desc: 'Start action, success, rest timer' },
+  { key: 'warn',    label: 'Tertiary accent',  desc: 'Weights tag, highlights' },
+];
+
+// Resolve a palette by ID from either presets or user-saved customs
+function resolvePalette(activeId, customPalettes) {
+  const preset = PALETTES.find(p => p.id === activeId);
+  if (preset) return preset;
+  const custom = (customPalettes || []).find(p => p.id === activeId);
+  if (custom) return custom;
+  return PALETTES[0]; // fallback to GRIND
+}
+
+function getBrowserStorage() {
+  try {
+    if (typeof window === 'undefined' || !window.localStorage) return null;
+    return window.localStorage;
+  } catch {
+    return null;
+  }
+}
+
+function safeParseStorageValue(rawValue, fallback) {
+  if (rawValue == null) return fallback;
+  try {
+    return JSON.parse(rawValue);
+  } catch {
+    return fallback;
+  }
+}
+
+const storage = {
+  async get(key, fallback) {
+    try {
+      const browserStorage = getBrowserStorage();
+      if (!browserStorage) return fallback;
+      return safeParseStorageValue(browserStorage.getItem(key), fallback);
+    } catch {
+      return fallback;
+    }
+  },
+  async set(key, value) {
+    try {
+      const browserStorage = getBrowserStorage();
+      if (!browserStorage) return;
+      // Store the same JSON payload shape the app already expects on read.
+      browserStorage.setItem(key, JSON.stringify(value));
+    } catch (e) {
+      console.error('storage set failed', e);
+    }
+  },
+};
+
+// ============ MUSCLE GROUP CLASSIFIER ============
+// Classifies exercises as push/pull/legs/core for "opposing muscle" superset pairing.
+// Pattern-matches against exercise name so we don't have to tag every item by hand.
+function classifyMuscle(ex) {
+  if (ex.category === 'core') return 'core';
+  if (ex.category === 'lower') return 'legs';
+  // upper body: split push vs pull by name patterns
+  const name = ex.name.toLowerCase();
+  const pullPatterns = /pull|chin|row|curl|hang|scapular|commando|archer pull/;
+  const pushPatterns = /push|dip|press|raise|tricep|shoulder tap|plank to|pseudo/;
+  if (pullPatterns.test(name)) return 'pull';
+  if (pushPatterns.test(name)) return 'push';
+  return 'push'; // default for upper body fallback
+}
+
+// Fisher-Yates shuffle (unbiased)
+function shuffleArr(arr) {
+  const a = [...arr];
+  for (let i = a.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [a[i], a[j]] = [a[j], a[i]];
+  }
+  return a;
+}
+
+// Sort exercises grouped by category (upper → lower → core),
+// shuffled within each category
+function shuffleByCategory(exercises) {
+  const order = ['upper', 'lower', 'core'];
+  const byCategory = {};
+  exercises.forEach(ex => {
+    if (!byCategory[ex.category]) byCategory[ex.category] = [];
+    byCategory[ex.category].push(ex);
+  });
+  const result = [];
+  order.forEach(cat => {
+    if (byCategory[cat]) {
+      shuffleArr(byCategory[cat]).forEach(ex => result.push(ex));
+    }
+  });
+  return result;
+}
+
+// Interleave opposing muscle groups (push/pull first, then fit legs/core in between)
+// This is best-effort: if you only have pushes, it just shuffles them.
+function shuffleByOpposing(exercises) {
+  const buckets = { push: [], pull: [], legs: [], core: [] };
+  exercises.forEach(ex => buckets[classifyMuscle(ex)].push(ex));
+  Object.keys(buckets).forEach(k => { buckets[k] = shuffleArr(buckets[k]); });
+
+  const result = [];
+  // alternate push/pull as long as both have items
+  while (buckets.push.length > 0 || buckets.pull.length > 0) {
+    if (buckets.push.length > 0) result.push(buckets.push.shift());
+    if (buckets.pull.length > 0) result.push(buckets.pull.shift());
+  }
+  // now weave in legs and core between every other pair
+  const extras = shuffleArr([...buckets.legs, ...buckets.core]);
+  if (extras.length === 0) return result;
+  if (result.length === 0) return extras;
+  // insert an extra every 2 items in result
+  const final = [];
+  for (let i = 0; i < result.length; i++) {
+    final.push(result[i]);
+    if (i % 2 === 1 && extras.length > 0) {
+      final.push(extras.shift());
+    }
+  }
+  // append any remaining
+  while (extras.length > 0) final.push(extras.shift());
+  return final;
+}
+
+export default function WorkoutApp() {
+  const [screen, setScreen] = useState('home');
+  const [library, setLibrary] = useState(null);
+  const [selectedCategories, setSelectedCategories] = useState([]);
+  const [selectedModifiers, setSelectedModifiers] = useState([]);
+  const [selectedExercises, setSelectedExercises] = useState([]);
+  const [mode, setMode] = useState(null);
+  const [modeConfig, setModeConfig] = useState({});
+  const [restConfig, setRestConfig] = useState({ type: 'fixed', short: 30, long: 90, longEvery: 4 });
+  const [queue, setQueue] = useState([]);
+  const [queueIdx, setQueueIdx] = useState(0);
+  const [history, setHistory] = useState([]);
+  const [favorites, setFavorites] = useState([]);
+  // Home screen collapse state - lifted here so it survives navigation
+  const [favCollapsed, setFavCollapsed] = useState(true);
+  const [recentCollapsed, setRecentCollapsed] = useState(true);
+  const [collapseHydrated, setCollapseHydrated] = useState(false);
+  // App-wide settings
+  const [settings, setSettings] = useState({ rememberSectionState: true });
+  const [settingsHydrated, setSettingsHydrated] = useState(false);
+  // Color palette state
+  const [activePaletteId, setActivePaletteId] = useState(DEFAULT_PALETTE_ID);
+  const [customPalettes, setCustomPalettes] = useState([]);
+  const [paletteHydrated, setPaletteHydrated] = useState(false);
+
+  useEffect(() => {
+    (async () => {
+      const lib = await storage.get('library', DEFAULT_EXERCISES);
+      setLibrary(lib);
+      const hist = await storage.get('history', []);
+      setHistory(hist);
+      const favs = await storage.get('favorites', []);
+      setFavorites(favs);
+      const rest = await storage.get('restConfig', null);
+      if (rest) setRestConfig(rest);
+      const loadedSettings = await storage.get('settings', { rememberSectionState: true });
+      setSettings({ rememberSectionState: true, ...loadedSettings });
+      setSettingsHydrated(true);
+      // Only apply stored collapse state if rememberSectionState is ON
+      const willRemember = loadedSettings.rememberSectionState !== false;
+      if (willRemember) {
+        const collapse = await storage.get('homeCollapse', { favorites: true, recent: true });
+        setFavCollapsed(collapse.favorites !== false);
+        setRecentCollapsed(collapse.recent !== false);
+      }
+      setCollapseHydrated(true);
+      // Palette hydration
+      const storedPaletteId = await storage.get('activePaletteId', DEFAULT_PALETTE_ID);
+      const storedCustoms = await storage.get('customPalettes', []);
+      setActivePaletteId(storedPaletteId);
+      setCustomPalettes(storedCustoms);
+      setPaletteHydrated(true);
+    })();
+  }, []);
+
+  useEffect(() => { if (library) storage.set('library', library); }, [library]);
+  useEffect(() => { storage.set('restConfig', restConfig); }, [restConfig]);
+  useEffect(() => { storage.set('history', history); }, [history]);
+  useEffect(() => { storage.set('favorites', favorites); }, [favorites]);
+  useEffect(() => {
+    if (!settingsHydrated) return;
+    storage.set('settings', settings);
+  }, [settings, settingsHydrated]);
+  useEffect(() => {
+    if (!paletteHydrated) return;
+    storage.set('activePaletteId', activePaletteId);
+  }, [activePaletteId, paletteHydrated]);
+  useEffect(() => {
+    if (!paletteHydrated) return;
+    storage.set('customPalettes', customPalettes);
+  }, [customPalettes, paletteHydrated]);
+  // Only persist collapse state after hydration AND when the setting is on
+  useEffect(() => {
+    if (!collapseHydrated) return;
+    if (!settings.rememberSectionState) return;
+    storage.set('homeCollapse', { favorites: favCollapsed, recent: recentCollapsed });
+  }, [favCollapsed, recentCollapsed, collapseHydrated, settings.rememberSectionState]);
+
+  // When rememberSectionState is OFF, force both sections collapsed on every arrival at home
+  useEffect(() => {
+    if (screen === 'home' && !settings.rememberSectionState) {
+      setFavCollapsed(true);
+      setRecentCollapsed(true);
+    }
+  }, [screen, settings.rememberSectionState]);
+
+  if (!library) {
+    return (
+      <div style={{ minHeight: '100vh', background: 'var(--bg)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--accent)', fontFamily: 'monospace' }}>
+        LOADING...
+      </div>
+    );
+  }
+
+  const goHome = () => {
+    setScreen('home');
+    setSelectedCategories([]);
+    setSelectedModifiers([]);
+    setSelectedExercises([]);
+    setMode(null);
+    setModeConfig({});
+    setQueue([]);
+    setQueueIdx(0);
+  };
+
+  const rerunFromHistory = (entry) => {
+    setSelectedCategories(entry.categories || []);
+    setSelectedModifiers(entry.modifiers || []);
+    setSelectedExercises(entry.exercises || []);
+    setMode(entry.mode);
+    setModeConfig(entry.modeConfig || {});
+    const q = buildQueue(entry.exercises, entry.mode, entry.modeConfig);
+    setQueue(q);
+    setQueueIdx(0);
+    setScreen('active');
+  };
+
+  // Signature for matching a workout against favorites - based on mode + exercise IDs in order
+  const makeSignature = (entry) => {
+    if (!entry || !entry.exercises) return '';
+    const exIds = entry.exercises.map(e => e.id).join(',');
+    return `${entry.mode}|${exIds}|${JSON.stringify(entry.modeConfig?.exerciseSets || {})}`;
+  };
+
+  // Find a favorite that matches this workout entry (returns the fav or null)
+  const findMatchingFavorite = (entry) => {
+    const sig = makeSignature(entry);
+    return favorites.find(f => makeSignature(f) === sig) || null;
+  };
+
+  // Add a favorite with a name
+  const addFavorite = (entry, name) => {
+    const fav = {
+      ...entry,
+      favoritedAt: Date.now(),
+      name: (name || '').trim() || 'Untitled workout',
+      favId: 'fav-' + Date.now(),
+    };
+    setFavorites(prev => [fav, ...prev]);
+  };
+
+  // Remove a favorite by matching signature
+  const removeFavorite = (entry) => {
+    const sig = makeSignature(entry);
+    setFavorites(prev => prev.filter(f => makeSignature(f) !== sig));
+  };
+
+  // Build a workout entry from current active state (for starring mid-workout)
+  const currentWorkoutAsEntry = () => ({
+    date: Date.now(),
+    mode,
+    modeConfig,
+    categories: selectedCategories,
+    modifiers: selectedModifiers,
+    exercises: selectedExercises,
+    totalItems: queue.length,
+  });
+
+  // Resolve active palette and build CSS variables for it
+  const activePalette = resolvePalette(activePaletteId, customPalettes);
+  const paletteVars = {
+    '--bg': '#0E0E0E',
+    '--surface': activePalette.surface,
+    '--fg': activePalette.fg,
+    '--accent': activePalette.accent,
+    '--accent2': activePalette.accent2,
+    '--warn': activePalette.warn,
+  };
+
+  // Add/replace custom palette (by id); returns the saved palette
+  const saveCustomPalette = (palette) => {
+    setCustomPalettes(prev => {
+      const existing = prev.findIndex(p => p.id === palette.id);
+      if (existing >= 0) {
+        const copy = [...prev];
+        copy[existing] = palette;
+        return copy;
+      }
+      // Cap at 3 — if we're at 3, remove oldest
+      const trimmed = prev.length >= 3 ? prev.slice(0, 2) : prev;
+      return [palette, ...trimmed];
+    });
+  };
+
+  const deleteCustomPalette = (id) => {
+    setCustomPalettes(prev => prev.filter(p => p.id !== id));
+    // If we deleted the active one, fall back to default
+    if (activePaletteId === id) setActivePaletteId(DEFAULT_PALETTE_ID);
+  };
+
+  return (
+    <div style={{ ...paletteVars, minHeight: '100vh', background: 'var(--bg)', color: 'var(--fg)', fontFamily: '"JetBrains Mono", "Fira Code", monospace', position: 'relative', overflow: 'hidden' }}>
+      <GlobalStyles />
+      {screen === 'colorSettings' && (
+        <ColorSettingsScreen
+          activePaletteId={activePaletteId}
+          setActivePaletteId={setActivePaletteId}
+          customPalettes={customPalettes}
+          saveCustomPalette={saveCustomPalette}
+          deleteCustomPalette={deleteCustomPalette}
+          onBack={() => setScreen('home')}
+        />
+      )}
+      {screen === 'home' && (
+        <HomeScreen
+          onStart={() => setScreen('categories')}
+          onHistory={() => setScreen('history')}
+          onFavorites={() => setScreen('favorites')}
+          onColorSettings={() => setScreen('colorSettings')}
+          onRerun={rerunFromHistory}
+          history={history}
+          favorites={favorites}
+          findMatchingFavorite={findMatchingFavorite}
+          addFavorite={addFavorite}
+          removeFavorite={removeFavorite}
+          favCollapsed={favCollapsed}
+          setFavCollapsed={setFavCollapsed}
+          recentCollapsed={recentCollapsed}
+          setRecentCollapsed={setRecentCollapsed}
+          settings={settings}
+          setSettings={setSettings}
+        />
+      )}
+      {screen === 'history' && (
+        <HistoryScreen
+          history={history}
+          onBack={() => setScreen('home')}
+          onRerun={rerunFromHistory}
+          onClear={() => setHistory([])}
+          findMatchingFavorite={findMatchingFavorite}
+          addFavorite={addFavorite}
+          removeFavorite={removeFavorite}
+        />
+      )}
+      {screen === 'favorites' && (
+        <FavoritesScreen
+          favorites={favorites}
+          onBack={() => setScreen('home')}
+          onRerun={rerunFromHistory}
+          removeFavorite={removeFavorite}
+        />
+      )}
+      {screen === 'categories' && (
+        <CategoryScreen
+          selectedCategories={selectedCategories}
+          setSelectedCategories={setSelectedCategories}
+          selectedModifiers={selectedModifiers}
+          setSelectedModifiers={setSelectedModifiers}
+          onBack={goHome}
+          onNext={() => setScreen('exercises')}
+        />
+      )}
+      {screen === 'exercises' && (
+        <ExerciseScreen
+          library={library}
+          setLibrary={setLibrary}
+          categories={selectedCategories}
+          modifiers={selectedModifiers}
+          selected={selectedExercises}
+          setSelected={setSelectedExercises}
+          onBack={() => setScreen('categories')}
+          onNext={() => setScreen('mode')}
+        />
+      )}
+      {screen === 'mode' && (
+        <ModeScreen
+          mode={mode}
+          setMode={setMode}
+          modeConfig={modeConfig}
+          setModeConfig={setModeConfig}
+          exercises={selectedExercises}
+          setExercises={setSelectedExercises}
+          onBack={() => setScreen('exercises')}
+          onNext={() => setScreen('rest')}
+        />
+      )}
+      {screen === 'rest' && (
+        <RestScreen
+          restConfig={restConfig}
+          setRestConfig={setRestConfig}
+          onBack={() => setScreen('mode')}
+          onNext={() => {
+            const q = buildQueue(selectedExercises, mode, modeConfig);
+            setQueue(q);
+            setQueueIdx(0);
+            setScreen('active');
+          }}
+        />
+      )}
+      {screen === 'active' && (
+        <ActiveWorkout
+          queue={queue}
+          idx={queueIdx}
+          setIdx={setQueueIdx}
+          restConfig={restConfig}
+          onExit={goHome}
+          onEdit={() => setScreen('categories')}
+          currentEntry={currentWorkoutAsEntry()}
+          findMatchingFavorite={findMatchingFavorite}
+          addFavorite={addFavorite}
+          removeFavorite={removeFavorite}
+          onComplete={() => {
+            const entry = {
+              date: Date.now(),
+              mode,
+              modeConfig,
+              categories: selectedCategories,
+              modifiers: selectedModifiers,
+              exercises: selectedExercises,
+              totalItems: queue.length,
+            };
+            setHistory(prev => [entry, ...prev].slice(0, 100));
+            setScreen('done');
+          }}
+        />
+      )}
+      {screen === 'done' && <DoneScreen onHome={goHome} queueLen={queue.length} />}
+    </div>
+  );
+}
+
+function GlobalStyles() {
+  return (
+    <style>{`
+      @import url('https://fonts.googleapis.com/css2?family=Archivo+Black&family=JetBrains+Mono:wght@400;500;700&family=Bebas+Neue&display=swap');
+      * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+      body { margin: 0; overscroll-behavior: none; }
+      button { font-family: inherit; cursor: pointer; border: none; background: none; color: inherit; }
+      .display { font-family: 'Archivo Black', sans-serif; letter-spacing: -0.02em; }
+      .stencil { font-family: 'Bebas Neue', sans-serif; letter-spacing: 0.05em; }
+      .mono { font-family: 'JetBrains Mono', monospace; }
+      @keyframes pulse-ring { 0% { transform: scale(1); opacity: 0.8; } 100% { transform: scale(1.4); opacity: 0; } }
+      @keyframes slide-up { from { opacity: 0; } to { opacity: 1; } }
+      @keyframes fade-in { from { opacity: 0; } to { opacity: 1; } }
+      @keyframes title-in-top {
+        0% { transform: translateX(-110%); opacity: 0; }
+        60% { transform: translateX(8px); opacity: 1; }
+        100% { transform: translateX(0); opacity: 1; }
+      }
+      @keyframes title-in-bottom {
+        0% { transform: translateX(110%); opacity: 0; }
+        60% { transform: translateX(-8px); opacity: 1; }
+        100% { transform: translateX(0); opacity: 1; }
+      }
+      .slide-in { animation: slide-up 0.4s ease-out both; }
+      .fade-in { animation: fade-in 0.25s ease-out both; }
+      .title-slide-top { animation: title-in-top 0.55s cubic-bezier(0.22, 1, 0.36, 1) both; }
+      .title-slide-bottom { animation: title-in-bottom 0.55s cubic-bezier(0.22, 1, 0.36, 1) 0.08s both; }
+      input[type="range"] {
+        -webkit-appearance: none; appearance: none; width: 100%; height: 6px; background: #1A1A1A;
+        border-radius: 2px; outline: none;
+      }
+      input[type="range"]::-webkit-slider-thumb {
+        -webkit-appearance: none; appearance: none; width: 24px; height: 24px; background: var(--accent);
+        border-radius: 2px; cursor: pointer; border: 2px solid #0A0A0A;
+      }
+      input[type="range"]::-moz-range-thumb {
+        width: 24px; height: 24px; background: var(--accent); border-radius: 2px; cursor: pointer; border: 2px solid #0A0A0A;
+      }
+    `}</style>
+  );
+}
+
+function GrainOverlay() {
+  return (
+    <div style={{
+      position: 'fixed', inset: 0, pointerEvents: 'none', zIndex: 1, opacity: 0.08,
+      backgroundImage: "url(\"data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E\")",
+    }} />
+  );
+}
+
+function relativeTime(ts) {
+  const diff = Date.now() - ts;
+  const mins = Math.floor(diff / 60000);
+  const hours = Math.floor(mins / 60);
+  const days = Math.floor(hours / 24);
+  if (mins < 1) return 'just now';
+  if (mins < 60) return mins + 'm ago';
+  if (hours < 24) return hours + 'h ago';
+  if (days < 7) return days + 'd ago';
+  return new Date(ts).toLocaleDateString();
+}
+
+// 10 punchy two-word variants that cycle through the home screen
+const TITLE_VARIANTS = [
+  { top: 'GRIND', bottom: 'MODE' },
+  { top: 'BEAST', bottom: 'MODE' },
+  { top: 'LOCK', bottom: 'IN' },
+  { top: 'NO', bottom: 'EXCUSES' },
+  { top: 'GET', bottom: 'AFTER IT' },
+  { top: 'CRUSH', bottom: 'IT' },
+  { top: 'SEND', bottom: 'IT' },
+  { top: 'NO', bottom: 'DAYS OFF' },
+  { top: 'STAY', bottom: 'HUNGRY' },
+  { top: 'EARN', bottom: 'IT' },
+];
+
+// "Workout complete" screen variants: big two-word headline + short tagline
+const DONE_VARIANTS = [
+  { top: 'NICE', bottom: 'WORK.', tag: 'Go hydrate.' },
+  { top: 'WELL', bottom: 'DONE.', tag: 'Stretch it out.' },
+  { top: 'WORK', bottom: 'PUT IN.', tag: 'Future you says thanks.' },
+  { top: 'THAT\'S', bottom: 'A REP.', tag: 'Grab some water.' },
+  { top: 'GET', bottom: 'SOME.', tag: 'Fuel up.' },
+  { top: 'STACKED', bottom: 'IT.', tag: 'Rest up.' },
+  { top: 'ANOTHER', bottom: 'ONE DOWN.', tag: 'Momentum wins.' },
+  { top: 'EARNED', bottom: 'IT.', tag: 'Protein and water.' },
+  { top: 'BIG', bottom: 'MOVES.', tag: 'Cool down properly.' },
+  { top: 'LOCKED', bottom: 'IN.', tag: 'Breathe. Recover.' },
+];
+
+// Pick a random index different from the current one (avoids repeats)
+function pickDifferentIdx(current, length) {
+  if (length <= 1) return 0;
+  let next = Math.floor(Math.random() * length);
+  if (next === current) next = (next + 1) % length;
+  return next;
+}
+
+function AnimatedTitle() {
+  // Start on a random variant so users see different things at app launch
+  const [idx, setIdx] = React.useState(() => Math.floor(Math.random() * TITLE_VARIANTS.length));
+  const [nonce, setNonce] = React.useState(0);
+
+  React.useEffect(() => {
+    const timer = setTimeout(() => {
+      setIdx(i => pickDifferentIdx(i, TITLE_VARIANTS.length));
+      setNonce(n => n + 1);
+    }, 7000);
+    return () => clearTimeout(timer);
+  }, [nonce]);
+
+  const variant = TITLE_VARIANTS[idx];
+
+  return (
+    <div style={{ overflow: 'hidden' }}>
+      <div
+        key={`top-${nonce}`}
+        className="display title-slide-top"
+        style={{
+          fontSize: 'clamp(56px, 14vw, 120px)', lineHeight: 0.85,
+          color: 'var(--fg)', whiteSpace: 'nowrap',
+        }}
+      >
+        {variant.top}
+      </div>
+      <div
+        key={`bot-${nonce}`}
+        className="display title-slide-bottom"
+        style={{
+          fontSize: 'clamp(56px, 14vw, 120px)', lineHeight: 0.85,
+          color: 'var(--accent)', marginBottom: '8px', whiteSpace: 'nowrap',
+        }}
+      >
+        {variant.bottom}
+      </div>
+    </div>
+  );
+}
+
+function ColorSettingsScreen({ activePaletteId, setActivePaletteId, customPalettes, saveCustomPalette, deleteCustomPalette, onBack }) {
+  // Editor state - null means "browsing", otherwise it's the palette being edited
+  const [editing, setEditing] = React.useState(null);
+
+  // Handler for opening a new custom palette for editing
+  const startNewCustom = () => {
+    // Base the starting values on the currently active palette so the editor doesn't look empty
+    const base = [...PALETTES, ...customPalettes].find(p => p.id === activePaletteId) || PALETTES[0];
+    setEditing({
+      id: 'custom-' + Date.now(),
+      name: '',
+      bg: base.bg,
+      surface: base.surface,
+      fg: base.fg,
+      accent: base.accent,
+      accent2: base.accent2,
+      warn: base.warn,
+      isNew: true,
+    });
+  };
+
+  // Handler for editing an existing custom
+  const startEditCustom = (palette) => {
+    setEditing({ ...palette, isNew: false });
+  };
+
+  const handleSave = (palette) => {
+    saveCustomPalette(palette);
+    // Auto-activate newly saved palette
+    setActivePaletteId(palette.id);
+    setEditing(null);
+  };
+
+  const handleDelete = (id) => {
+    deleteCustomPalette(id);
+    setEditing(null);
+  };
+
+  if (editing) {
+    return (
+      <CustomPaletteEditor
+        palette={editing}
+        onChange={setEditing}
+        onSave={handleSave}
+        onDelete={editing.isNew ? null : () => handleDelete(editing.id)}
+        onCancel={() => setEditing(null)}
+      />
+    );
+  }
+
+  const canAddMoreCustoms = customPalettes.length < 3;
+
+  return (
+    <div className="slide-in" style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column', position: 'relative', zIndex: 2 }}>
+      <div style={{ padding: '20px 24px 12px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px' }}>
+          <button onClick={onBack} style={{ display: 'flex', alignItems: 'center', gap: '6px', color: '#888', padding: '4px 0' }}>
+            <ChevronLeft size={18} />
+            <span className="mono" style={{ fontSize: '11px' }}>BACK</span>
+          </button>
+        </div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+          <Palette size={28} color="var(--accent)" />
+          <div className="display" style={{ fontSize: 'clamp(36px, 10vw, 56px)', lineHeight: 0.9, color: 'var(--fg)' }}>
+            COLORS
+          </div>
+        </div>
+        <div className="mono" style={{ fontSize: '11px', color: '#666', marginTop: '8px' }}>
+          Tap to apply. Hold or tap edit on customs.
+        </div>
+      </div>
+
+      <div style={{ flex: 1, padding: '12px 24px 24px', overflowY: 'auto' }}>
+        {/* Presets */}
+        <div className="mono" style={{ fontSize: '10px', color: '#666', marginBottom: '10px', letterSpacing: '0.1em' }}>
+          // PRESETS
+        </div>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: '8px', marginBottom: '24px' }}>
+          {PALETTES.map(p => (
+            <PaletteCard
+              key={p.id}
+              palette={p}
+              active={p.id === activePaletteId}
+              onTap={() => setActivePaletteId(p.id)}
+            />
+          ))}
+        </div>
+
+        {/* Customs */}
+        <div className="mono" style={{ fontSize: '10px', color: '#666', marginBottom: '10px', letterSpacing: '0.1em', display: 'flex', justifyContent: 'space-between' }}>
+          <span>// CUSTOM ({customPalettes.length}/3)</span>
+        </div>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: '8px', marginBottom: '12px' }}>
+          {customPalettes.map(p => (
+            <PaletteCard
+              key={p.id}
+              palette={p}
+              active={p.id === activePaletteId}
+              onTap={() => setActivePaletteId(p.id)}
+              onEdit={() => startEditCustom(p)}
+            />
+          ))}
+          {canAddMoreCustoms && (
+            <button
+              onClick={startNewCustom}
+              style={{
+                padding: '18px', background: '#0F0F0F',
+                border: '1px dashed #FF4D2E66', borderRadius: '2px',
+                display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px',
+                color: 'var(--accent)', fontSize: '13px', fontWeight: 700,
+              }}
+            >
+              <Plus size={16} /> NEW CUSTOM PALETTE
+            </button>
+          )}
+          {!canAddMoreCustoms && (
+            <div className="mono" style={{ padding: '12px', fontSize: '10px', color: '#555', textAlign: 'center', lineHeight: 1.5 }}>
+              Max of 3 custom palettes.<br/>Delete one to add another.
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function PaletteCard({ palette, active, onTap, onEdit }) {
+  return (
+    <div
+      style={{
+        background: palette.bg,
+        border: active ? `2px solid ${palette.accent}` : '1px solid #222',
+        borderRadius: '2px', padding: '14px',
+        display: 'flex', flexDirection: 'column', gap: '10px',
+        position: 'relative',
+      }}
+    >
+      <button
+        onClick={onTap}
+        style={{
+          display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+          width: '100%', textAlign: 'left', padding: 0,
+        }}
+      >
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', minWidth: 0 }}>
+          <div className="stencil" style={{
+            fontSize: '20px', color: palette.fg, lineHeight: 1,
+            overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+          }}>
+            {palette.name || 'UNTITLED'}
+          </div>
+          {active && (
+            <span className="mono" style={{
+              fontSize: '9px', padding: '2px 6px',
+              background: palette.accent, color: palette.bg,
+              borderRadius: '2px', fontWeight: 700,
+            }}>ACTIVE</span>
+          )}
+        </div>
+        {onEdit && (
+          <div
+            onClick={(e) => { e.stopPropagation(); onEdit(); }}
+            style={{
+              fontSize: '10px', color: palette.fg, opacity: 0.6,
+              padding: '4px 8px', border: `1px solid ${palette.fg}33`, borderRadius: '2px',
+            }}
+          >
+            EDIT
+          </div>
+        )}
+      </button>
+
+      {/* Swatches - preview showing all 6 colors plus sample UI */}
+      <button
+        onClick={onTap}
+        style={{
+          display: 'flex', gap: '4px', width: '100%', height: '32px', padding: 0,
+        }}
+      >
+        <div style={{ flex: 2, background: palette.surface, borderRadius: '2px' }} />
+        <div style={{ flex: 1, background: palette.fg, borderRadius: '2px' }} />
+        <div style={{ flex: 1, background: palette.accent, borderRadius: '2px' }} />
+        <div style={{ flex: 1, background: palette.accent2, borderRadius: '2px' }} />
+        <div style={{ flex: 1, background: palette.warn, borderRadius: '2px' }} />
+      </button>
+
+      {/* Mini sample UI preview using this palette's colors */}
+      <div style={{
+        background: palette.surface, borderRadius: '2px', padding: '8px 10px',
+        display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px',
+      }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '3px', minWidth: 0 }}>
+          <div className="stencil" style={{ fontSize: '11px', color: palette.accent, lineHeight: 1 }}>SAMPLE</div>
+          <div className="mono" style={{ fontSize: '9px', color: palette.fg, opacity: 0.7 }}>Aa Text 123</div>
+        </div>
+        <div style={{
+          padding: '4px 8px', background: palette.accent, color: palette.bg,
+          borderRadius: '2px', fontSize: '9px', fontWeight: 900,
+          fontFamily: 'Archivo Black, sans-serif',
+        }}>
+          GO
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function CustomPaletteEditor({ palette, onChange, onSave, onDelete, onCancel }) {
+  const [editingSlot, setEditingSlot] = React.useState(null); // which slot color picker is open for
+  const [nameError, setNameError] = React.useState(false);
+
+  const updateSlot = (key, value) => {
+    onChange({ ...palette, [key]: value });
+  };
+
+  const handleSave = () => {
+    if (!palette.name || !palette.name.trim()) {
+      setNameError(true);
+      return;
+    }
+    onSave({ ...palette, name: palette.name.trim() });
+  };
+
+  return (
+    <div className="slide-in" style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column', position: 'relative', zIndex: 2, background: palette.bg }}>
+      <div style={{ padding: '20px 24px 12px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px' }}>
+          <button onClick={onCancel} style={{ display: 'flex', alignItems: 'center', gap: '6px', color: palette.fg, opacity: 0.6, padding: '4px 0' }}>
+            <ChevronLeft size={18} />
+            <span className="mono" style={{ fontSize: '11px' }}>CANCEL</span>
+          </button>
+          {onDelete && (
+            <button
+              onClick={onDelete}
+              style={{ color: palette.warn, fontSize: '11px', display: 'flex', alignItems: 'center', gap: '4px' }}
+              className="mono"
+            >
+              <Trash2 size={12} /> DELETE
+            </button>
+          )}
+        </div>
+        <div className="display" style={{ fontSize: 'clamp(32px, 9vw, 48px)', lineHeight: 0.9, color: palette.fg, marginBottom: '8px' }}>
+          {palette.isNew ? 'NEW PALETTE' : 'EDIT PALETTE'}
+        </div>
+        <div className="mono" style={{ fontSize: '11px', color: palette.fg, opacity: 0.6 }}>
+          Tap a color to change it. Preview updates live.
+        </div>
+      </div>
+
+      <div style={{ flex: 1, padding: '12px 24px 24px', overflowY: 'auto' }}>
+        {/* Name input */}
+        <div className="mono" style={{ fontSize: '10px', color: palette.fg, opacity: 0.6, marginBottom: '6px', letterSpacing: '0.1em' }}>
+          // NAME
+        </div>
+        <input
+          value={palette.name || ''}
+          onChange={e => { onChange({ ...palette, name: e.target.value }); setNameError(false); }}
+          placeholder="e.g. NIGHT RUN"
+          maxLength={20}
+          style={{
+            width: '100%', padding: '12px', background: palette.surface, color: palette.fg,
+            border: `1px solid ${nameError ? palette.warn : palette.fg + '33'}`,
+            fontFamily: 'inherit', fontSize: '16px', fontWeight: 700,
+            borderRadius: '2px', marginBottom: nameError ? '4px' : '20px',
+            textTransform: 'uppercase',
+          }}
+        />
+        {nameError && (
+          <div className="mono" style={{ fontSize: '10px', color: palette.warn, marginBottom: '16px' }}>
+            Please enter a name before saving.
+          </div>
+        )}
+
+        {/* Color slots */}
+        <div className="mono" style={{ fontSize: '10px', color: palette.fg, opacity: 0.6, marginBottom: '10px', letterSpacing: '0.1em' }}>
+          // COLORS
+        </div>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginBottom: '24px' }}>
+          {PALETTE_SLOTS.map(slot => (
+            <button
+              key={slot.key}
+              onClick={() => setEditingSlot(slot.key)}
+              style={{
+                padding: '12px 14px', display: 'flex', alignItems: 'center', gap: '12px',
+                background: palette.surface, border: `1px solid ${palette.fg}22`,
+                borderRadius: '2px', textAlign: 'left',
+              }}
+            >
+              <div style={{
+                width: '40px', height: '40px', borderRadius: '2px',
+                background: palette[slot.key],
+                border: `1px solid ${palette.fg}33`, flexShrink: 0,
+              }} />
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ fontSize: '13px', fontWeight: 700, color: palette.fg }}>{slot.label}</div>
+                <div className="mono" style={{ fontSize: '10px', color: palette.fg, opacity: 0.6 }}>
+                  {slot.desc}
+                </div>
+              </div>
+              <div className="mono" style={{
+                fontSize: '10px', color: palette.fg, opacity: 0.5,
+                padding: '3px 6px', background: palette.bg, borderRadius: '2px',
+              }}>
+                {palette[slot.key].toUpperCase()}
+              </div>
+            </button>
+          ))}
+        </div>
+
+        {/* Live preview */}
+        <div className="mono" style={{ fontSize: '10px', color: palette.fg, opacity: 0.6, marginBottom: '10px', letterSpacing: '0.1em' }}>
+          // PREVIEW
+        </div>
+        <PaletteCard palette={palette} active={true} onTap={() => {}} />
+      </div>
+
+      {/* Save bar */}
+      <div style={{ padding: '16px 24px 24px', borderTop: `1px solid ${palette.fg}22`, background: palette.bg }}>
+        <button
+          onClick={handleSave}
+          style={{
+            width: '100%', padding: '20px', background: palette.accent, color: palette.bg,
+            fontSize: '16px', fontWeight: 900, fontFamily: 'Archivo Black, sans-serif',
+            letterSpacing: '0.02em', borderRadius: '2px',
+            display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+          }}
+        >
+          <span>SAVE PALETTE</span>
+          <Check size={20} strokeWidth={3} />
+        </button>
+      </div>
+
+      {editingSlot && (
+        <ColorPickerModal
+          slot={PALETTE_SLOTS.find(s => s.key === editingSlot)}
+          value={palette[editingSlot]}
+          palette={palette}
+          onChange={(v) => updateSlot(editingSlot, v)}
+          onClose={() => setEditingSlot(null)}
+        />
+      )}
+    </div>
+  );
+}
+
+function ColorPickerModal({ slot, value, palette, onChange, onClose }) {
+  return (
+    <div
+      onClick={onClose}
+      className="fade-in"
+      style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.88)', zIndex: 200, display: 'flex', alignItems: 'flex-end', padding: '20px' }}
+    >
+      <div
+        onClick={e => e.stopPropagation()}
+        style={{
+          width: '100%', background: palette.surface, border: `2px solid ${palette.accent}`, borderRadius: '2px',
+          padding: '20px',
+        }}
+      >
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
+          <div>
+            <div className="stencil" style={{ fontSize: '22px', color: palette.accent }}>{slot.label.toUpperCase()}</div>
+            <div className="mono" style={{ fontSize: '10px', color: palette.fg, opacity: 0.6, marginTop: '2px' }}>
+              {slot.desc}
+            </div>
+          </div>
+          <button onClick={onClose} style={{ color: palette.fg, opacity: 0.5 }}><X size={18} /></button>
+        </div>
+
+        {/* Big preview of current value */}
+        <div style={{
+          height: '80px', background: value, borderRadius: '2px',
+          border: `1px solid ${palette.fg}22`, marginBottom: '12px',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+        }}>
+          <div className="mono" style={{
+            fontSize: '14px', fontWeight: 700,
+            color: value, filter: 'invert(1) grayscale(1) contrast(100)',
+            mixBlendMode: 'difference',
+          }}>
+            {value.toUpperCase()}
+          </div>
+        </div>
+
+        {/* Native color picker */}
+        <label style={{ display: 'block', marginBottom: '12px' }}>
+          <div className="mono" style={{ fontSize: '10px', color: palette.fg, opacity: 0.6, marginBottom: '6px' }}>
+            // PICKER
+          </div>
+          <input
+            type="color"
+            value={value}
+            onChange={e => onChange(e.target.value)}
+            style={{
+              width: '100%', height: '48px', background: palette.bg,
+              border: `1px solid ${palette.fg}22`, borderRadius: '2px', cursor: 'pointer',
+            }}
+          />
+        </label>
+
+        {/* Hex input */}
+        <label style={{ display: 'block', marginBottom: '16px' }}>
+          <div className="mono" style={{ fontSize: '10px', color: palette.fg, opacity: 0.6, marginBottom: '6px' }}>
+            // HEX
+          </div>
+          <input
+            type="text"
+            value={value}
+            onChange={e => {
+              let v = e.target.value;
+              if (!v.startsWith('#')) v = '#' + v;
+              onChange(v);
+            }}
+            style={{
+              width: '100%', padding: '10px', background: palette.bg, color: palette.fg,
+              border: `1px solid ${palette.fg}22`, fontFamily: 'JetBrains Mono, monospace',
+              fontSize: '14px', borderRadius: '2px', textTransform: 'uppercase',
+            }}
+          />
+        </label>
+
+        <button
+          onClick={onClose}
+          style={{
+            width: '100%', padding: '14px', background: palette.accent, color: palette.bg,
+            fontFamily: 'Archivo Black, sans-serif', fontSize: '13px', borderRadius: '2px',
+          }}
+        >
+          DONE
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function HomeScreen({ onStart, onHistory, onFavorites, onColorSettings, onRerun, history, favorites, findMatchingFavorite, addFavorite, removeFavorite, favCollapsed, setFavCollapsed, recentCollapsed, setRecentCollapsed, settings, setSettings }) {
+  const [infoFor, setInfoFor] = useState(null);
+  const [namingEntry, setNamingEntry] = useState(null); // entry being named for favoriting
+  const [settingsOpen, setSettingsOpen] = useState(false);
+
+  const recent = history.slice(0, 3);
+  const favs = favorites.slice(0, 3);
+  const hasFavorites = favs.length > 0;
+
+  const handleStarToggle = (entry) => {
+    const existing = findMatchingFavorite(entry);
+    if (existing) {
+      removeFavorite(entry);
+    } else {
+      setNamingEntry(entry);
+    }
+  };
+
+  const saveFavoriteName = (name) => {
+    if (namingEntry) addFavorite(namingEntry, name);
+    setNamingEntry(null);
+  };
+
+  return (
+    <div className="slide-in" style={{ minHeight: '100vh', padding: '24px', display: 'flex', flexDirection: 'column', position: 'relative', zIndex: 2 }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '32px' }}>
+        <div>
+          <div className="mono" style={{ fontSize: '11px', color: 'var(--accent)', marginBottom: '4px' }}>// NO EXCUSES</div>
+          <div className="mono" style={{ fontSize: '11px', color: '#666' }}>v2.0 / build ready</div>
+        </div>
+        <div style={{ display: 'flex', gap: '6px' }}>
+          {favorites.length > 0 && (
+            <button onClick={onFavorites} style={{
+              padding: '10px 12px', background: 'var(--surface)', border: '1px solid #FFB80033',
+              borderRadius: '2px', display: 'flex', alignItems: 'center', gap: '5px', color: '#FFB800',
+            }}>
+              <Star size={14} fill="#FFB800" />
+              <span className="mono" style={{ fontSize: '11px' }}>{favorites.length}</span>
+            </button>
+          )}
+          <button onClick={onHistory} style={{
+            padding: '10px 14px', background: 'var(--surface)', border: '1px solid #222',
+            borderRadius: '2px', display: 'flex', alignItems: 'center', gap: '6px', color: '#AAA',
+          }}>
+            <History size={14} />
+            <span className="mono" style={{ fontSize: '11px' }}>HISTORY</span>
+          </button>
+          <button onClick={() => setSettingsOpen(true)} style={{
+            padding: '10px 12px', background: 'var(--surface)', border: '1px solid #222',
+            borderRadius: '2px', display: 'flex', alignItems: 'center', color: '#AAA',
+          }}>
+            <Settings size={14} />
+          </button>
+        </div>
+      </div>
+
+      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
+        <AnimatedTitle />
+        <div className="mono" style={{ fontSize: '13px', color: '#888', marginTop: '16px', maxWidth: '320px', lineHeight: 1.5 }}>
+          Build your workout. Pick your format. Do the work.
+        </div>
+      </div>
+
+      {hasFavorites && (
+        <div style={{ marginBottom: '12px' }}>
+          <button
+            onClick={() => setFavCollapsed(v => !v)}
+            style={{
+              width: '100%', padding: '6px 0', marginBottom: favCollapsed ? 0 : '8px',
+              display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+              color: '#FFB800',
+            }}
+          >
+            <div className="mono" style={{ fontSize: '10px', letterSpacing: '0.1em', display: 'flex', alignItems: 'center', gap: '5px' }}>
+              <Star size={10} fill="#FFB800" /> FAVORITES
+              <span style={{ color: '#666', marginLeft: '4px' }}>({favorites.length})</span>
+            </div>
+            <ChevronDown
+              size={14}
+              style={{ transition: 'transform 0.2s', transform: favCollapsed ? 'rotate(-90deg)' : 'rotate(0deg)' }}
+            />
+          </button>
+          {!favCollapsed && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+              {favs.map((entry, i) => (
+                <RecentWorkoutCard
+                  key={entry.favId || entry.date}
+                  entry={entry}
+                  opacity={1 - i * 0.15}
+                  isFavorite
+                  onRun={() => onRerun(entry)}
+                  onInfo={() => setInfoFor(entry)}
+                  onStarToggle={() => handleStarToggle(entry)}
+                  findMatchingFavorite={findMatchingFavorite}
+                />
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
+      {recent.length > 0 && (
+        <div style={{ marginBottom: '16px' }}>
+          <button
+            onClick={() => setRecentCollapsed(v => !v)}
+            style={{
+              width: '100%', padding: '6px 0', marginBottom: recentCollapsed ? 0 : '8px',
+              display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+              color: '#666',
+            }}
+          >
+            <div className="mono" style={{ fontSize: '10px', letterSpacing: '0.1em' }}>
+              // RECENT
+              <span style={{ marginLeft: '6px', color: '#555' }}>({recent.length})</span>
+            </div>
+            <ChevronDown
+              size={14}
+              style={{ transition: 'transform 0.2s', transform: recentCollapsed ? 'rotate(-90deg)' : 'rotate(0deg)' }}
+            />
+          </button>
+          {!recentCollapsed && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+              {recent.map((entry, i) => (
+                <RecentWorkoutCard
+                  key={entry.date}
+                  entry={entry}
+                  opacity={1 - i * 0.3}
+                  onRun={() => onRerun(entry)}
+                  onInfo={() => setInfoFor(entry)}
+                  onStarToggle={() => handleStarToggle(entry)}
+                  findMatchingFavorite={findMatchingFavorite}
+                />
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
+      <button onClick={onStart} style={{
+        padding: '24px', background: 'var(--accent)', color: '#0A0A0A', fontSize: '20px', fontWeight: 900,
+        letterSpacing: '0.02em', display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+        borderRadius: '2px', fontFamily: 'Archivo Black, sans-serif',
+      }}>
+        <span>BUILD NEW WORKOUT</span>
+        <Play size={24} fill="#0A0A0A" />
+      </button>
+
+      {infoFor && <WorkoutInfoModal entry={infoFor} onClose={() => setInfoFor(null)} onRun={() => { onRerun(infoFor); setInfoFor(null); }} />}
+      {namingEntry && (
+        <NameFavoriteModal
+          entry={namingEntry}
+          onCancel={() => setNamingEntry(null)}
+          onSave={saveFavoriteName}
+        />
+      )}
+      {settingsOpen && (
+        <SettingsModal
+          settings={settings}
+          setSettings={setSettings}
+          onOpenColorSettings={() => {
+            setSettingsOpen(false);
+            onColorSettings();
+          }}
+          onClose={() => setSettingsOpen(false)}
+        />
+      )}
+    </div>
+  );
+}
+
+function SettingsModal({ settings, setSettings, onOpenColorSettings, onClose }) {
+  const toggle = (key) => {
+    setSettings(prev => ({ ...prev, [key]: !prev[key] }));
+  };
+
+  return (
+    <div
+      onClick={onClose}
+      className="fade-in"
+      style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.88)', zIndex: 100, display: 'flex', alignItems: 'flex-end', padding: '20px' }}
+    >
+      <div
+        onClick={e => e.stopPropagation()}
+        style={{
+          width: '100%', background: 'var(--surface)', border: '2px solid var(--accent)', borderRadius: '2px',
+          padding: '20px', maxHeight: '80vh', overflowY: 'auto',
+        }}
+      >
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+            <Settings size={18} color="var(--accent)" />
+            <div className="stencil" style={{ fontSize: '22px', color: 'var(--accent)' }}>SETTINGS</div>
+          </div>
+          <button onClick={onClose} style={{ color: '#666' }}><X size={18} /></button>
+        </div>
+
+        <SettingsToggle
+          label="Remember section layout"
+          description="Keep Favorites and Recent collapse states between visits. When off, both start collapsed every time."
+          checked={!!settings.rememberSectionState}
+          onToggle={() => toggle('rememberSectionState')}
+        />
+
+        <button
+          onClick={onOpenColorSettings}
+          style={{
+            width: '100%', padding: '14px', background: '#0F0F0F',
+            border: '1px solid #222', borderRadius: '2px',
+            display: 'flex', alignItems: 'center', gap: '14px',
+            textAlign: 'left', marginBottom: '8px',
+          }}
+        >
+          <Palette size={18} color="var(--accent)" />
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div style={{ fontSize: '14px', fontWeight: 600, color: 'var(--fg)', marginBottom: '2px' }}>
+              Customize colors
+            </div>
+            <div className="mono" style={{ fontSize: '10px', color: '#666', lineHeight: 1.4 }}>
+              Choose a palette or build your own.
+            </div>
+          </div>
+          <ChevronRight size={18} color="#666" />
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function SettingsToggle({ label, description, checked, onToggle }) {
+  return (
+    <button
+      onClick={onToggle}
+      style={{
+        width: '100%', padding: '14px', background: '#0F0F0F',
+        border: '1px solid #222', borderRadius: '2px',
+        display: 'flex', alignItems: 'center', gap: '14px',
+        textAlign: 'left', marginBottom: '8px',
+      }}
+    >
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <div style={{ fontSize: '14px', fontWeight: 600, color: 'var(--fg)', marginBottom: '2px' }}>
+          {label}
+        </div>
+        <div className="mono" style={{ fontSize: '10px', color: '#666', lineHeight: 1.4 }}>
+          {description}
+        </div>
+      </div>
+      <div style={{
+        width: '40px', height: '22px', borderRadius: '20px',
+        background: checked ? 'var(--accent)' : '#2A2A2A',
+        position: 'relative', transition: 'all 0.2s', flexShrink: 0,
+      }}>
+        <div style={{
+          position: 'absolute', top: '2px', left: checked ? '20px' : '2px',
+          width: '18px', height: '18px', borderRadius: '18px',
+          background: checked ? '#0A0A0A' : '#666', transition: 'all 0.2s',
+        }} />
+      </div>
+    </button>
+  );
+}
+
+function NameFavoriteModal({ entry, onCancel, onSave }) {
+  const [name, setName] = React.useState('');
+  const modeLabel = MODE_LABELS[entry.mode] || (entry.mode && entry.mode.toUpperCase());
+  const defaultPlaceholder = `${modeLabel} · ${entry.exercises?.length || 0} exercises`;
+
+  return (
+    <div
+      onClick={onCancel}
+      className="fade-in"
+      style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.88)', zIndex: 200, display: 'flex', alignItems: 'flex-start', padding: '20px' }}
+    >
+      <div
+        onClick={e => e.stopPropagation()}
+        style={{
+          width: '100%', background: 'var(--surface)', border: '2px solid #FFB800', borderRadius: '2px',
+          padding: '20px',
+        }}
+      >
+        <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '16px' }}>
+          <Star size={18} fill="#FFB800" color="#FFB800" />
+          <div className="stencil" style={{ fontSize: '22px', color: '#FFB800' }}>NAME THIS WORKOUT</div>
+        </div>
+        <div className="mono" style={{ fontSize: '11px', color: '#888', marginBottom: '12px', lineHeight: 1.5 }}>
+          Give it a name so you can find it later.
+        </div>
+        <input
+          autoFocus
+          value={name}
+          onChange={e => setName(e.target.value)}
+          onKeyDown={e => { if (e.key === 'Enter') onSave(name); }}
+          placeholder={defaultPlaceholder}
+          maxLength={50}
+          style={{
+            width: '100%', padding: '14px', background: '#000', color: 'var(--fg)',
+            border: '1px solid #333', fontFamily: 'inherit', fontSize: '15px',
+            borderRadius: '2px', marginBottom: '16px',
+          }}
+        />
+        <div style={{ display: 'flex', gap: '8px' }}>
+          <button onClick={onCancel} style={{
+            flex: 1, padding: '14px', background: '#1A1A1A', color: '#888',
+            fontFamily: 'Archivo Black, sans-serif', fontSize: '13px', borderRadius: '2px',
+          }}>CANCEL</button>
+          <button onClick={() => onSave(name)} style={{
+            flex: 2, padding: '14px', background: '#FFB800', color: '#0A0A0A',
+            fontFamily: 'Archivo Black, sans-serif', fontSize: '13px', borderRadius: '2px',
+            display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px',
+          }}>
+            <Star size={14} fill="#0A0A0A" /> SAVE
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function RecentWorkoutCard({ entry, opacity, onRun, onInfo, onStarToggle, findMatchingFavorite, isFavorite }) {
+  const cats = entry.categories || [];
+  const mods = entry.modifiers || [];
+  const modeLabel = MODE_LABELS[entry.mode] || (entry.mode && entry.mode.toUpperCase());
+  const when = relativeTime(entry.date);
+  // Determine if this entry is starred (either it's a favorite itself or matches one)
+  const starred = isFavorite || (findMatchingFavorite && !!findMatchingFavorite(entry));
+  // Show name on top if favorite (either the direct name or matched fav name)
+  const matchedFav = findMatchingFavorite ? findMatchingFavorite(entry) : null;
+  const displayName = entry.name || (matchedFav && matchedFav.name);
+  const borderColor = starred ? '#FFB80055' : '#222';
+
+  return (
+    <div style={{
+      background: 'var(--surface)', border: `1px solid ${borderColor}`, borderRadius: '2px',
+      opacity, display: 'flex', alignItems: 'stretch', transition: 'opacity 0.2s',
+    }}>
+      <button
+        onClick={onRun}
+        style={{ flex: 1, padding: '12px 14px', textAlign: 'left', display: 'flex', flexDirection: 'column', gap: '4px', minWidth: 0 }}
+      >
+        {displayName && (
+          <div style={{ fontSize: '14px', fontWeight: 700, color: '#FFB800', marginBottom: '2px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+            {displayName}
+          </div>
+        )}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+          <div className="stencil" style={{ fontSize: displayName ? '14px' : '18px', color: 'var(--accent)', lineHeight: 1 }}>{modeLabel}</div>
+          <div className="mono" style={{ fontSize: '10px', color: '#666' }}>· {when}</div>
+        </div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap', marginTop: '4px' }}>
+          {cats.map(c => {
+            const cat = CATEGORIES.find(x => x.key === c);
+            if (!cat) return null;
+            return (
+              <span key={c} className="mono" style={{
+                fontSize: '9px', padding: '2px 6px', background: cat.color + '22',
+                color: cat.color, borderRadius: '2px', fontWeight: 700, letterSpacing: '0.05em',
+              }}>{cat.label}</span>
+            );
+          })}
+          {mods.map(m => {
+            const mod = MODIFIERS.find(x => x.key === m);
+            if (!mod) return null;
+            return (
+              <span key={m} className="mono" style={{
+                fontSize: '9px', padding: '2px 6px', background: mod.color + '22',
+                color: mod.color, borderRadius: '2px', fontWeight: 700, letterSpacing: '0.05em',
+              }}>+ {mod.label}</span>
+            );
+          })}
+          <span className="mono" style={{ fontSize: '9px', color: '#555' }}>{entry.totalItems} sets</span>
+        </div>
+      </button>
+      {onStarToggle && (
+        <button
+          onClick={onStarToggle}
+          style={{ padding: '12px 12px', borderLeft: '1px solid #222', color: starred ? '#FFB800' : '#444', display: 'flex', alignItems: 'center' }}
+        >
+          <Star size={16} fill={starred ? '#FFB800' : 'transparent'} />
+        </button>
+      )}
+      <button
+        onClick={onInfo}
+        style={{ padding: '12px 14px', borderLeft: '1px solid #222', color: '#666', display: 'flex', alignItems: 'center' }}
+      >
+        <Info size={16} />
+      </button>
+    </div>
+  );
+}
+
+function WorkoutInfoModal({ entry, onClose, onRun }) {
+  const cats = entry.categories || [];
+  const mods = entry.modifiers || [];
+  const exercises = entry.exercises || [];
+  const modeLabel = MODE_LABELS[entry.mode] || (entry.mode && entry.mode.toUpperCase());
+
+  return (
+    <div
+      onClick={onClose}
+      className="fade-in"
+      style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.88)', zIndex: 100, display: 'flex', alignItems: 'flex-end', padding: '20px' }}
+    >
+      <div
+        onClick={e => e.stopPropagation()}
+        style={{
+          width: '100%', background: 'var(--surface)', border: '2px solid var(--accent)', borderRadius: '2px',
+          padding: '20px', maxHeight: '80vh', overflowY: 'auto',
+        }}
+      >
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
+          <div className="mono" style={{ fontSize: '10px', color: '#666' }}>// {new Date(entry.date).toLocaleString()}</div>
+          <button onClick={onClose} style={{ color: '#666' }}><X size={18} /></button>
+        </div>
+
+        <div className="display" style={{ fontSize: '32px', lineHeight: 0.9, color: 'var(--accent)', marginBottom: '4px' }}>
+          {modeLabel}
+        </div>
+        <div className="mono" style={{ fontSize: '12px', color: '#888', marginBottom: '16px' }}>
+          {entry.totalItems} total sets · {exercises.length} exercises
+        </div>
+
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', marginBottom: '16px' }}>
+          {cats.map(c => {
+            const cat = CATEGORIES.find(x => x.key === c);
+            if (!cat) return null;
+            return (
+              <span key={c} className="stencil" style={{
+                fontSize: '14px', padding: '4px 10px', background: cat.color + '22',
+                color: cat.color, borderRadius: '2px',
+              }}>{cat.label}</span>
+            );
+          })}
+          {mods.map(m => {
+            const mod = MODIFIERS.find(x => x.key === m);
+            if (!mod) return null;
+            return (
+              <span key={m} className="stencil" style={{
+                fontSize: '14px', padding: '4px 10px', background: mod.color + '22',
+                color: mod.color, borderRadius: '2px',
+              }}>+ {mod.label}</span>
+            );
+          })}
+        </div>
+
+        <div className="mono" style={{ fontSize: '11px', color: 'var(--accent)', marginBottom: '8px' }}>// EXERCISES</div>
+        <div style={{ marginBottom: '20px' }}>
+          {exercises.map(ex => {
+            const reps = (entry.modeConfig && entry.modeConfig.exerciseSets && entry.modeConfig.exerciseSets[ex.id]) || ex.default || ex.defaultReps;
+            const equip = EQUIP[ex.equipment] || EQUIP.bodyweight;
+            return (
+              <div key={ex.id} style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '8px 0', borderBottom: '1px solid #1A1A1A' }}>
+                <span className="mono" style={{
+                  fontSize: '9px', padding: '2px 5px', background: equip.color + '22',
+                  color: equip.color, borderRadius: '2px', fontWeight: 700, minWidth: '30px', textAlign: 'center',
+                }}>{equip.label}</span>
+                <div style={{ flex: 1, fontSize: '13px' }}>{ex.name}</div>
+                <div className="mono" style={{ fontSize: '11px', color: '#888' }}>{reps} {ex.unit}</div>
+              </div>
+            );
+          })}
+        </div>
+
+        <button onClick={onRun} style={{
+          width: '100%', padding: '20px', background: 'var(--accent)', color: '#0A0A0A',
+          fontSize: '16px', fontWeight: 900, fontFamily: 'Archivo Black, sans-serif',
+          borderRadius: '2px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '10px',
+        }}>
+          <Play size={18} fill="#0A0A0A" /> RUN AGAIN
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function HistoryScreen({ history, onBack, onRerun, onClear, findMatchingFavorite, addFavorite, removeFavorite }) {
+  const [infoFor, setInfoFor] = useState(null);
+  const [confirmClear, setConfirmClear] = useState(false);
+  const [namingEntry, setNamingEntry] = useState(null);
+
+  const handleStarToggle = (entry) => {
+    const existing = findMatchingFavorite(entry);
+    if (existing) {
+      removeFavorite(entry);
+    } else {
+      setNamingEntry(entry);
+    }
+  };
+
+  return (
+    <div className="slide-in" style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column', position: 'relative', zIndex: 2 }}>
+      <div style={{ padding: '20px 24px 12px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px' }}>
+          <button onClick={onBack} style={{ display: 'flex', alignItems: 'center', gap: '6px', color: '#888', padding: '4px 0' }}>
+            <ChevronLeft size={18} />
+            <span className="mono" style={{ fontSize: '11px' }}>HOME</span>
+          </button>
+          {history.length > 0 && (
+            <button
+              onClick={() => confirmClear ? (onClear(), setConfirmClear(false)) : setConfirmClear(true)}
+              style={{ color: confirmClear ? 'var(--accent)' : '#666', fontSize: '11px' }}
+              className="mono"
+            >
+              {confirmClear ? 'TAP AGAIN TO CONFIRM' : 'CLEAR'}
+            </button>
+          )}
+        </div>
+        <div className="display" style={{ fontSize: 'clamp(36px, 10vw, 56px)', lineHeight: 0.9, color: 'var(--fg)' }}>
+          HISTORY
+        </div>
+        <div className="mono" style={{ fontSize: '11px', color: '#666', marginTop: '8px' }}>
+          {history.length} {history.length === 1 ? 'session' : 'sessions'} logged
+        </div>
+      </div>
+
+      <div style={{ flex: 1, padding: '12px 24px 24px', overflowY: 'auto' }}>
+        {history.length === 0 ? (
+          <div style={{ padding: '40px 20px', textAlign: 'center', color: '#444' }}>
+            <div className="mono" style={{ fontSize: '12px' }}>// NOTHING HERE YET</div>
+            <div style={{ fontSize: '13px', marginTop: '8px' }}>Finish a workout and it'll show up.</div>
+          </div>
+        ) : (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+            {history.map(entry => (
+              <RecentWorkoutCard
+                key={entry.date}
+                entry={entry}
+                opacity={1}
+                onRun={() => onRerun(entry)}
+                onInfo={() => setInfoFor(entry)}
+                onStarToggle={() => handleStarToggle(entry)}
+                findMatchingFavorite={findMatchingFavorite}
+              />
+            ))}
+          </div>
+        )}
+      </div>
+
+      {infoFor && <WorkoutInfoModal entry={infoFor} onClose={() => setInfoFor(null)} onRun={() => { onRerun(infoFor); setInfoFor(null); }} />}
+      {namingEntry && (
+        <NameFavoriteModal
+          entry={namingEntry}
+          onCancel={() => setNamingEntry(null)}
+          onSave={(name) => { addFavorite(namingEntry, name); setNamingEntry(null); }}
+        />
+      )}
+    </div>
+  );
+}
+
+function FavoritesScreen({ favorites, onBack, onRerun, removeFavorite }) {
+  const [infoFor, setInfoFor] = useState(null);
+
+  return (
+    <div className="slide-in" style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column', position: 'relative', zIndex: 2 }}>
+      <div style={{ padding: '20px 24px 12px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px' }}>
+          <button onClick={onBack} style={{ display: 'flex', alignItems: 'center', gap: '6px', color: '#888', padding: '4px 0' }}>
+            <ChevronLeft size={18} />
+            <span className="mono" style={{ fontSize: '11px' }}>HOME</span>
+          </button>
+        </div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+          <Star size={28} fill="#FFB800" color="#FFB800" />
+          <div className="display" style={{ fontSize: 'clamp(36px, 10vw, 56px)', lineHeight: 0.9, color: '#FFB800' }}>
+            FAVORITES
+          </div>
+        </div>
+        <div className="mono" style={{ fontSize: '11px', color: '#666', marginTop: '8px' }}>
+          {favorites.length} saved {favorites.length === 1 ? 'workout' : 'workouts'}
+        </div>
+      </div>
+
+      <div style={{ flex: 1, padding: '12px 24px 24px', overflowY: 'auto' }}>
+        {favorites.length === 0 ? (
+          <div style={{ padding: '40px 20px', textAlign: 'center', color: '#444' }}>
+            <div className="mono" style={{ fontSize: '12px' }}>// NOTHING HERE YET</div>
+            <div style={{ fontSize: '13px', marginTop: '8px' }}>Tap the star on any workout to favorite it.</div>
+          </div>
+        ) : (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+            {favorites.map(entry => (
+              <RecentWorkoutCard
+                key={entry.favId || entry.date}
+                entry={entry}
+                opacity={1}
+                isFavorite
+                onRun={() => onRerun(entry)}
+                onInfo={() => setInfoFor(entry)}
+                onStarToggle={() => removeFavorite(entry)}
+              />
+            ))}
+          </div>
+        )}
+      </div>
+
+      {infoFor && <WorkoutInfoModal entry={infoFor} onClose={() => setInfoFor(null)} onRun={() => { onRerun(infoFor); setInfoFor(null); }} />}
+    </div>
+  );
+}
+
+function CategoryScreen({ selectedCategories, setSelectedCategories, selectedModifiers, setSelectedModifiers, onBack, onNext }) {
+  const toggleCat = (key) => {
+    setSelectedCategories(prev => prev.includes(key) ? prev.filter(k => k !== key) : [...prev, key]);
+  };
+  const toggleMod = (key) => {
+    setSelectedModifiers(prev => prev.includes(key) ? prev.filter(k => k !== key) : [...prev, key]);
+  };
+
+  return (
+    <div className="slide-in" style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column', position: 'relative', zIndex: 2 }}>
+      <Header step={1} total={4} title="TARGETS" onBack={onBack} />
+      <div style={{ padding: '0 24px 24px', flex: 1, overflowY: 'auto' }}>
+        <div className="mono" style={{ fontSize: '12px', color: '#666', marginBottom: '16px' }}>
+          // MUSCLE GROUPS
+        </div>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '8px', marginBottom: '32px' }}>
+          {CATEGORIES.map(cat => {
+            const Icon = cat.icon;
+            const on = selectedCategories.includes(cat.key);
+            return (
+              <button
+                key={cat.key}
+                onClick={() => toggleCat(cat.key)}
+                style={{
+                  padding: '18px 10px', aspectRatio: '1', display: 'flex', flexDirection: 'column',
+                  alignItems: 'flex-start', justifyContent: 'space-between', textAlign: 'left',
+                  background: on ? cat.color : '#121212', color: on ? '#0A0A0A' : '#F5F1E8',
+                  border: on ? `2px solid ${cat.color}` : '2px solid #222',
+                  borderRadius: '2px', transition: 'all 0.15s',
+                }}
+              >
+                <Icon size={24} strokeWidth={on ? 2.5 : 1.5} />
+                <div>
+                  <div className="stencil" style={{ fontSize: '18px', lineHeight: 1, marginBottom: '2px' }}>{cat.label}</div>
+                  <div className="mono" style={{ fontSize: '9px', opacity: 0.7 }}>
+                    {on ? '✓ ON' : 'TAP'}
+                  </div>
+                </div>
+              </button>
+            );
+          })}
+        </div>
+
+        <div className="mono" style={{ fontSize: '12px', color: '#666', marginBottom: '8px' }}>
+          // EQUIPMENT AVAILABLE
+        </div>
+        <div className="mono" style={{ fontSize: '11px', color: '#555', marginBottom: '12px', lineHeight: 1.5 }}>
+          Toggle these to unlock more exercise variants in each group.
+        </div>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+          {MODIFIERS.map(mod => {
+            const Icon = mod.icon;
+            const on = selectedModifiers.includes(mod.key);
+            return (
+              <button
+                key={mod.key}
+                onClick={() => toggleMod(mod.key)}
+                style={{
+                  padding: '14px 16px', display: 'flex', alignItems: 'center', gap: '14px', textAlign: 'left',
+                  background: on ? mod.color : '#121212', color: on ? '#0A0A0A' : '#F5F1E8',
+                  border: on ? `2px solid ${mod.color}` : '2px solid #222',
+                  borderRadius: '2px', transition: 'all 0.15s',
+                }}
+              >
+                <Icon size={22} strokeWidth={on ? 2.5 : 1.5} />
+                <div style={{ flex: 1 }}>
+                  <div className="stencil" style={{ fontSize: '18px', lineHeight: 1, marginBottom: '2px' }}>{mod.label}</div>
+                  <div className="mono" style={{ fontSize: '10px', opacity: 0.75 }}>{mod.desc}</div>
+                </div>
+                <div style={{
+                  width: '36px', height: '20px', borderRadius: '20px',
+                  background: on ? '#0A0A0A' : '#222', position: 'relative', transition: 'all 0.2s',
+                }}>
+                  <div style={{
+                    position: 'absolute', top: '2px', left: on ? '18px' : '2px',
+                    width: '16px', height: '16px', borderRadius: '16px',
+                    background: on ? mod.color : '#666', transition: 'all 0.2s',
+                  }} />
+                </div>
+              </button>
+            );
+          })}
+        </div>
+      </div>
+      <BottomBar disabled={selectedCategories.length === 0} onNext={onNext} label="PICK EXERCISES" />
+    </div>
+  );
+}
+
+function CategoryRandomPicker({ catKey, catColor, maxCount, value, onValueChange, onRandom }) {
+  // If no exercises in this category, don't render
+  if (maxCount === 0) return null;
+  // Clamp value to valid range
+  const safeValue = Math.max(1, Math.min(maxCount, value));
+  const min = 1;
+  const max = maxCount;
+
+  return (
+    <div style={{
+      padding: '10px 12px', marginBottom: '10px',
+      background: '#0F0F0F', border: `1px solid ${catColor}33`, borderRadius: '2px',
+    }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '8px' }}>
+        <div className="mono" style={{ fontSize: '10px', color: '#888', flex: 1 }}>
+          PICK <span style={{ color: catColor, fontWeight: 700 }}>{safeValue}</span> AT RANDOM
+        </div>
+        <button onClick={onRandom} style={{
+          padding: '6px 12px', background: catColor, color: '#0A0A0A',
+          fontSize: '11px', fontWeight: 900, fontFamily: 'Archivo Black, sans-serif',
+          letterSpacing: '0.05em', borderRadius: '2px', display: 'flex',
+          alignItems: 'center', gap: '5px',
+        }}>
+          <Shuffle size={12} strokeWidth={2.5} /> RANDOM
+        </button>
+      </div>
+      <input
+        type="range"
+        min={min}
+        max={max}
+        value={safeValue}
+        onChange={e => onValueChange(parseInt(e.target.value))}
+        style={{ width: '100%', accentColor: catColor }}
+      />
+      <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '2px' }}>
+        <div className="mono" style={{ fontSize: '9px', color: '#555' }}>{min}</div>
+        <div className="mono" style={{ fontSize: '9px', color: '#555' }}>{max}</div>
+      </div>
+    </div>
+  );
+}
+
+function ExerciseScreen({ library, setLibrary, categories, modifiers, selected, setSelected, onBack, onNext }) {
+  const [addingTo, setAddingTo] = useState(null);
+  const [newName, setNewName] = useState('');
+  const [newMin, setNewMin] = useState(10);
+  const [newMax, setNewMax] = useState(30);
+  const [newDefault, setNewDefault] = useState(15);
+  const [newEquip, setNewEquip] = useState('bodyweight');
+  const [newUnit, setNewUnit] = useState('reps');
+  // Per-category random-pick counts (how many to randomly select)
+  const [randomCounts, setRandomCounts] = useState({});
+
+  const allowedEquip = new Set(['bodyweight', ...modifiers]);
+
+  const toggle = (ex) => {
+    setSelected(prev => {
+      const exists = prev.find(e => e.id === ex.id);
+      return exists ? prev.filter(e => e.id !== ex.id) : [...prev, { ...ex }];
+    });
+  };
+
+  // Randomly pick N exercises from this category's available pool,
+  // REPLACING any currently-selected exercises in that category
+  const randomizePicksForCategory = (catKey, n) => {
+    const pool = library[catKey].filter(ex => allowedEquip.has(ex.equipment));
+    if (pool.length === 0) return;
+    const count = Math.min(n, pool.length);
+    const shuffled = shuffleArr(pool).slice(0, count);
+    setSelected(prev => {
+      // Keep selections from other categories, replace this one
+      const otherCats = prev.filter(e => e.category !== catKey);
+      return [...otherCats, ...shuffled.map(ex => ({ ...ex }))];
+    });
+  };
+
+  const addCustom = (catKey) => {
+    if (!newName.trim()) return;
+    const ex = {
+      id: 'custom-' + Date.now(), name: newName.trim(), category: catKey,
+      equipment: newEquip, unit: newUnit,
+      min: parseInt(newMin) || 5, max: parseInt(newMax) || 30, default: parseInt(newDefault) || 15,
+      custom: true,
+    };
+    setLibrary(prev => ({ ...prev, [catKey]: [...prev[catKey], ex] }));
+    setNewName(''); setAddingTo(null);
+  };
+
+  const removeCustom = (ex) => {
+    setLibrary(prev => ({ ...prev, [ex.category]: prev[ex.category].filter(e => e.id !== ex.id) }));
+    setSelected(prev => prev.filter(e => e.id !== ex.id));
+  };
+
+  return (
+    <div className="slide-in" style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column', position: 'relative', zIndex: 2 }}>
+      <Header step={2} total={4} title="EXERCISES" onBack={onBack} />
+      <div style={{ padding: '0 24px 24px', flex: 1, overflowY: 'auto' }}>
+        <div className="mono" style={{ fontSize: '12px', color: '#666', marginBottom: '16px' }}>
+          // {selected.length} SELECTED
+        </div>
+
+        <div style={{ display: 'flex', gap: '8px', marginBottom: '20px', flexWrap: 'wrap' }}>
+          {Object.values(EQUIP).filter(e => allowedEquip.has(e.key)).map(e => (
+            <div key={e.key} className="mono" style={{
+              fontSize: '9px', padding: '3px 8px', background: e.color + '22',
+              color: e.color, borderRadius: '2px', fontWeight: 700, letterSpacing: '0.05em',
+            }}>{e.label} {e.name}</div>
+          ))}
+        </div>
+
+        {categories.map(catKey => {
+          const cat = CATEGORIES.find(c => c.key === catKey);
+          const Icon = cat.icon;
+          const visibleExs = library[catKey].filter(ex => allowedEquip.has(ex.equipment));
+          return (
+            <div key={catKey} style={{ marginBottom: '28px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '12px', borderBottom: `2px solid ${cat.color}`, paddingBottom: '8px' }}>
+                <Icon size={18} color={cat.color} />
+                <div className="stencil" style={{ fontSize: '20px', color: cat.color }}>{cat.label}</div>
+                <div className="mono" style={{ fontSize: '10px', color: '#555', marginLeft: 'auto' }}>{visibleExs.length} available</div>
+              </div>
+
+              {/* Random picker for this category */}
+              <CategoryRandomPicker
+                catKey={catKey}
+                catColor={cat.color}
+                maxCount={visibleExs.length}
+                value={randomCounts[catKey] ?? Math.min(5, visibleExs.length)}
+                onValueChange={v => setRandomCounts(p => ({ ...p, [catKey]: v }))}
+                onRandom={() => randomizePicksForCategory(catKey, randomCounts[catKey] ?? Math.min(5, visibleExs.length))}
+              />
+
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                {visibleExs.map(ex => {
+                  const on = selected.find(e => e.id === ex.id);
+                  const equip = EQUIP[ex.equipment] || EQUIP.bodyweight;
+                  return (
+                    <button
+                      key={ex.id}
+                      onClick={() => toggle(ex)}
+                      style={{
+                        padding: '12px 14px', display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                        background: on ? '#F5F1E8' : '#121212', color: on ? '#0A0A0A' : '#F5F1E8',
+                        border: `1px solid ${on ? '#F5F1E8' : '#222'}`, borderRadius: '2px', textAlign: 'left',
+                      }}
+                    >
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flex: 1, minWidth: 0 }}>
+                        <div style={{
+                          width: '18px', height: '18px', border: `2px solid ${on ? '#0A0A0A' : '#444'}`,
+                          display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: '2px',
+                          flexShrink: 0,
+                        }}>
+                          {on && <Check size={12} strokeWidth={3} />}
+                        </div>
+                        <div style={{ fontWeight: 600, fontSize: '14px', flex: 1, overflow: 'hidden', textOverflow: 'ellipsis' }}>{ex.name}</div>
+                      </div>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0 }}>
+                        <span className="mono" style={{
+                          fontSize: '9px', padding: '2px 6px',
+                          background: on ? '#0A0A0A' : '#1F1F1F',
+                          color: equip.color,
+                          borderRadius: '2px', fontWeight: 700, letterSpacing: '0.05em',
+                        }}>{equip.label}</span>
+                        {ex.custom && (
+                          <div
+                            onClick={(e) => { e.stopPropagation(); removeCustom(ex); }}
+                            style={{ padding: '4px', opacity: 0.5 }}
+                          >
+                            <X size={14} />
+                          </div>
+                        )}
+                      </div>
+                    </button>
+                  );
+                })}
+                {addingTo === catKey ? (
+                  <div style={{ padding: '12px', background: '#0F0F0F', border: `1px dashed ${cat.color}`, borderRadius: '2px' }}>
+                    <input
+                      autoFocus value={newName} onChange={e => setNewName(e.target.value)}
+                      placeholder="Exercise name"
+                      style={{ width: '100%', padding: '8px', background: '#000', color: 'var(--fg)', border: '1px solid #333', marginBottom: '8px', fontFamily: 'inherit', borderRadius: '2px' }}
+                    />
+                    <div style={{ display: 'flex', gap: '6px', marginBottom: '8px' }}>
+                      <select value={newEquip} onChange={e => setNewEquip(e.target.value)} style={{ flex: 1, padding: '8px', background: '#000', color: 'var(--fg)', border: '1px solid #333', fontFamily: 'inherit', borderRadius: '2px', fontSize: '11px' }}>
+                        <option value="bodyweight">Bodyweight</option>
+                        {allowedEquip.has('weights') && <option value="weights">Weights</option>}
+                        {allowedEquip.has('pullup') && <option value="pullup">Pull-up Bar</option>}
+                      </select>
+                      <select value={newUnit} onChange={e => setNewUnit(e.target.value)} style={{ padding: '8px', background: '#000', color: 'var(--fg)', border: '1px solid #333', fontFamily: 'inherit', borderRadius: '2px', fontSize: '11px' }}>
+                        <option value="reps">reps</option>
+                        <option value="sec">sec</option>
+                      </select>
+                    </div>
+                    <div style={{ display: 'flex', gap: '6px', marginBottom: '8px', fontSize: '11px' }}>
+                      <label style={{ flex: 1, color: '#888' }}>
+                        MIN
+                        <input type="number" value={newMin} onChange={e => setNewMin(e.target.value)} style={{ width: '100%', padding: '6px', background: '#000', color: 'var(--fg)', border: '1px solid #333', fontFamily: 'inherit', borderRadius: '2px', marginTop: '2px' }} />
+                      </label>
+                      <label style={{ flex: 1, color: '#888' }}>
+                        DEFAULT
+                        <input type="number" value={newDefault} onChange={e => setNewDefault(e.target.value)} style={{ width: '100%', padding: '6px', background: '#000', color: 'var(--fg)', border: '1px solid #333', fontFamily: 'inherit', borderRadius: '2px', marginTop: '2px' }} />
+                      </label>
+                      <label style={{ flex: 1, color: '#888' }}>
+                        MAX
+                        <input type="number" value={newMax} onChange={e => setNewMax(e.target.value)} style={{ width: '100%', padding: '6px', background: '#000', color: 'var(--fg)', border: '1px solid #333', fontFamily: 'inherit', borderRadius: '2px', marginTop: '2px' }} />
+                      </label>
+                    </div>
+                    <div style={{ display: 'flex', gap: '6px' }}>
+                      <button onClick={() => addCustom(catKey)} style={{ flex: 1, padding: '8px', background: cat.color, color: '#0A0A0A', fontWeight: 700, borderRadius: '2px' }}>ADD</button>
+                      <button onClick={() => setAddingTo(null)} style={{ padding: '8px 12px', color: '#666' }}><X size={16} /></button>
+                    </div>
+                  </div>
+                ) : (
+                  <button
+                    onClick={() => setAddingTo(catKey)}
+                    style={{ padding: '10px', color: cat.color, border: `1px dashed ${cat.color}44`, borderRadius: '2px', fontSize: '12px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}
+                  >
+                    <Plus size={14} /> ADD CUSTOM
+                  </button>
+                )}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+      <BottomBar disabled={selected.length === 0} onNext={onNext} label="CHOOSE FORMAT" />
+    </div>
+  );
+}
+
+function ModeScreen({ mode, setMode, modeConfig, setModeConfig, exercises, setExercises, onBack, onNext }) {
+  // Track previous mode so we know what to seed from when switching to manual
+  const prevModeRef = React.useRef(mode);
+
+  useEffect(() => {
+    if (mode && mode !== 'manual') {
+      setModeConfig(prev => {
+        const next = { ...prev };
+        if (!next.sets) next.sets = 3;
+        if (!next.supersetSize) next.supersetSize = 2;
+        const filled = { ...(next.exerciseSets || {}) };
+        exercises.forEach(e => {
+          if (filled[e.id] === undefined) filled[e.id] = e.default || e.defaultReps || 10;
+        });
+        next.exerciseSets = filled;
+        return next;
+      });
+    }
+    // When switching INTO manual, seed the queue from the previous non-manual mode config
+    // (only if manualQueue is empty, so we don't wipe user's manual edits on every re-entry)
+    if (mode === 'manual') {
+      const prev = prevModeRef.current;
+      setModeConfig(cfg => {
+        const hasExistingQueue = cfg.manualQueue && cfg.manualQueue.length > 0;
+        if (hasExistingQueue) return cfg; // preserve user's existing manual edits
+
+        // If user had a real mode configured with exercises, seed from it
+        if (prev && prev !== 'manual' && exercises && exercises.length > 0) {
+          const built = buildQueue(exercises, prev, cfg);
+          // Enrich with min/max and fresh unique IDs for the manual queue
+          const seeded = built.map((item, i) => {
+            const libEx = exercises.find(e => e.id === item.exId);
+            return {
+              id: 'q-' + Date.now() + '-' + i + '-' + Math.random(),
+              exId: item.exId,
+              name: item.name,
+              reps: item.reps,
+              unit: item.unit,
+              equipment: item.equipment,
+              min: libEx ? libEx.min : undefined,
+              max: libEx ? libEx.max : undefined,
+            };
+          });
+          return { ...cfg, manualQueue: seeded };
+        }
+
+        // Otherwise just make sure it's initialized as empty array
+        return { ...cfg, manualQueue: [] };
+      });
+    }
+    prevModeRef.current = mode;
+  }, [mode]);
+
+  const canProceed = mode && (mode !== 'manual' || (modeConfig.manualQueue && modeConfig.manualQueue.length > 0));
+
+  return (
+    <div className="slide-in" style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column', position: 'relative', zIndex: 2 }}>
+      <Header step={3} total={4} title="FORMAT" onBack={onBack} />
+      <div style={{ padding: '0 24px 24px', flex: 1, overflowY: 'auto' }}>
+        <div className="mono" style={{ fontSize: '12px', color: '#666', marginBottom: '16px' }}>
+          // HOW DO YOU WANT TO RUN IT
+        </div>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginBottom: '24px' }}>
+          {MODES.map(m => {
+            const Icon = m.icon;
+            const on = mode === m.key;
+            return (
+              <button
+                key={m.key}
+                onClick={() => setMode(m.key)}
+                style={{
+                  padding: '14px 16px', textAlign: 'left', background: on ? 'var(--accent)' : '#121212',
+                  color: on ? '#0A0A0A' : '#F5F1E8', border: `2px solid ${on ? 'var(--accent)' : '#222'}`,
+                  borderRadius: '2px', display: 'flex', gap: '14px', alignItems: 'flex-start',
+                }}
+              >
+                <Icon size={22} strokeWidth={on ? 2.5 : 1.5} style={{ marginTop: '2px' }} />
+                <div style={{ flex: 1 }}>
+                  <div className="stencil" style={{ fontSize: '18px', marginBottom: '2px', lineHeight: 1 }}>{m.label}</div>
+                  <div className="mono" style={{ fontSize: '11px', opacity: 0.75, lineHeight: 1.4 }}>{m.desc}</div>
+                </div>
+              </button>
+            );
+          })}
+        </div>
+
+        {mode && mode !== 'manual' && (
+          <div style={{ padding: '16px', border: '1px solid #222', borderRadius: '2px', marginBottom: '16px' }}>
+            <div className="mono" style={{ fontSize: '11px', color: 'var(--accent)', marginBottom: '12px' }}>// CONFIG</div>
+            {(mode === 'focus' || mode === 'circuit') && (
+              <NumberField
+                label={mode === 'focus' ? 'SETS PER EXERCISE' : 'ROUNDS'}
+                value={modeConfig.sets || 3}
+                onChange={v => setModeConfig(p => ({ ...p, sets: v }))}
+                min={1} max={10}
+              />
+            )}
+            {mode === 'superset' && (
+              <>
+                <NumberField
+                  label="EXERCISES PER GROUP"
+                  value={modeConfig.supersetSize || 2}
+                  onChange={v => setModeConfig(p => ({ ...p, supersetSize: v }))}
+                  min={2} max={10}
+                />
+                <NumberField
+                  label="SETS PER GROUP"
+                  value={modeConfig.sets || 3}
+                  onChange={v => setModeConfig(p => ({ ...p, sets: v }))}
+                  min={1} max={10}
+                />
+              </>
+            )}
+            {mode === 'addon' && (
+              <div className="mono" style={{ fontSize: '11px', color: '#888', lineHeight: 1.5 }}>
+                Round 1: exercise 1. Round 2: exercises 1, 2. Round 3: 1, 2, 3. And so on, until all {exercises.length} are hit in the final round.
+              </div>
+            )}
+          </div>
+        )}
+
+        {mode && mode !== 'manual' && (
+          <OrderList
+            exercises={exercises}
+            setExercises={setExercises}
+            mode={mode}
+            supersetSize={modeConfig.supersetSize || 2}
+          />
+        )}
+
+        {mode && mode !== 'manual' && (
+          <div style={{ padding: '16px', border: '1px solid #222', borderRadius: '2px' }}>
+            <div className="mono" style={{ fontSize: '11px', color: 'var(--accent)', marginBottom: '16px' }}>// REPS PER EXERCISE</div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '18px' }}>
+              {exercises.map(ex => (
+                <RepSlider
+                  key={ex.id}
+                  exercise={ex}
+                  value={(modeConfig.exerciseSets && modeConfig.exerciseSets[ex.id]) || ex.default}
+                  onChange={v => setModeConfig(p => ({ ...p, exerciseSets: { ...p.exerciseSets, [ex.id]: v } }))}
+                />
+              ))}
+            </div>
+          </div>
+        )}
+
+        {mode === 'manual' && (
+          <ManualBuilder
+            exercises={exercises}
+            queue={modeConfig.manualQueue || []}
+            setQueue={q => setModeConfig(p => ({ ...p, manualQueue: q }))}
+          />
+        )}
+      </div>
+      <BottomBar disabled={!canProceed} onNext={onNext} label="REST SETTINGS" />
+    </div>
+  );
+}
+
+function OrderList({ exercises, setExercises, mode, supersetSize = 2 }) {
+  const [dragState, setDragState] = React.useState(null);
+  // dragState shape: { srcIdx, targetIdx, y, offsetY }
+  const listRef = React.useRef(null);
+  const rowHeightRef = React.useRef(50); // measured row height including divider
+
+  const doShuffle = (variant) => {
+    if (variant === 'random') setExercises(shuffleArr(exercises));
+    else if (variant === 'category') setExercises(shuffleByCategory(exercises));
+    else if (variant === 'opposing') setExercises(shuffleByOpposing(exercises));
+  };
+
+  const shuffleOptions = [
+    { key: 'random', label: 'PURE RANDOM', desc: 'Any exercise, any order' },
+    { key: 'category', label: 'BY CATEGORY', desc: 'Upper → lower → core' },
+  ];
+  if (mode === 'superset') {
+    shuffleOptions.push({ key: 'opposing', label: 'OPPOSING MUSCLES', desc: 'Push / pull / legs / core pairing' });
+  }
+
+  const catColor = (cat) => {
+    const c = CATEGORIES.find(x => x.key === cat);
+    return c ? c.color : '#888';
+  };
+
+  const showGroupDividers = mode === 'superset';
+
+  // ========= Drag handlers =========
+  const onPointerDown = (e, srcIdx) => {
+    e.preventDefault();
+    // Try to measure actual row height from the list
+    if (listRef.current) {
+      const rows = listRef.current.querySelectorAll('[data-row]');
+      if (rows.length > 1) {
+        const r0 = rows[0].getBoundingClientRect();
+        const r1 = rows[1].getBoundingClientRect();
+        rowHeightRef.current = r1.top - r0.top;
+      } else if (rows.length === 1) {
+        rowHeightRef.current = rows[0].getBoundingClientRect().height + 8;
+      }
+    }
+    const listRect = listRef.current.getBoundingClientRect();
+    setDragState({
+      srcIdx,
+      targetIdx: srcIdx,
+      y: e.clientY - listRect.top,
+      listTop: listRect.top,
+    });
+  };
+
+  // Native document-level handlers (attached via useEffect below).
+  // Using native listeners because React's synthetic event system attaches
+  // touchmove as passive on some browsers, which makes preventDefault a no-op
+  // and lets the page scroll when dragging downward.
+  React.useEffect(() => {
+    if (!dragState) return;
+
+    const handleMove = (e) => {
+      // Support both touch and mouse during drag
+      const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+      if (clientY == null) return;
+      // Block scroll while dragging
+      if (e.cancelable) e.preventDefault();
+
+      if (!listRef.current) return;
+      const listRect = listRef.current.getBoundingClientRect();
+      const relY = clientY - listRect.top;
+      const clampedY = Math.max(0, Math.min(listRect.height, relY));
+      const rowH = rowHeightRef.current;
+      let targetIdx = Math.floor(clampedY / rowH);
+      targetIdx = Math.max(0, Math.min(exercises.length - 1, targetIdx));
+      setDragState(prev => prev ? { ...prev, y: clampedY, targetIdx } : null);
+    };
+
+    const handleEnd = () => {
+      setDragState(current => {
+        if (current && current.srcIdx !== current.targetIdx) {
+          const n = [...exercises];
+          const [moved] = n.splice(current.srcIdx, 1);
+          n.splice(current.targetIdx, 0, moved);
+          setExercises(n);
+        }
+        return null;
+      });
+    };
+
+    // passive: false is crucial — lets preventDefault actually stop scrolling
+    document.addEventListener('touchmove', handleMove, { passive: false });
+    document.addEventListener('mousemove', handleMove);
+    document.addEventListener('touchend', handleEnd);
+    document.addEventListener('touchcancel', handleEnd);
+    document.addEventListener('mouseup', handleEnd);
+
+    return () => {
+      document.removeEventListener('touchmove', handleMove);
+      document.removeEventListener('mousemove', handleMove);
+      document.removeEventListener('touchend', handleEnd);
+      document.removeEventListener('touchcancel', handleEnd);
+      document.removeEventListener('mouseup', handleEnd);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [dragState ? dragState.srcIdx : null, exercises]);
+
+  return (
+    <div style={{ padding: '16px', border: '1px solid #222', borderRadius: '2px', marginBottom: '16px' }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '12px' }}>
+        <div className="mono" style={{ fontSize: '11px', color: 'var(--accent)' }}>
+          // ORDER ({exercises.length})
+        </div>
+        <div className="mono" style={{ fontSize: '10px', color: '#666' }}>
+          HOLD HANDLE TO DRAG
+        </div>
+      </div>
+
+      {/* Shuffle buttons row */}
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', marginBottom: '12px' }}>
+        {shuffleOptions.map(opt => (
+          <button
+            key={opt.key}
+            onClick={() => doShuffle(opt.key)}
+            style={{
+              padding: '10px 12px', background: '#0F0F0F', border: '1px solid #222',
+              borderRadius: '2px', display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+              textAlign: 'left',
+            }}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+              <Shuffle size={14} color="var(--accent)" />
+              <div>
+                <div className="stencil" style={{ fontSize: '14px', color: 'var(--fg)', lineHeight: 1 }}>{opt.label}</div>
+                <div className="mono" style={{ fontSize: '9px', color: '#666', marginTop: '2px' }}>{opt.desc}</div>
+              </div>
+            </div>
+            <div className="mono" style={{ fontSize: '10px', color: 'var(--accent)', fontWeight: 700 }}>ROLL →</div>
+          </button>
+        ))}
+      </div>
+
+      {/* Ordered list - the draggable container */}
+      <div
+        ref={listRef}
+        style={{
+          display: 'flex', flexDirection: 'column', position: 'relative',
+          // Disable browser gestures during drag so page doesn't scroll
+          touchAction: dragState ? 'none' : 'auto',
+        }}
+      >
+        {exercises.map((ex, i) => {
+          const equip = EQUIP[ex.equipment] || EQUIP.bodyweight;
+          const isGroupEnd = showGroupDividers && (i + 1) % supersetSize === 0 && i < exercises.length - 1;
+          const isDragging = dragState && dragState.srcIdx === i;
+          const isDropTarget = dragState && !isDragging && dragState.targetIdx === i;
+
+          // Display index (accounts for where dragged item will slot in visually)
+          let displayIdx = i;
+          if (dragState && !isDragging) {
+            const { srcIdx, targetIdx } = dragState;
+            if (srcIdx < targetIdx) {
+              // item moved down, rows srcIdx+1..targetIdx shift up by 1
+              if (i > srcIdx && i <= targetIdx) displayIdx = i - 1;
+            } else {
+              // item moved up, rows targetIdx..srcIdx-1 shift down by 1
+              if (i >= targetIdx && i < srcIdx) displayIdx = i + 1;
+            }
+          }
+
+          return (
+            <React.Fragment key={ex.id}>
+              <div
+                data-row
+                style={{
+                  padding: '10px 0', display: 'flex', alignItems: 'center', gap: '8px',
+                  borderBottom: isGroupEnd ? 'none' : '1px solid #1A1A1A',
+                  background: isDragging ? '#1A1A1A' : 'transparent',
+                  opacity: isDragging ? 0.55 : 1,
+                  boxShadow: isDropTarget ? `inset 0 -2px 0 0 var(--accent)` : 'none',
+                  transition: dragState ? 'none' : 'background 0.15s',
+                  userSelect: 'none',
+                  WebkitUserSelect: 'none',
+                }}
+              >
+                <div className="mono" style={{
+                  fontSize: '10px', color: '#666', width: '22px', flexShrink: 0,
+                }}>{String(displayIdx + 1).padStart(2, '0')}</div>
+                <div style={{
+                  width: '3px', height: '28px', background: catColor(ex.category),
+                  borderRadius: '2px', flexShrink: 0,
+                }} />
+                <span className="mono" style={{
+                  fontSize: '9px', padding: '2px 5px', background: equip.color + '22',
+                  color: equip.color, borderRadius: '2px', fontWeight: 700, flexShrink: 0,
+                }}>{equip.label}</span>
+                <div style={{
+                  flex: 1, fontSize: '13px', minWidth: 0,
+                  overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+                }}>{ex.name}</div>
+
+                {/* Drag handle - press and hold to reorder */}
+                <div
+                  onTouchStart={(e) => {
+                    e.preventDefault();
+                    onPointerDown({ clientY: e.touches[0].clientY, preventDefault: () => {} }, i);
+                  }}
+                  onMouseDown={(e) => onPointerDown(e, i)}
+                  style={{
+                    width: '44px', height: '40px', display: 'flex', alignItems: 'center',
+                    justifyContent: 'center', cursor: 'grab', touchAction: 'none',
+                    color: isDragging ? 'var(--accent)' : '#666',
+                    background: isDragging ? '#0A0A0A' : 'transparent',
+                    borderRadius: '2px', flexShrink: 0,
+                  }}
+                >
+                  <GripVertical size={20} strokeWidth={2} />
+                </div>
+              </div>
+              {isGroupEnd && (
+                <div style={{
+                  height: '2px', background: 'var(--accent)', opacity: 0.4, margin: '4px 0',
+                  borderRadius: '2px',
+                }} />
+              )}
+            </React.Fragment>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+function RepSlider({ exercise, value, onChange }) {
+  const min = exercise.min || 5;
+  const max = exercise.max || 30;
+  const equip = EQUIP[exercise.equipment] || EQUIP.bodyweight;
+  const span = max - min;
+  const presets = [min, Math.round(min + span / 3), Math.round(min + (2 * span) / 3), max];
+  const currentValue = value || exercise.default || min;
+
+  return (
+    <div>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '6px', minWidth: 0, flex: 1 }}>
+          <span className="mono" style={{
+            fontSize: '9px', padding: '2px 5px', background: equip.color + '22',
+            color: equip.color, borderRadius: '2px', fontWeight: 700, flexShrink: 0,
+          }}>{equip.label}</span>
+          <div style={{ fontSize: '13px', fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{exercise.name}</div>
+        </div>
+        <div className="display" style={{ fontSize: '20px', color: 'var(--accent)', lineHeight: 1, flexShrink: 0, marginLeft: '8px' }}>
+          {currentValue}<span className="mono" style={{ fontSize: '10px', color: '#666', marginLeft: '3px', fontWeight: 400 }}>{exercise.unit}</span>
+        </div>
+      </div>
+      <input
+        type="range"
+        min={min}
+        max={max}
+        value={currentValue}
+        onChange={e => onChange(parseInt(e.target.value))}
+        style={{ marginBottom: '8px' }}
+      />
+      <div style={{ display: 'flex', gap: '4px' }}>
+        {presets.map((v, i) => (
+          <button key={v + '-' + i} onClick={() => onChange(v)} style={{
+            flex: 1, padding: '5px 4px', background: currentValue === v ? 'var(--accent)' : '#0F0F0F',
+            color: currentValue === v ? '#0A0A0A' : '#888', fontSize: '10px', borderRadius: '2px',
+            fontWeight: 700, fontFamily: 'JetBrains Mono, monospace',
+          }}>{v}</button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function NumberField({ label, value, onChange, min = 1, max = 99 }) {
+  const atMin = value <= min;
+  const atMax = value >= max;
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '10px' }}>
+      <div className="mono" style={{ fontSize: '11px', color: '#AAA' }}>{label}</div>
+      <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+        {atMin ? (
+          <div style={{ width: '32px', height: '32px' }} />
+        ) : (
+          <button onClick={() => onChange(Math.max(min, value - 1))} style={{ width: '32px', height: '32px', background: '#1A1A1A', borderRadius: '2px' }}><Minus size={14} /></button>
+        )}
+        <div className="display" style={{ minWidth: '40px', textAlign: 'center', fontSize: '20px', color: 'var(--accent)' }}>{value}</div>
+        {atMax ? (
+          <div style={{ width: '32px', height: '32px' }} />
+        ) : (
+          <button onClick={() => onChange(Math.min(max, value + 1))} style={{ width: '32px', height: '32px', background: '#1A1A1A', borderRadius: '2px' }}><Plus size={14} /></button>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function ManualBuilder({ exercises, queue, setQueue }) {
+  const [pickerOpen, setPickerOpen] = useState(false);
+  const [confirmReset, setConfirmReset] = useState(false);
+
+  const addItem = (ex) => {
+    const item = {
+      id: 'q-' + Date.now() + '-' + Math.random(),
+      exId: ex.id, name: ex.name, reps: ex.default || ex.defaultReps || 10,
+      unit: ex.unit, equipment: ex.equipment, min: ex.min, max: ex.max,
+    };
+    setQueue([...queue, item]);
+    setPickerOpen(false);
+  };
+
+  const removeAt = (i) => setQueue(queue.filter((_, idx) => idx !== i));
+  const move = (i, dir) => {
+    const n = [...queue];
+    const j = i + dir;
+    if (j < 0 || j >= n.length) return;
+    [n[i], n[j]] = [n[j], n[i]];
+    setQueue(n);
+  };
+  const updateReps = (i, newReps) => {
+    const n = [...queue];
+    n[i] = { ...n[i], reps: Math.max(1, newReps) };
+    setQueue(n);
+  };
+
+  return (
+    <div style={{ padding: '16px', border: '1px solid #222', borderRadius: '2px' }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '12px' }}>
+        <div className="mono" style={{ fontSize: '11px', color: 'var(--accent)' }}>
+          // QUEUE ({queue.length} ITEMS)
+        </div>
+        {queue.length > 0 && (
+          <button
+            onClick={() => {
+              if (confirmReset) {
+                setQueue([]);
+                setConfirmReset(false);
+              } else {
+                setConfirmReset(true);
+              }
+            }}
+            onBlur={() => setConfirmReset(false)}
+            className="mono"
+            style={{
+              fontSize: '10px',
+              color: confirmReset ? 'var(--accent)' : '#666',
+              padding: '4px 8px',
+              border: `1px solid ${confirmReset ? 'var(--accent)' : '#333'}`,
+              borderRadius: '2px',
+              letterSpacing: '0.05em',
+            }}
+          >
+            {confirmReset ? 'TAP AGAIN TO RESET' : 'RESET'}
+          </button>
+        )}
+      </div>
+      {queue.length === 0 && (
+        <div className="mono" style={{ fontSize: '11px', color: '#666', padding: '20px 0', textAlign: 'center' }}>
+          Empty queue. Add exercises below.
+        </div>
+      )}
+      {queue.map((item, i) => {
+        const equip = EQUIP[item.equipment] || EQUIP.bodyweight;
+        return (
+          <div key={item.id} style={{ padding: '10px 0', borderBottom: '1px solid #1A1A1A' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '6px' }}>
+              <div className="mono" style={{ fontSize: '10px', color: '#666', width: '22px' }}>{String(i + 1).padStart(2, '0')}</div>
+              <span className="mono" style={{
+                fontSize: '9px', padding: '2px 5px', background: equip.color + '22',
+                color: equip.color, borderRadius: '2px', fontWeight: 700,
+              }}>{equip.label}</span>
+              <div style={{ flex: 1, fontSize: '13px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{item.name}</div>
+              <button onClick={() => move(i, -1)} disabled={i === 0} style={{ opacity: i === 0 ? 0.3 : 1, padding: '4px', color: '#888' }}>↑</button>
+              <button onClick={() => move(i, 1)} disabled={i === queue.length - 1} style={{ opacity: i === queue.length - 1 ? 0.3 : 1, padding: '4px', color: '#888' }}>↓</button>
+              <button onClick={() => removeAt(i)} style={{ padding: '4px', color: 'var(--accent)' }}><X size={14} /></button>
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', paddingLeft: '30px' }}>
+              <input
+                type="range"
+                min={item.min || 5}
+                max={item.max || 30}
+                value={item.reps}
+                onChange={e => updateReps(i, parseInt(e.target.value))}
+                style={{ flex: 1 }}
+              />
+              <div className="mono" style={{ fontSize: '11px', minWidth: '50px', textAlign: 'right', color: 'var(--accent)', fontWeight: 700 }}>{item.reps} {item.unit}</div>
+            </div>
+          </div>
+        );
+      })}
+      <button
+        onClick={() => setPickerOpen(true)}
+        style={{ marginTop: '12px', width: '100%', padding: '12px', background: 'var(--accent)', color: '#0A0A0A', fontWeight: 700, borderRadius: '2px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}
+      >
+        <Plus size={16} /> ADD TO QUEUE
+      </button>
+
+      {pickerOpen && (
+        <div
+          onClick={() => setPickerOpen(false)}
+          style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.85)', zIndex: 100, display: 'flex', alignItems: 'flex-end' }}
+        >
+          <div onClick={e => e.stopPropagation()} style={{ width: '100%', background: 'var(--surface)', borderTop: '2px solid var(--accent)', padding: '20px', maxHeight: '70vh', overflowY: 'auto', borderRadius: '2px 2px 0 0' }}>
+            <div className="stencil" style={{ fontSize: '24px', color: 'var(--accent)', marginBottom: '16px' }}>PICK EXERCISE</div>
+            {exercises.map(ex => {
+              const equip = EQUIP[ex.equipment] || EQUIP.bodyweight;
+              return (
+                <button key={ex.id} onClick={() => addItem(ex)} style={{
+                  display: 'flex', alignItems: 'center', gap: '10px', width: '100%', padding: '12px',
+                  textAlign: 'left', color: 'var(--fg)', background: 'var(--bg)', border: '1px solid #222',
+                  borderRadius: '2px', marginBottom: '6px',
+                }}>
+                  <span className="mono" style={{
+                    fontSize: '9px', padding: '2px 5px', background: equip.color + '22',
+                    color: equip.color, borderRadius: '2px', fontWeight: 700,
+                  }}>{equip.label}</span>
+                  <div style={{ flex: 1 }}>
+                    <div style={{ fontWeight: 600, fontSize: '14px' }}>{ex.name}</div>
+                    <div className="mono" style={{ fontSize: '10px', color: '#888' }}>{ex.default || ex.defaultReps} {ex.unit}</div>
+                  </div>
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function RestScreen({ restConfig, setRestConfig, onBack, onNext }) {
+  return (
+    <div className="slide-in" style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column', position: 'relative', zIndex: 2 }}>
+      <Header step={4} total={4} title="REST" onBack={onBack} />
+      <div style={{ padding: '0 24px 24px', flex: 1, overflowY: 'auto' }}>
+        <div className="mono" style={{ fontSize: '12px', color: '#666', marginBottom: '20px' }}>
+          // HOW MUCH BREATHER BETWEEN SETS
+        </div>
+
+        <div style={{ display: 'flex', gap: '8px', marginBottom: '24px' }}>
+          {[
+            { k: 'fixed', l: 'FIXED' },
+            { k: 'interval', l: 'WITH LONG REST' },
+            { k: 'none', l: 'NONE' },
+          ].map(t => {
+            const on = restConfig.type === t.k;
+            return (
+              <button key={t.k} onClick={() => setRestConfig(p => ({ ...p, type: t.k }))} style={{
+                flex: 1, padding: '14px 8px', background: on ? 'var(--accent)' : '#121212',
+                color: on ? '#0A0A0A' : '#F5F1E8', border: `2px solid ${on ? 'var(--accent)' : '#222'}`,
+                borderRadius: '2px', fontWeight: 700, fontSize: '11px',
+              }}>{t.l}</button>
+            );
+          })}
+        </div>
+
+        {restConfig.type !== 'none' && (
+          <div style={{ padding: '20px', border: '1px solid #222', borderRadius: '2px', marginBottom: '16px' }}>
+            <TimeField
+              label="REST BETWEEN SETS"
+              value={restConfig.short}
+              onChange={v => setRestConfig(p => ({ ...p, short: v }))}
+            />
+            {restConfig.type === 'interval' && (
+              <>
+                <div style={{ height: '1px', background: '#222', margin: '16px 0' }} />
+                <TimeField
+                  label="LONG REST"
+                  value={restConfig.long}
+                  onChange={v => setRestConfig(p => ({ ...p, long: v }))}
+                />
+                <NumberField
+                  label="LONG REST EVERY X SETS"
+                  value={restConfig.longEvery}
+                  onChange={v => setRestConfig(p => ({ ...p, longEvery: v }))}
+                  min={2} max={20}
+                />
+              </>
+            )}
+          </div>
+        )}
+
+        <div className="mono" style={{ fontSize: '11px', color: '#666', padding: '12px', background: 'var(--surface)', borderRadius: '2px', lineHeight: 1.6 }}>
+          TIP: You can always hit DONE to skip the rest timer early, or hit +15 to extend.
+        </div>
+      </div>
+      <BottomBar disabled={false} onNext={onNext} label="START WORKOUT" primary />
+    </div>
+  );
+}
+
+function TimeField({ label, value, onChange }) {
+  const [customOpen, setCustomOpen] = React.useState(false);
+  const [customInput, setCustomInput] = React.useState('');
+  const presets = [10, 15, 30, 60, 90, 120];
+  // Slider range: 5s min (never less), 120s max (past that, use CUSTOM)
+  const sliderMin = 5;
+  const sliderMax = 120;
+  // For display: if value exceeds slider max, slider caps at max but value shows correctly
+  const sliderValue = Math.min(value, sliderMax);
+  const isOverMax = value > sliderMax;
+
+  const saveCustom = () => {
+    const n = parseInt(customInput, 10);
+    if (!isNaN(n) && n >= 1) {
+      onChange(n);
+    }
+    setCustomOpen(false);
+    setCustomInput('');
+  };
+
+  return (
+    <div style={{ marginBottom: '10px' }}>
+      <div className="mono" style={{ fontSize: '11px', color: '#AAA', marginBottom: '8px' }}>{label}</div>
+
+      {/* Big value display */}
+      <div className="display" style={{ textAlign: 'center', fontSize: '32px', color: 'var(--accent)', marginBottom: '10px' }}>
+        {value}<span style={{ fontSize: '14px', color: '#888', marginLeft: '4px' }}>sec</span>
+      </div>
+
+      {/* Slider - steps of 1 second for fine control */}
+      <input
+        type="range"
+        min={sliderMin}
+        max={sliderMax}
+        step={1}
+        value={sliderValue}
+        onChange={e => onChange(parseInt(e.target.value, 10))}
+        style={{ width: '100%', marginBottom: '6px' }}
+      />
+      <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '10px' }}>
+        <div className="mono" style={{ fontSize: '9px', color: '#555' }}>{sliderMin}s</div>
+        <div className="mono" style={{ fontSize: '9px', color: isOverMax ? 'var(--accent)' : '#555' }}>
+          {isOverMax ? `${value}s (CUSTOM)` : `${sliderMax}s`}
+        </div>
+      </div>
+
+      {/* Preset chips + custom */}
+      <div style={{ display: 'flex', gap: '4px' }}>
+        {presets.map(v => (
+          <button key={v} onClick={() => onChange(v)} style={{
+            flex: 1, padding: '6px 2px', background: value === v ? 'var(--accent)' : '#0F0F0F',
+            color: value === v ? '#0A0A0A' : '#888', fontSize: '10px', borderRadius: '2px', fontWeight: 700,
+            fontFamily: 'JetBrains Mono, monospace',
+          }}>{v}</button>
+        ))}
+        <button
+          onClick={() => { setCustomInput(String(value)); setCustomOpen(true); }}
+          style={{
+            flex: 1.2, padding: '6px 2px',
+            background: isOverMax ? 'var(--accent)' : '#0F0F0F',
+            color: isOverMax ? '#0A0A0A' : '#FF4D2E',
+            fontSize: '9px', borderRadius: '2px', fontWeight: 700,
+            fontFamily: 'JetBrains Mono, monospace',
+            border: isOverMax ? 'none' : '1px solid #FF4D2E44',
+          }}
+        >CUSTOM</button>
+      </div>
+
+      {customOpen && (
+        <div
+          onClick={() => setCustomOpen(false)}
+          className="fade-in"
+          style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.88)', zIndex: 200, display: 'flex', alignItems: 'flex-start', padding: '20px' }}
+        >
+          <div
+            onClick={e => e.stopPropagation()}
+            style={{
+              width: '100%', background: 'var(--surface)', border: '2px solid var(--accent)', borderRadius: '2px',
+              padding: '20px',
+            }}
+          >
+            <div className="stencil" style={{ fontSize: '22px', color: 'var(--accent)', marginBottom: '10px' }}>
+              CUSTOM REST
+            </div>
+            <div className="mono" style={{ fontSize: '11px', color: '#888', marginBottom: '14px', lineHeight: 1.5 }}>
+              Enter rest time in seconds.
+            </div>
+            <div style={{ display: 'flex', alignItems: 'baseline', gap: '8px', marginBottom: '16px' }}>
+              <input
+                autoFocus
+                type="number"
+                min={1}
+                inputMode="numeric"
+                value={customInput}
+                onChange={e => setCustomInput(e.target.value)}
+                onKeyDown={e => { if (e.key === 'Enter') saveCustom(); }}
+                style={{
+                  flex: 1, padding: '14px', background: '#000', color: 'var(--fg)',
+                  border: '1px solid #333', fontFamily: 'inherit', fontSize: '24px',
+                  borderRadius: '2px', textAlign: 'center', fontWeight: 700,
+                }}
+              />
+              <div className="mono" style={{ fontSize: '14px', color: '#888' }}>sec</div>
+            </div>
+            <div style={{ display: 'flex', gap: '8px' }}>
+              <button onClick={() => setCustomOpen(false)} style={{
+                flex: 1, padding: '14px', background: '#1A1A1A', color: '#888',
+                fontFamily: 'Archivo Black, sans-serif', fontSize: '13px', borderRadius: '2px',
+              }}>CANCEL</button>
+              <button onClick={saveCustom} style={{
+                flex: 2, padding: '14px', background: 'var(--accent)', color: '#0A0A0A',
+                fontFamily: 'Archivo Black, sans-serif', fontSize: '13px', borderRadius: '2px',
+              }}>SET</button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function buildQueue(exercises, mode, cfg) {
+  const q = [];
+  const getReps = (ex) => (cfg.exerciseSets && cfg.exerciseSets[ex.id]) || ex.default || ex.defaultReps || 10;
+
+  if (mode === 'manual') {
+    return (cfg.manualQueue || []).map((item, i) => ({
+      ...item, round: 1, setNum: i + 1, totalSets: cfg.manualQueue.length,
+    }));
+  }
+
+  if (mode === 'focus') {
+    exercises.forEach(ex => {
+      for (let s = 0; s < (cfg.sets || 3); s++) {
+        q.push({ exId: ex.id, name: ex.name, reps: getReps(ex), unit: ex.unit, equipment: ex.equipment, round: s + 1, setNum: q.length + 1 });
+      }
+    });
+  }
+
+  if (mode === 'circuit') {
+    for (let r = 0; r < (cfg.sets || 3); r++) {
+      exercises.forEach(ex => {
+        q.push({ exId: ex.id, name: ex.name, reps: getReps(ex), unit: ex.unit, equipment: ex.equipment, round: r + 1, setNum: q.length + 1 });
+      });
+    }
+  }
+
+  if (mode === 'superset') {
+    const size = cfg.supersetSize || 2;
+    const sets = cfg.sets || 3;
+    const groups = [];
+    for (let i = 0; i < exercises.length; i += size) {
+      groups.push(exercises.slice(i, i + size));
+    }
+    groups.forEach((group, gi) => {
+      for (let s = 0; s < sets; s++) {
+        group.forEach(ex => {
+          q.push({
+            exId: ex.id, name: ex.name, reps: getReps(ex), unit: ex.unit, equipment: ex.equipment,
+            round: s + 1, setNum: q.length + 1, groupLabel: 'Group ' + (gi + 1),
+          });
+        });
+      }
+    });
+  }
+
+  if (mode === 'addon') {
+    for (let round = 1; round <= exercises.length; round++) {
+      for (let i = 0; i < round; i++) {
+        const ex = exercises[i];
+        q.push({ exId: ex.id, name: ex.name, reps: getReps(ex), unit: ex.unit, equipment: ex.equipment, round, setNum: q.length + 1 });
+      }
+    }
+  }
+
+  return q.map((item, i) => ({ ...item, totalSets: q.length }));
+}
+
+function WorkoutMenu({ onClose, currentEntry, findMatchingFavorite, onFavoriteToggle, onEdit }) {
+  const isFavorited = currentEntry && findMatchingFavorite && !!findMatchingFavorite(currentEntry);
+
+  return (
+    <div
+      onClick={onClose}
+      className="fade-in"
+      style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)', zIndex: 150, display: 'flex', alignItems: 'flex-start', justifyContent: 'flex-end', padding: '56px 20px 0' }}
+    >
+      <div
+        onClick={e => e.stopPropagation()}
+        style={{
+          background: 'var(--surface)', border: '1px solid #333', borderRadius: '2px',
+          minWidth: '240px', overflow: 'hidden',
+          boxShadow: '0 8px 24px rgba(0,0,0,0.5)',
+        }}
+      >
+        <div style={{
+          padding: '10px 14px', borderBottom: '1px solid #222',
+          display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+        }}>
+          <div className="mono" style={{ fontSize: '10px', color: '#666', letterSpacing: '0.1em' }}>// MENU</div>
+          <button onClick={onClose} style={{ color: '#666', padding: '2px' }}><X size={14} /></button>
+        </div>
+
+        <button
+          onClick={onFavoriteToggle}
+          style={{
+            width: '100%', padding: '14px', display: 'flex', alignItems: 'center', gap: '12px',
+            color: isFavorited ? '#FFB800' : 'var(--fg)', textAlign: 'left',
+            borderBottom: '1px solid #1A1A1A',
+          }}
+        >
+          <Star size={18} fill={isFavorited ? '#FFB800' : 'transparent'} color={isFavorited ? '#FFB800' : '#AAA'} />
+          <div>
+            <div style={{ fontSize: '14px', fontWeight: 600 }}>
+              {isFavorited ? 'Unfavorite' : 'Favorite workout'}
+            </div>
+            <div className="mono" style={{ fontSize: '10px', color: '#666', marginTop: '2px' }}>
+              {isFavorited ? 'Remove from favorites' : 'Save this one for later'}
+            </div>
+          </div>
+        </button>
+
+        {onEdit && (
+          <button
+            onClick={onEdit}
+            style={{
+              width: '100%', padding: '14px', display: 'flex', alignItems: 'center', gap: '12px',
+              color: 'var(--fg)', textAlign: 'left',
+              borderBottom: '1px solid #1A1A1A',
+            }}
+          >
+            <Pencil size={18} color="var(--accent)" />
+            <div>
+              <div style={{ fontSize: '14px', fontWeight: 600 }}>
+                Edit current workout
+              </div>
+              <div className="mono" style={{ fontSize: '10px', color: '#666', marginTop: '2px' }}>
+                Change exercises, format, or rest
+              </div>
+            </div>
+          </button>
+        )}
+
+        <div style={{ padding: '10px 14px' }}>
+          <div className="mono" style={{ fontSize: '9px', color: '#444', letterSpacing: '0.05em' }}>
+            More options coming soon
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function ActiveWorkout({ queue, idx, setIdx, restConfig, onExit, onEdit, onComplete, currentEntry, findMatchingFavorite, addFavorite, removeFavorite }) {
+  const [phase, setPhase] = useState('exercise');
+  const [restRemaining, setRestRemaining] = useState(0);
+  const [elapsed, setElapsed] = useState(0);
+  const [menuOpen, setMenuOpen] = useState(false);
+  const [namingEntry, setNamingEntry] = useState(null);
+  const startRef = useRef(Date.now());
+  const intervalRef = useRef(null);
+
+  const current = queue[idx];
+  const next = queue[idx + 1];
+  // The 2 items after "next" — only shown during long rest
+  const afterNext = [queue[idx + 2], queue[idx + 3]].filter(Boolean);
+  // Is the current/pending rest a long rest?
+  const isLongRest = restConfig.type === 'interval' && (idx + 1) % restConfig.longEvery === 0;
+
+  useEffect(() => {
+    const t = setInterval(() => setElapsed(Math.floor((Date.now() - startRef.current) / 1000)), 1000);
+    return () => clearInterval(t);
+  }, []);
+
+  useEffect(() => {
+    if (phase === 'rest' && restRemaining > 0) {
+      intervalRef.current = setInterval(() => {
+        setRestRemaining(r => {
+          if (r <= 1) {
+            clearInterval(intervalRef.current);
+            advance();
+            return 0;
+          }
+          return r - 1;
+        });
+      }, 1000);
+      return () => clearInterval(intervalRef.current);
+    }
+  }, [phase]);
+
+  const advance = () => {
+    if (intervalRef.current) clearInterval(intervalRef.current);
+    if (idx >= queue.length - 1) {
+      onComplete();
+      return;
+    }
+    setIdx(idx + 1);
+    setPhase('exercise');
+    setRestRemaining(0);
+  };
+
+  const completeSet = () => {
+    if (intervalRef.current) clearInterval(intervalRef.current);
+    // If already resting, the button is "SKIP REST" — advance to next exercise
+    if (phase === 'rest') {
+      advance();
+      return;
+    }
+    if (idx >= queue.length - 1) {
+      onComplete();
+      return;
+    }
+    if (restConfig.type === 'none') {
+      advance();
+      return;
+    }
+    const isLong = restConfig.type === 'interval' && (idx + 1) % restConfig.longEvery === 0;
+    const duration = isLong ? restConfig.long : restConfig.short;
+    setRestRemaining(duration);
+    setPhase('rest');
+  };
+
+  const skipBack = () => {
+    if (intervalRef.current) clearInterval(intervalRef.current);
+    if (idx > 0) {
+      setIdx(idx - 1);
+      setPhase('exercise');
+      setRestRemaining(0);
+    }
+  };
+
+  const skipForward = () => {
+    if (intervalRef.current) clearInterval(intervalRef.current);
+    if (idx < queue.length - 1) {
+      setIdx(idx + 1);
+      setPhase('exercise');
+      setRestRemaining(0);
+    }
+  };
+
+  const addRest = (s) => setRestRemaining(r => Math.max(0, r + s));
+
+  if (!current) return null;
+
+  const fmtTime = (s) => {
+    const m = Math.floor(s / 60);
+    const sec = s % 60;
+    return m + ':' + String(sec).padStart(2, '0');
+  };
+
+  const progress = ((idx + (phase === 'rest' ? 1 : 0)) / queue.length) * 100;
+
+  return (
+    <div style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column', position: 'relative', zIndex: 2 }}>
+      <div style={{ padding: '16px 20px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <button onClick={onExit} style={{ padding: '8px', color: '#888', display: 'flex', alignItems: 'center', gap: '4px' }}>
+          <X size={18} />
+          <span className="mono" style={{ fontSize: '11px' }}>QUIT</span>
+        </button>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+          <div className="mono" style={{ fontSize: '11px', color: '#888' }}>
+            {idx + 1} / {queue.length} · {fmtTime(elapsed)}
+          </div>
+          <button
+            onClick={() => setMenuOpen(true)}
+            style={{
+              width: '34px', height: '34px', display: 'flex', alignItems: 'center', justifyContent: 'center',
+              background: 'var(--surface)', border: '1px solid #222', borderRadius: '2px', color: '#AAA',
+            }}
+          >
+            <Settings size={16} />
+          </button>
+        </div>
+      </div>
+
+      {menuOpen && (
+        <WorkoutMenu
+          onClose={() => setMenuOpen(false)}
+          currentEntry={currentEntry}
+          findMatchingFavorite={findMatchingFavorite}
+          onFavoriteToggle={() => {
+            if (!currentEntry) return;
+            const existing = findMatchingFavorite(currentEntry);
+            if (existing) {
+              removeFavorite(currentEntry);
+              setMenuOpen(false);
+            } else {
+              setMenuOpen(false);
+              setNamingEntry(currentEntry);
+            }
+          }}
+          onEdit={() => {
+            setMenuOpen(false);
+            onEdit();
+          }}
+        />
+      )}
+
+      {namingEntry && (
+        <NameFavoriteModal
+          entry={namingEntry}
+          onCancel={() => setNamingEntry(null)}
+          onSave={(name) => { addFavorite(namingEntry, name); setNamingEntry(null); }}
+        />
+      )}
+
+      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center', padding: '20px 24px' }}>
+        {phase === 'exercise' ? (
+          <ExerciseView current={current} next={next} />
+        ) : (
+          <RestView remaining={restRemaining} next={next} afterNext={afterNext} isLongRest={isLongRest} />
+        )}
+      </div>
+
+      <div style={{ padding: '0 24px' }}>
+        <button
+          onClick={completeSet}
+          style={{
+            width: '100%', padding: '28px', background: phase === 'rest' ? 'var(--accent2)' : 'var(--accent)',
+            color: '#0A0A0A', fontSize: '28px', fontWeight: 900, fontFamily: 'Archivo Black, sans-serif',
+            letterSpacing: '0.02em', borderRadius: '2px', display: 'flex', alignItems: 'center',
+            justifyContent: 'center', gap: '10px',
+          }}
+        >
+          <Check size={28} strokeWidth={3} />
+          {phase === 'rest' ? 'SKIP REST' : (idx === queue.length - 1 ? 'FINISH' : 'DONE')}
+        </button>
+      </div>
+
+      <div style={{ padding: '16px 24px 24px' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
+          <button onClick={skipBack} disabled={idx === 0} style={{ padding: '10px 14px', opacity: idx === 0 ? 0.3 : 1, color: '#888', display: 'flex', alignItems: 'center', gap: '4px' }}>
+            <SkipBack size={16} />
+            <span className="mono" style={{ fontSize: '10px' }}>BACK</span>
+          </button>
+          {phase === 'rest' && (
+            <button onClick={() => addRest(15)} style={{ padding: '10px 14px', background: '#1A1A1A', color: 'var(--accent2)', borderRadius: '2px', fontSize: '11px', fontWeight: 700 }}>
+              +15s
+            </button>
+          )}
+          <button onClick={skipForward} disabled={idx >= queue.length - 1} style={{ padding: '10px 14px', opacity: idx >= queue.length - 1 ? 0.3 : 1, color: '#888', display: 'flex', alignItems: 'center', gap: '4px' }}>
+            <span className="mono" style={{ fontSize: '10px' }}>SKIP</span>
+            <SkipForward size={16} />
+          </button>
+        </div>
+        <div style={{ height: '3px', background: '#1A1A1A', borderRadius: '2px', overflow: 'hidden' }}>
+          <div style={{ height: '100%', width: progress + '%', background: 'var(--accent)', transition: 'width 0.3s' }} />
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function ExerciseView({ current, next }) {
+  const equip = EQUIP[current.equipment] || EQUIP.bodyweight;
+  const nextEquip = next ? (EQUIP[next.equipment] || EQUIP.bodyweight) : null;
+  const isTimed = current.unit === 'sec';
+
+  // Timer state: 'idle' (pre-start), 'prep' (3-2-1 countdown), 'running' (counting down), 'overtime' (counting up after 0)
+  const [timerPhase, setTimerPhase] = React.useState('idle');
+  const [timerValue, setTimerValue] = React.useState(current.reps);
+  const [prepValue, setPrepValue] = React.useState(3);
+
+  // Reset timer when the exercise changes
+  React.useEffect(() => {
+    setTimerPhase('idle');
+    setTimerValue(current.reps);
+    setPrepValue(3);
+  }, [current.exId, current.setNum, current.reps]);
+
+  // 3-2-1 prep countdown
+  React.useEffect(() => {
+    if (timerPhase !== 'prep') return;
+    if (prepValue <= 0) {
+      setTimerPhase('running');
+      setTimerValue(current.reps);
+      return;
+    }
+    const t = setTimeout(() => setPrepValue(v => v - 1), 1000);
+    return () => clearTimeout(t);
+  }, [timerPhase, prepValue, current.reps]);
+
+  // Main countdown
+  React.useEffect(() => {
+    if (timerPhase !== 'running') return;
+    if (timerValue <= 0) {
+      setTimerPhase('overtime');
+      setTimerValue(0);
+      return;
+    }
+    const t = setTimeout(() => setTimerValue(v => v - 1), 1000);
+    return () => clearTimeout(t);
+  }, [timerPhase, timerValue]);
+
+  // Overtime count-up
+  React.useEffect(() => {
+    if (timerPhase !== 'overtime') return;
+    const t = setTimeout(() => setTimerValue(v => v + 1), 1000);
+    return () => clearTimeout(t);
+  }, [timerPhase, timerValue]);
+
+  const startTimer = () => {
+    setPrepValue(3);
+    setTimerPhase('prep');
+  };
+
+  return (
+    <>
+      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '12px', flexWrap: 'wrap' }}>
+        <div className="mono" style={{ fontSize: '11px', color: 'var(--accent)' }}>
+          // NOW {current.round ? '· ROUND ' + current.round : ''} {current.groupLabel ? '· ' + current.groupLabel.toUpperCase() : ''}
+        </div>
+        <span className="mono" style={{
+          fontSize: '10px', padding: '2px 7px', background: equip.color + '22',
+          color: equip.color, borderRadius: '2px', fontWeight: 700, letterSpacing: '0.05em',
+        }}>{equip.label}</span>
+      </div>
+      <div className="display" style={{
+        fontSize: 'clamp(40px, 9vw, 78px)', lineHeight: 0.9, color: 'var(--fg)', marginBottom: '24px',
+        wordBreak: 'break-word',
+      }}>
+        {current.name.toUpperCase()}
+      </div>
+
+      {/* Number display - switches between target, prep countdown, live countdown, overtime */}
+      {isTimed ? (
+        <TimedDisplay
+          phase={timerPhase}
+          prepValue={prepValue}
+          timerValue={timerValue}
+          target={current.reps}
+          onStart={startTimer}
+        />
+      ) : (
+        <div style={{ display: 'flex', alignItems: 'baseline', gap: '12px', marginBottom: '40px' }}>
+          <div className="display" style={{ fontSize: 'clamp(72px, 18vw, 140px)', color: 'var(--accent)', lineHeight: 0.9 }}>
+            {current.reps}
+          </div>
+          <div className="stencil" style={{ fontSize: '32px', color: '#888' }}>
+            {current.unit.toUpperCase()}
+          </div>
+        </div>
+      )}
+
+      {next && (
+        <div style={{ padding: '14px 16px', background: 'var(--surface)', border: '1px solid #222', borderRadius: '2px' }}>
+          <div className="mono" style={{ fontSize: '10px', color: '#666', marginBottom: '4px' }}>// UP NEXT</div>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '8px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', minWidth: 0, flex: 1 }}>
+              <span className="mono" style={{
+                fontSize: '9px', padding: '2px 5px', background: nextEquip.color + '22',
+                color: nextEquip.color, borderRadius: '2px', fontWeight: 700, flexShrink: 0,
+              }}>{nextEquip.label}</span>
+              <div style={{ fontSize: '14px', color: '#AAA', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{next.name}</div>
+            </div>
+            <div className="mono" style={{ fontSize: '12px', color: 'var(--accent)', flexShrink: 0 }}>{next.reps} {next.unit}</div>
+          </div>
+        </div>
+      )}
+    </>
+  );
+}
+
+function TimedDisplay({ phase, prepValue, timerValue, target, onStart }) {
+  if (phase === 'idle') {
+    // Show target + START TIMER button
+    return (
+      <div style={{ marginBottom: '40px' }}>
+        <div style={{ display: 'flex', alignItems: 'baseline', gap: '12px', marginBottom: '20px' }}>
+          <div className="display" style={{ fontSize: 'clamp(72px, 18vw, 140px)', color: 'var(--accent)', lineHeight: 0.9 }}>
+            {target}
+          </div>
+          <div className="stencil" style={{ fontSize: '32px', color: '#888' }}>SEC</div>
+        </div>
+        <button onClick={onStart} style={{
+          width: '100%', padding: '16px', background: '#7C5CFF', color: '#0A0A0A',
+          fontSize: '16px', fontWeight: 900, fontFamily: 'Archivo Black, sans-serif',
+          letterSpacing: '0.02em', borderRadius: '2px', display: 'flex',
+          alignItems: 'center', justifyContent: 'center', gap: '10px',
+        }}>
+          <Play size={18} fill="#0A0A0A" /> START TIMER
+        </button>
+      </div>
+    );
+  }
+
+  if (phase === 'prep') {
+    return (
+      <div style={{ marginBottom: '40px', textAlign: 'center' }}>
+        <div className="mono" style={{ fontSize: '11px', color: '#7C5CFF', marginBottom: '8px' }}>// GET READY</div>
+        <div className="display" style={{
+          fontSize: 'clamp(120px, 32vw, 220px)', color: '#7C5CFF', lineHeight: 1,
+        }}>
+          {prepValue === 0 ? 'GO' : prepValue}
+        </div>
+      </div>
+    );
+  }
+
+  if (phase === 'running') {
+    return (
+      <div style={{ marginBottom: '40px', textAlign: 'center' }}>
+        <div className="mono" style={{ fontSize: '11px', color: 'var(--accent)', marginBottom: '8px' }}>// COUNTDOWN</div>
+        <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'center', gap: '10px' }}>
+          <div className="display" style={{
+            fontSize: 'clamp(100px, 26vw, 180px)', color: 'var(--accent)', lineHeight: 0.9,
+          }}>
+            {timerValue}
+          </div>
+          <div className="stencil" style={{ fontSize: '28px', color: '#888' }}>SEC</div>
+        </div>
+      </div>
+    );
+  }
+
+  // overtime
+  return (
+    <div style={{ marginBottom: '40px', textAlign: 'center' }}>
+      <div className="mono" style={{ fontSize: '11px', color: 'var(--accent2)', marginBottom: '8px' }}>// OVERTIME · KEEP GOING</div>
+      <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'center', gap: '6px' }}>
+        <div className="display" style={{ fontSize: 'clamp(64px, 16vw, 110px)', color: 'var(--accent2)', lineHeight: 0.9 }}>
+          +{timerValue}
+        </div>
+        <div className="stencil" style={{ fontSize: '22px', color: 'var(--accent2)', opacity: 0.7 }}>SEC</div>
+      </div>
+      <div className="mono" style={{ fontSize: '10px', color: '#666', marginTop: '6px' }}>
+        TARGET {target}s HIT · BONUS TIME
+      </div>
+    </div>
+  );
+}
+
+function RestView({ remaining, next, afterNext = [], isLongRest = false }) {
+  const mins = Math.floor(remaining / 60);
+  const secs = remaining % 60;
+  const nextEquip = next ? (EQUIP[next.equipment] || EQUIP.bodyweight) : null;
+  // Only show the additional peek during long rests
+  const showExtras = isLongRest && afterNext.length > 0;
+
+  return (
+    <>
+      <div className="mono" style={{ fontSize: '11px', color: 'var(--accent2)', marginBottom: '12px' }}>
+        // {isLongRest ? 'LONG REST' : 'REST'}
+      </div>
+      <div className="display" style={{ fontSize: 'clamp(44px, 10vw, 72px)', lineHeight: 0.9, color: '#888', marginBottom: '24px' }}>
+        BREATHER
+      </div>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: '40px', position: 'relative' }}>
+        <div style={{
+          position: 'absolute', width: '220px', height: '220px', borderRadius: '50%',
+          border: '2px solid var(--accent2)', animation: 'pulse-ring 2s ease-out infinite',
+        }} />
+        <div className="display" style={{ fontSize: 'clamp(80px, 22vw, 160px)', color: 'var(--accent2)', lineHeight: 1 }}>
+          {mins > 0 ? mins + ':' + String(secs).padStart(2, '0') : secs}
+        </div>
+      </div>
+      {next && (
+        <div style={{ padding: '14px 16px', background: 'var(--surface)', border: '1px solid var(--accent2)', borderRadius: '2px' }}>
+          <div className="mono" style={{ fontSize: '10px', color: 'var(--accent2)', marginBottom: '4px' }}>// COMING UP</div>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '8px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', minWidth: 0, flex: 1 }}>
+              <span className="mono" style={{
+                fontSize: '9px', padding: '2px 5px', background: nextEquip.color + '22',
+                color: nextEquip.color, borderRadius: '2px', fontWeight: 700, flexShrink: 0,
+              }}>{nextEquip.label}</span>
+              <div style={{ fontSize: '14px', color: 'var(--fg)', fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{next.name}</div>
+            </div>
+            <div className="mono" style={{ fontSize: '12px', color: 'var(--accent)', flexShrink: 0 }}>{next.reps} {next.unit}</div>
+          </div>
+        </div>
+      )}
+      {showExtras && (
+        <div style={{ marginTop: '6px', paddingLeft: '4px' }}>
+          {afterNext.map((item, i) => {
+            const eq = EQUIP[item.equipment] || EQUIP.bodyweight;
+            return (
+              <div key={i} style={{
+                display: 'flex', alignItems: 'center', gap: '6px',
+                padding: '4px 12px', opacity: 0.5 - i * 0.1,
+              }}>
+                <span className="mono" style={{ fontSize: '9px', color: '#666', width: '14px', flexShrink: 0 }}>
+                  {i + 2}
+                </span>
+                <span className="mono" style={{
+                  fontSize: '8px', padding: '1px 4px', background: eq.color + '22',
+                  color: eq.color, borderRadius: '2px', fontWeight: 700, flexShrink: 0,
+                }}>{eq.label}</span>
+                <div style={{
+                  flex: 1, fontSize: '11px', color: '#888', minWidth: 0,
+                  overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+                }}>{item.name}</div>
+                <div className="mono" style={{ fontSize: '10px', color: '#666', flexShrink: 0 }}>
+                  {item.reps} {item.unit}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </>
+  );
+}
+
+function DoneScreen({ onHome, queueLen }) {
+  const [idx, setIdx] = React.useState(() => Math.floor(Math.random() * DONE_VARIANTS.length));
+  const [nonce, setNonce] = React.useState(0);
+
+  React.useEffect(() => {
+    const timer = setTimeout(() => {
+      setIdx(i => pickDifferentIdx(i, DONE_VARIANTS.length));
+      setNonce(n => n + 1);
+    }, 4000);
+    return () => clearTimeout(timer);
+  }, [nonce]);
+
+  const variant = DONE_VARIANTS[idx];
+
+  return (
+    <div className="slide-in" style={{ minHeight: '100vh', padding: '24px', display: 'flex', flexDirection: 'column', position: 'relative', zIndex: 2 }}>
+      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
+        <div className="mono" style={{ fontSize: '12px', color: 'var(--accent)', marginBottom: '16px' }}>
+          // SESSION COMPLETE
+        </div>
+        <div style={{ overflow: 'hidden' }}>
+          <div
+            key={`done-top-${nonce}`}
+            className="display title-slide-top"
+            style={{
+              fontSize: 'clamp(64px, 16vw, 120px)', lineHeight: 0.85,
+              color: 'var(--fg)', whiteSpace: 'nowrap',
+            }}
+          >
+            {variant.top}
+          </div>
+          <div
+            key={`done-bot-${nonce}`}
+            className="display title-slide-bottom"
+            style={{
+              fontSize: 'clamp(64px, 16vw, 120px)', lineHeight: 0.85,
+              color: 'var(--accent2)', whiteSpace: 'nowrap',
+            }}
+          >
+            {variant.bottom}
+          </div>
+        </div>
+        <div key={`done-tag-${nonce}`} className="mono fade-in" style={{ fontSize: '14px', color: '#888', marginTop: '20px' }}>
+          {queueLen} sets logged. {variant.tag}
+        </div>
+      </div>
+      <button onClick={onHome} style={{
+        padding: '24px', background: '#F5F1E8', color: '#0A0A0A', fontSize: '18px', fontWeight: 900,
+        fontFamily: 'Archivo Black, sans-serif', borderRadius: '2px',
+      }}>
+        HOME
+      </button>
+    </div>
+  );
+}
+
+function Header({ step, total, title, onBack }) {
+  return (
+    <div style={{ padding: '20px 24px 12px' }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px' }}>
+        <button onClick={onBack} style={{ display: 'flex', alignItems: 'center', gap: '6px', color: '#888', padding: '4px 0' }}>
+          <ChevronLeft size={18} />
+          <span className="mono" style={{ fontSize: '11px' }}>BACK</span>
+        </button>
+        <div className="mono" style={{ fontSize: '11px', color: '#666' }}>STEP {step} / {total}</div>
+      </div>
+      <div className="display" style={{ fontSize: 'clamp(36px, 10vw, 56px)', lineHeight: 0.9, color: 'var(--fg)' }}>
+        {title}
+      </div>
+      <div style={{ display: 'flex', gap: '4px', marginTop: '12px' }}>
+        {Array.from({ length: total }).map((_, i) => (
+          <div key={i} style={{ flex: 1, height: '3px', background: i < step ? 'var(--accent)' : '#222', borderRadius: '2px' }} />
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function BottomBar({ disabled, onNext, label, primary }) {
+  const dockRef = React.useRef(null);
+  const [atBottom, setAtBottom] = React.useState(true);
+
+  React.useEffect(() => {
+    if (!dockRef.current) return;
+
+    // Find the nearest scrollable ancestor (the content div with overflowY: auto)
+    const findScrollable = (el) => {
+      let node = el.parentElement;
+      while (node && node !== document.body) {
+        const style = window.getComputedStyle(node);
+        if (/(auto|scroll|overlay)/.test(style.overflowY)) return node;
+        node = node.parentElement;
+      }
+      return window;
+    };
+
+    const scrollParent = findScrollable(dockRef.current);
+
+    const checkScroll = () => {
+      if (!dockRef.current) return;
+      // Compare how close the user is to the bottom of their scroll container
+      let distanceFromBottom;
+      if (scrollParent === window) {
+        distanceFromBottom = document.documentElement.scrollHeight - window.innerHeight - window.scrollY;
+      } else {
+        distanceFromBottom = scrollParent.scrollHeight - scrollParent.clientHeight - scrollParent.scrollTop;
+      }
+      // "At bottom" = within 80px of the end (so the user doesn't need the FAB)
+      setAtBottom(distanceFromBottom < 80);
+    };
+
+    checkScroll(); // run once on mount
+    scrollParent.addEventListener('scroll', checkScroll, { passive: true });
+    window.addEventListener('resize', checkScroll);
+    // Also re-check when content changes size (e.g. opening random picker, adding items)
+    const resizeObserver = new ResizeObserver(checkScroll);
+    if (scrollParent !== window) resizeObserver.observe(scrollParent);
+
+    return () => {
+      scrollParent.removeEventListener('scroll', checkScroll);
+      window.removeEventListener('resize', checkScroll);
+      resizeObserver.disconnect();
+    };
+  }, []);
+
+  const bgColor = disabled ? '#1A1A1A' : (primary ? 'var(--accent2)' : 'var(--accent)');
+  const fgColor = disabled ? '#444' : '#0A0A0A';
+  // Show FAB when user has scrolled up (not at bottom) AND button is enabled
+  const showFab = !atBottom && !disabled;
+
+  return (
+    <>
+      {/* Docked bar — always present at bottom of viewport */}
+      <div ref={dockRef} style={{ padding: '16px 24px 24px', borderTop: '1px solid #1A1A1A', background: 'var(--bg)' }}>
+        <button
+          onClick={onNext}
+          disabled={disabled}
+          style={{
+            width: '100%', padding: '20px', background: bgColor, color: fgColor,
+            fontSize: '16px', fontWeight: 900, fontFamily: 'Archivo Black, sans-serif',
+            letterSpacing: '0.02em', borderRadius: '2px',
+            display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+            opacity: disabled ? 0.5 : 1, transition: 'all 0.2s',
+          }}
+        >
+          <span>{label}</span>
+          {!disabled && <Play size={20} fill={fgColor} />}
+        </button>
+      </div>
+
+      {/* Floating FAB — shows when user hasn't scrolled to the bottom.
+          NOTE: position:fixed only works if no ancestor has a transform.
+          We removed the transform from .slide-in so this works. */}
+      <button
+        onClick={onNext}
+        aria-label={label}
+        style={{
+          position: 'fixed', right: '20px', bottom: '28px', zIndex: 1000,
+          width: '60px', height: '60px', borderRadius: '50%',
+          background: bgColor, color: fgColor,
+          display: 'flex', alignItems: 'center', justifyContent: 'center', border: 'none',
+          cursor: 'pointer',
+          boxShadow: showFab ? (primary
+            ? '0 8px 24px rgba(0, 217, 178, 0.4), 0 2px 6px rgba(0,0,0,0.4)'
+            : '0 8px 24px rgba(255, 77, 46, 0.4), 0 2px 6px rgba(0,0,0,0.4)'
+          ) : 'none',
+          transition: 'opacity 0.25s ease-out, transform 0.25s ease-out',
+          opacity: showFab ? 1 : 0,
+          transform: showFab ? 'scale(1)' : 'scale(0.6)',
+          pointerEvents: showFab ? 'auto' : 'none',
+        }}
+      >
+        <Play size={24} fill={fgColor} />
+      </button>
+    </>
+  );
+}
