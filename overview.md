@@ -12,6 +12,7 @@ Use this document as the first orientation point for future sessions. Keep it cu
 - Persistence is browser-native `localStorage`, wrapped by an async adapter so the rest of the app can call `storage.get(key, fallback)` and `storage.set(key, value)`.
 - The visual system is inline-style driven inside React components, with global font/import/keyframe rules injected by `GlobalStyles`.
 - The app background is currently fixed to solid `#0E0E0E`; palette selection still controls surface, foreground, accent, secondary accent, and warning colors.
+- The visible app version is controlled by `APP_VERSION` in `src/App.jsx`, and Settings exposes `APP_VERSION_HISTORY` so users can see released changes from version 2.1 onward.
 
 ## Project Structure
 
@@ -36,6 +37,7 @@ Use this document as the first orientation point for future sessions. Keep it cu
 - Workout setup flow state
 - Screen rendering
 - Home, history, favorites, color settings, exercise, mode, rest, active workout, and done screens
+- Settings modal controls, including app version history
 - Queue-generation logic
 - Inline styling and global style injection
 
@@ -60,6 +62,8 @@ Secondary screens:
 - `colorSettings`
 
 The home screen can start a new workout, rerun recent workouts, rerun favorites, open history, open favorites, and open settings/color controls.
+
+The settings modal includes app preferences, color customization, and an app version history view. The home header displays only the current app version.
 
 ## Core State
 
@@ -187,6 +191,7 @@ Vercel should use:
 When adding or changing behavior:
 
 - Prefer focused edits in `src/App.jsx` unless the project is intentionally being split into modules.
+- Increment `APP_VERSION` and prepend an `APP_VERSION_HISTORY` entry for every completed change.
 - Preserve the storage API and persisted keys unless a migration is part of the task.
 - Keep the app usable as a static frontend.
 - Run `npm run build` before committing code changes when dependencies are installed.

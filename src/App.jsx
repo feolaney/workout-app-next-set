@@ -117,6 +117,21 @@ const MODES = [
 
 const MODE_LABELS = MODES.reduce((acc, m) => ({ ...acc, [m.key]: m.label }), {});
 
+const APP_VERSION = '2.1';
+
+const APP_VERSION_HISTORY = [
+  {
+    version: '2.1',
+    date: '2026-04-24',
+    type: 'Feature / workflow',
+    changes: [
+      'Added app version history in Settings.',
+      'Changed the home header version display to show only the app version.',
+      'Documented the version bump and history-entry requirement for future changes.',
+    ],
+  },
+];
+
 // ============ COLOR PALETTES ============
 // Each palette defines 6 key colors that get applied as CSS variables across the app.
 // - bg:      main background
@@ -1197,7 +1212,7 @@ function HomeScreen({ onStart, onHistory, onFavorites, onColorSettings, onRerun,
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '32px' }}>
         <div>
           <div className="mono" style={{ fontSize: '11px', color: 'var(--accent)', marginBottom: '4px' }}>// NO EXCUSES</div>
-          <div className="mono" style={{ fontSize: '11px', color: '#666' }}>v2.0 / build ready</div>
+          <div className="mono" style={{ fontSize: '11px', color: '#666' }}>v{APP_VERSION}</div>
         </div>
         <div style={{ display: 'flex', gap: '6px' }}>
           {favorites.length > 0 && (
@@ -1340,6 +1355,8 @@ function HomeScreen({ onStart, onHistory, onFavorites, onColorSettings, onRerun,
 }
 
 function SettingsModal({ settings, setSettings, onOpenColorSettings, onClose }) {
+  const [showVersionHistory, setShowVersionHistory] = useState(false);
+
   const toggle = (key) => {
     setSettings(prev => ({ ...prev, [key]: !prev[key] }));
   };
@@ -1359,40 +1376,104 @@ function SettingsModal({ settings, setSettings, onOpenColorSettings, onClose }) 
       >
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-            <Settings size={18} color="var(--accent)" />
-            <div className="stencil" style={{ fontSize: '22px', color: 'var(--accent)' }}>SETTINGS</div>
+            {showVersionHistory ? (
+              <button onClick={() => setShowVersionHistory(false)} style={{ color: '#888', padding: '2px' }}>
+                <ChevronLeft size={18} />
+              </button>
+            ) : (
+              <Settings size={18} color="var(--accent)" />
+            )}
+            <div className="stencil" style={{ fontSize: '22px', color: 'var(--accent)' }}>
+              {showVersionHistory ? 'APP VERSION HISTORY' : 'SETTINGS'}
+            </div>
           </div>
           <button onClick={onClose} style={{ color: '#666' }}><X size={18} /></button>
         </div>
 
-        <SettingsToggle
-          label="Remember section layout"
-          description="Keep Favorites and Recent collapse states between visits. When off, both start collapsed every time."
-          checked={!!settings.rememberSectionState}
-          onToggle={() => toggle('rememberSectionState')}
-        />
+        {showVersionHistory ? (
+          <VersionHistoryList />
+        ) : (
+          <>
+            <SettingsToggle
+              label="Remember section layout"
+              description="Keep Favorites and Recent collapse states between visits. When off, both start collapsed every time."
+              checked={!!settings.rememberSectionState}
+              onToggle={() => toggle('rememberSectionState')}
+            />
 
-        <button
-          onClick={onOpenColorSettings}
+            <SettingsAction
+              icon={<Palette size={18} color="var(--accent)" />}
+              label="Customize colors"
+              description="Choose a palette or build your own."
+              onClick={onOpenColorSettings}
+            />
+
+            <SettingsAction
+              icon={<Info size={18} color="var(--accent)" />}
+              label="App version history"
+              description="See released versions and what changed."
+              onClick={() => setShowVersionHistory(true)}
+            />
+          </>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function SettingsAction({ icon, label, description, onClick }) {
+  return (
+    <button
+      onClick={onClick}
+      style={{
+        width: '100%', padding: '14px', background: '#0F0F0F',
+        border: '1px solid #222', borderRadius: '2px',
+        display: 'flex', alignItems: 'center', gap: '14px',
+        textAlign: 'left', marginBottom: '8px',
+      }}
+    >
+      {icon}
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <div style={{ fontSize: '14px', fontWeight: 600, color: 'var(--fg)', marginBottom: '2px' }}>
+          {label}
+        </div>
+        <div className="mono" style={{ fontSize: '10px', color: '#666', lineHeight: 1.4 }}>
+          {description}
+        </div>
+      </div>
+      <ChevronRight size={18} color="#666" />
+    </button>
+  );
+}
+
+function VersionHistoryList() {
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+      {APP_VERSION_HISTORY.map(entry => (
+        <div
+          key={entry.version}
           style={{
-            width: '100%', padding: '14px', background: '#0F0F0F',
+            padding: '14px', background: '#0F0F0F',
             border: '1px solid #222', borderRadius: '2px',
-            display: 'flex', alignItems: 'center', gap: '14px',
-            textAlign: 'left', marginBottom: '8px',
           }}
         >
-          <Palette size={18} color="var(--accent)" />
-          <div style={{ flex: 1, minWidth: 0 }}>
-            <div style={{ fontSize: '14px', fontWeight: 600, color: 'var(--fg)', marginBottom: '2px' }}>
-              Customize colors
-            </div>
-            <div className="mono" style={{ fontSize: '10px', color: '#666', lineHeight: 1.4 }}>
-              Choose a palette or build your own.
-            </div>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: '10px', marginBottom: '6px' }}>
+            <div className="stencil" style={{ fontSize: '18px', color: 'var(--accent)' }}>v{entry.version}</div>
+            <div className="mono" style={{ fontSize: '10px', color: '#666', flexShrink: 0 }}>{entry.date}</div>
           </div>
-          <ChevronRight size={18} color="#666" />
-        </button>
-      </div>
+          <div className="mono" style={{ fontSize: '10px', color: '#888', marginBottom: '10px' }}>
+            {entry.type}
+          </div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+            {entry.changes.map(change => (
+              <div key={change} style={{ display: 'flex', gap: '8px', color: '#AAA', fontSize: '12px', lineHeight: 1.4 }}>
+                <span className="mono" style={{ color: 'var(--accent)', flexShrink: 0 }}>//</span>
+                <span>{change}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      ))}
     </div>
   );
 }
