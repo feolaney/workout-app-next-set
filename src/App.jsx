@@ -117,9 +117,18 @@ const MODES = [
 
 const MODE_LABELS = MODES.reduce((acc, m) => ({ ...acc, [m.key]: m.label }), {});
 
-const APP_VERSION = '2.4';
+const APP_VERSION = '2.5';
 
 const APP_VERSION_HISTORY = [
+  {
+    version: '2.5',
+    date: '2026-04-24',
+    type: 'UI / mobile',
+    changes: [
+      'Enlarged active workout exercise details on wide desktop screens while keeping the main action controls unchanged.',
+      'Added safe-area-aware top spacing so mobile headers avoid notched iPhone status areas.',
+    ],
+  },
   {
     version: '2.4',
     date: '2026-04-24',
@@ -158,6 +167,10 @@ const APP_VERSION_HISTORY = [
     ],
   },
 ];
+
+const SAFE_TOP_16 = 'calc(16px + env(safe-area-inset-top, 0px))';
+const SAFE_TOP_20 = 'calc(20px + env(safe-area-inset-top, 0px))';
+const SAFE_TOP_24 = 'calc(24px + env(safe-area-inset-top, 0px))';
 
 // ============ COLOR PALETTES ============
 // Each palette defines 6 key colors that get applied as CSS variables across the app.
@@ -691,6 +704,64 @@ function GlobalStyles() {
       .fade-in { animation: fade-in 0.25s ease-out both; }
       .title-slide-top { animation: title-in-top 0.55s cubic-bezier(0.22, 1, 0.36, 1) both; }
       .title-slide-bottom { animation: title-in-bottom 0.55s cubic-bezier(0.22, 1, 0.36, 1) 0.08s both; }
+      .active-workout-screen {
+        --active-header-meta-size: 11px;
+        --active-content-x: 24px;
+        --active-content-y: 20px;
+        --active-meta-size: 11px;
+        --active-equip-size: 10px;
+        --active-title-size: clamp(40px, 9vw, 78px);
+        --active-title-margin: 24px;
+        --active-rep-size: clamp(72px, 18vw, 140px);
+        --active-unit-size: 32px;
+        --active-rep-margin: 40px;
+        --active-rest-label-size: 11px;
+        --active-rest-title-size: clamp(44px, 10vw, 72px);
+        --active-rest-timer-size: clamp(80px, 22vw, 160px);
+        --active-rest-ring-size: 220px;
+        --active-timer-target-size: clamp(72px, 18vw, 140px);
+        --active-timer-unit-size: 32px;
+        --active-timer-prep-label-size: 11px;
+        --active-timer-prep-size: clamp(120px, 32vw, 220px);
+        --active-timer-running-label-size: 11px;
+        --active-timer-running-size: clamp(100px, 26vw, 180px);
+        --active-timer-running-unit-size: 28px;
+        --active-timer-overtime-label-size: 11px;
+        --active-timer-overtime-size: clamp(64px, 16vw, 110px);
+        --active-timer-overtime-unit-size: 22px;
+        --active-timer-note-size: 10px;
+        --active-timer-button-font: 16px;
+      }
+      @media (min-width: 1100px) and (min-height: 720px) {
+        .active-workout-screen {
+          --active-header-meta-size: clamp(12px, 0.8vw, 14px);
+          --active-content-x: 24px;
+          --active-content-y: clamp(24px, 3vh, 44px);
+          --active-meta-size: clamp(13px, 0.95vw, 16px);
+          --active-equip-size: clamp(11px, 0.75vw, 13px);
+          --active-title-size: clamp(86px, 6.4vw, 132px);
+          --active-title-margin: 32px;
+          --active-rep-size: clamp(150px, 10.5vw, 220px);
+          --active-unit-size: clamp(38px, 2.5vw, 52px);
+          --active-rep-margin: 52px;
+          --active-rest-label-size: clamp(13px, 0.95vw, 16px);
+          --active-rest-title-size: clamp(80px, 6vw, 124px);
+          --active-rest-timer-size: clamp(170px, 11vw, 260px);
+          --active-rest-ring-size: clamp(260px, 18vw, 340px);
+          --active-timer-target-size: clamp(150px, 10.5vw, 220px);
+          --active-timer-unit-size: clamp(38px, 2.5vw, 52px);
+          --active-timer-prep-label-size: clamp(13px, 0.95vw, 16px);
+          --active-timer-prep-size: clamp(220px, 16vw, 320px);
+          --active-timer-running-label-size: clamp(13px, 0.95vw, 16px);
+          --active-timer-running-size: clamp(180px, 13vw, 280px);
+          --active-timer-running-unit-size: clamp(34px, 2.2vw, 46px);
+          --active-timer-overtime-label-size: clamp(13px, 0.95vw, 16px);
+          --active-timer-overtime-size: clamp(120px, 8vw, 180px);
+          --active-timer-overtime-unit-size: clamp(28px, 1.8vw, 38px);
+          --active-timer-note-size: 12px;
+          --active-timer-button-font: 18px;
+        }
+      }
       input[type="range"] {
         -webkit-appearance: none; appearance: none; width: 100%; height: 6px; background: #1A1A1A;
         border-radius: 2px; outline: none;
@@ -858,7 +929,7 @@ function ColorSettingsScreen({ activePaletteId, setActivePaletteId, customPalett
 
   return (
     <div className="slide-in" style={{ minHeight: '100dvh', display: 'flex', flexDirection: 'column', position: 'relative', zIndex: 2 }}>
-      <div style={{ padding: '20px 24px 12px' }}>
+      <div style={{ padding: `${SAFE_TOP_20} 24px 12px` }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px' }}>
           <button onClick={onBack} style={{ display: 'flex', alignItems: 'center', gap: '6px', color: '#888', padding: '4px 0' }}>
             <ChevronLeft size={18} />
@@ -1029,7 +1100,7 @@ function CustomPaletteEditor({ palette, onChange, onSave, onDelete, onCancel }) 
 
   return (
     <div className="slide-in" style={{ minHeight: '100dvh', display: 'flex', flexDirection: 'column', position: 'relative', zIndex: 2, background: palette.bg }}>
-      <div style={{ padding: '20px 24px 12px' }}>
+      <div style={{ padding: `${SAFE_TOP_20} 24px 12px` }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px' }}>
           <button onClick={onCancel} style={{ display: 'flex', alignItems: 'center', gap: '6px', color: palette.fg, opacity: 0.6, padding: '4px 0' }}>
             <ChevronLeft size={18} />
@@ -1263,7 +1334,7 @@ function HomeScreen({ onStart, onHistory, onFavorites, onColorSettings, onRerun,
   };
 
   return (
-    <div className="slide-in" style={{ minHeight: '100dvh', padding: '24px', display: 'flex', flexDirection: 'column', position: 'relative', zIndex: 2 }}>
+    <div className="slide-in" style={{ minHeight: '100dvh', padding: `${SAFE_TOP_24} 24px 24px`, display: 'flex', flexDirection: 'column', position: 'relative', zIndex: 2 }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '32px' }}>
         <div>
           <div className="mono" style={{ fontSize: '11px', color: 'var(--accent)', marginBottom: '4px' }}>// NO EXCUSES</div>
@@ -1795,7 +1866,7 @@ function HistoryScreen({ history, onBack, onRerun, onClear, findMatchingFavorite
 
   return (
     <div className="slide-in" style={{ minHeight: '100dvh', display: 'flex', flexDirection: 'column', position: 'relative', zIndex: 2 }}>
-      <div style={{ padding: '20px 24px 12px' }}>
+      <div style={{ padding: `${SAFE_TOP_20} 24px 12px` }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px' }}>
           <button onClick={onBack} style={{ display: 'flex', alignItems: 'center', gap: '6px', color: '#888', padding: '4px 0' }}>
             <ChevronLeft size={18} />
@@ -1859,7 +1930,7 @@ function FavoritesScreen({ favorites, onBack, onRerun, removeFavorite }) {
 
   return (
     <div className="slide-in" style={{ minHeight: '100dvh', display: 'flex', flexDirection: 'column', position: 'relative', zIndex: 2 }}>
-      <div style={{ padding: '20px 24px 12px' }}>
+      <div style={{ padding: `${SAFE_TOP_20} 24px 12px` }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px' }}>
           <button onClick={onBack} style={{ display: 'flex', alignItems: 'center', gap: '6px', color: '#888', padding: '4px 0' }}>
             <ChevronLeft size={18} />
@@ -3239,14 +3310,14 @@ function ActiveWorkout({ queue, idx, setIdx, restConfig, onExit, onEdit, onCompl
   const progress = ((idx + (phase === 'rest' ? 1 : 0)) / queue.length) * 100;
 
   return (
-    <div style={{ minHeight: '100dvh', display: 'flex', flexDirection: 'column', position: 'relative', zIndex: 2 }}>
-      <div style={{ padding: '16px 20px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+    <div className="active-workout-screen" style={{ minHeight: '100dvh', display: 'flex', flexDirection: 'column', position: 'relative', zIndex: 2 }}>
+      <div style={{ padding: `${SAFE_TOP_16} 20px 16px`, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <button onClick={onExit} style={{ padding: '8px', color: '#888', display: 'flex', alignItems: 'center', gap: '4px' }}>
           <X size={18} />
           <span className="mono" style={{ fontSize: '11px' }}>QUIT</span>
         </button>
         <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-          <div className="mono" style={{ fontSize: '11px', color: '#888' }}>
+          <div className="mono" style={{ fontSize: 'var(--active-header-meta-size)', color: '#888' }}>
             {idx + 1} / {queue.length} · {fmtTime(elapsed)}
           </div>
           <button
@@ -3292,7 +3363,7 @@ function ActiveWorkout({ queue, idx, setIdx, restConfig, onExit, onEdit, onCompl
         />
       )}
 
-      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center', padding: '20px 24px' }}>
+      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center', padding: 'var(--active-content-y) var(--active-content-x)' }}>
         {phase === 'exercise' ? (
           <ExerciseView current={current} next={next} />
         ) : (
@@ -3395,16 +3466,16 @@ function ExerciseView({ current, next }) {
   return (
     <>
       <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '12px', flexWrap: 'wrap' }}>
-        <div className="mono" style={{ fontSize: '11px', color: 'var(--accent)' }}>
+        <div className="mono" style={{ fontSize: 'var(--active-meta-size)', color: 'var(--accent)' }}>
           // NOW {current.positionLabel ? '· ' + current.positionLabel : ''}
         </div>
         <span className="mono" style={{
-          fontSize: '10px', padding: '2px 7px', background: equip.color + '22',
+          fontSize: 'var(--active-equip-size)', padding: '2px 7px', background: equip.color + '22',
           color: equip.color, borderRadius: '2px', fontWeight: 700, letterSpacing: '0.05em',
         }}>{equip.label}</span>
       </div>
       <div className="display" style={{
-        fontSize: 'clamp(40px, 9vw, 78px)', lineHeight: 0.9, color: 'var(--fg)', marginBottom: '24px',
+        fontSize: 'var(--active-title-size)', lineHeight: 0.9, color: 'var(--fg)', marginBottom: 'var(--active-title-margin)',
         wordBreak: 'break-word',
       }}>
         {current.name.toUpperCase()}
@@ -3420,11 +3491,11 @@ function ExerciseView({ current, next }) {
           onStart={startTimer}
         />
       ) : (
-        <div style={{ display: 'flex', alignItems: 'baseline', gap: '12px', marginBottom: '40px' }}>
-          <div className="display" style={{ fontSize: 'clamp(72px, 18vw, 140px)', color: 'var(--accent)', lineHeight: 0.9 }}>
+        <div style={{ display: 'flex', alignItems: 'baseline', gap: '12px', marginBottom: 'var(--active-rep-margin)' }}>
+          <div className="display" style={{ fontSize: 'var(--active-rep-size)', color: 'var(--accent)', lineHeight: 0.9 }}>
             {current.reps}
           </div>
-          <div className="stencil" style={{ fontSize: '32px', color: '#888' }}>
+          <div className="stencil" style={{ fontSize: 'var(--active-unit-size)', color: '#888' }}>
             {current.unit.toUpperCase()}
           </div>
         </div>
@@ -3455,14 +3526,14 @@ function TimedDisplay({ phase, prepValue, timerValue, target, onStart }) {
     return (
       <div style={{ marginBottom: '40px' }}>
         <div style={{ display: 'flex', alignItems: 'baseline', gap: '12px', marginBottom: '20px' }}>
-          <div className="display" style={{ fontSize: 'clamp(72px, 18vw, 140px)', color: 'var(--accent)', lineHeight: 0.9 }}>
+          <div className="display" style={{ fontSize: 'var(--active-timer-target-size)', color: 'var(--accent)', lineHeight: 0.9 }}>
             {target}
           </div>
-          <div className="stencil" style={{ fontSize: '32px', color: '#888' }}>SEC</div>
+          <div className="stencil" style={{ fontSize: 'var(--active-timer-unit-size)', color: '#888' }}>SEC</div>
         </div>
         <button onClick={onStart} style={{
           width: '100%', padding: '16px', background: '#7C5CFF', color: '#0A0A0A',
-          fontSize: '16px', fontWeight: 900, fontFamily: 'Archivo Black, sans-serif',
+          fontSize: 'var(--active-timer-button-font)', fontWeight: 900, fontFamily: 'Archivo Black, sans-serif',
           letterSpacing: '0.02em', borderRadius: '2px', display: 'flex',
           alignItems: 'center', justifyContent: 'center', gap: '10px',
         }}>
@@ -3475,9 +3546,9 @@ function TimedDisplay({ phase, prepValue, timerValue, target, onStart }) {
   if (phase === 'prep') {
     return (
       <div style={{ marginBottom: '40px', textAlign: 'center' }}>
-        <div className="mono" style={{ fontSize: '11px', color: '#7C5CFF', marginBottom: '8px' }}>// GET READY</div>
+        <div className="mono" style={{ fontSize: 'var(--active-timer-prep-label-size)', color: '#7C5CFF', marginBottom: '8px' }}>// GET READY</div>
         <div className="display" style={{
-          fontSize: 'clamp(120px, 32vw, 220px)', color: '#7C5CFF', lineHeight: 1,
+          fontSize: 'var(--active-timer-prep-size)', color: '#7C5CFF', lineHeight: 1,
         }}>
           {prepValue === 0 ? 'GO' : prepValue}
         </div>
@@ -3488,14 +3559,14 @@ function TimedDisplay({ phase, prepValue, timerValue, target, onStart }) {
   if (phase === 'running') {
     return (
       <div style={{ marginBottom: '40px', textAlign: 'center' }}>
-        <div className="mono" style={{ fontSize: '11px', color: 'var(--accent)', marginBottom: '8px' }}>// COUNTDOWN</div>
+        <div className="mono" style={{ fontSize: 'var(--active-timer-running-label-size)', color: 'var(--accent)', marginBottom: '8px' }}>// COUNTDOWN</div>
         <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'center', gap: '10px' }}>
           <div className="display" style={{
-            fontSize: 'clamp(100px, 26vw, 180px)', color: 'var(--accent)', lineHeight: 0.9,
+            fontSize: 'var(--active-timer-running-size)', color: 'var(--accent)', lineHeight: 0.9,
           }}>
             {timerValue}
           </div>
-          <div className="stencil" style={{ fontSize: '28px', color: '#888' }}>SEC</div>
+          <div className="stencil" style={{ fontSize: 'var(--active-timer-running-unit-size)', color: '#888' }}>SEC</div>
         </div>
       </div>
     );
@@ -3504,14 +3575,14 @@ function TimedDisplay({ phase, prepValue, timerValue, target, onStart }) {
   // overtime
   return (
     <div style={{ marginBottom: '40px', textAlign: 'center' }}>
-      <div className="mono" style={{ fontSize: '11px', color: 'var(--accent2)', marginBottom: '8px' }}>// OVERTIME · KEEP GOING</div>
+      <div className="mono" style={{ fontSize: 'var(--active-timer-overtime-label-size)', color: 'var(--accent2)', marginBottom: '8px' }}>// OVERTIME · KEEP GOING</div>
       <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'center', gap: '6px' }}>
-        <div className="display" style={{ fontSize: 'clamp(64px, 16vw, 110px)', color: 'var(--accent2)', lineHeight: 0.9 }}>
+        <div className="display" style={{ fontSize: 'var(--active-timer-overtime-size)', color: 'var(--accent2)', lineHeight: 0.9 }}>
           +{timerValue}
         </div>
-        <div className="stencil" style={{ fontSize: '22px', color: 'var(--accent2)', opacity: 0.7 }}>SEC</div>
+        <div className="stencil" style={{ fontSize: 'var(--active-timer-overtime-unit-size)', color: 'var(--accent2)', opacity: 0.7 }}>SEC</div>
       </div>
-      <div className="mono" style={{ fontSize: '10px', color: '#666', marginTop: '6px' }}>
+      <div className="mono" style={{ fontSize: 'var(--active-timer-note-size)', color: '#666', marginTop: '6px' }}>
         TARGET {target}s HIT · BONUS TIME
       </div>
     </div>
@@ -3527,18 +3598,18 @@ function RestView({ remaining, next, afterNext = [], isLongRest = false }) {
 
   return (
     <>
-      <div className="mono" style={{ fontSize: '11px', color: 'var(--accent2)', marginBottom: '12px' }}>
+      <div className="mono" style={{ fontSize: 'var(--active-rest-label-size)', color: 'var(--accent2)', marginBottom: '12px' }}>
         // {isLongRest ? 'LONG REST' : 'REST'}
       </div>
-      <div className="display" style={{ fontSize: 'clamp(44px, 10vw, 72px)', lineHeight: 0.9, color: '#888', marginBottom: '24px' }}>
+      <div className="display" style={{ fontSize: 'var(--active-rest-title-size)', lineHeight: 0.9, color: '#888', marginBottom: '24px' }}>
         BREATHER
       </div>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: '40px', position: 'relative' }}>
         <div style={{
-          position: 'absolute', width: '220px', height: '220px', borderRadius: '50%',
+          position: 'absolute', width: 'var(--active-rest-ring-size)', height: 'var(--active-rest-ring-size)', borderRadius: '50%',
           border: '2px solid var(--accent2)', animation: 'pulse-ring 2s ease-out infinite',
         }} />
-        <div className="display" style={{ fontSize: 'clamp(80px, 22vw, 160px)', color: 'var(--accent2)', lineHeight: 1 }}>
+        <div className="display" style={{ fontSize: 'var(--active-rest-timer-size)', color: 'var(--accent2)', lineHeight: 1 }}>
           {mins > 0 ? mins + ':' + String(secs).padStart(2, '0') : secs}
         </div>
       </div>
@@ -3604,7 +3675,7 @@ function DoneScreen({ onHome, queueLen }) {
   const variant = DONE_VARIANTS[idx];
 
   return (
-    <div className="slide-in" style={{ minHeight: '100dvh', padding: '24px', display: 'flex', flexDirection: 'column', position: 'relative', zIndex: 2 }}>
+    <div className="slide-in" style={{ minHeight: '100dvh', padding: `${SAFE_TOP_24} 24px 24px`, display: 'flex', flexDirection: 'column', position: 'relative', zIndex: 2 }}>
       <div style={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
         <div className="mono" style={{ fontSize: '12px', color: 'var(--accent)', marginBottom: '16px' }}>
           // SESSION COMPLETE
@@ -3647,7 +3718,7 @@ function DoneScreen({ onHome, queueLen }) {
 
 function Header({ step, total, title, onBack }) {
   return (
-    <div style={{ padding: '20px 24px 12px' }}>
+    <div style={{ padding: `${SAFE_TOP_20} 24px 12px` }}>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px' }}>
         <button onClick={onBack} style={{ display: 'flex', alignItems: 'center', gap: '6px', color: '#888', padding: '4px 0' }}>
           <ChevronLeft size={18} />
