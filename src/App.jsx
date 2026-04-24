@@ -117,9 +117,18 @@ const MODES = [
 
 const MODE_LABELS = MODES.reduce((acc, m) => ({ ...acc, [m.key]: m.label }), {});
 
-const APP_VERSION = '2.1';
+const APP_VERSION = '2.2';
 
 const APP_VERSION_HISTORY = [
+  {
+    version: '2.2',
+    date: '2026-04-24',
+    type: 'Bug fix',
+    changes: [
+      'Prevented saved history, favorites, rest settings, and custom exercises from being overwritten during app startup.',
+      'Kept persisted workout data intact across page refreshes and reloads.',
+    ],
+  },
   {
     version: '2.1',
     date: '2026-04-24',
@@ -301,6 +310,7 @@ export default function WorkoutApp() {
   const [queueIdx, setQueueIdx] = useState(0);
   const [history, setHistory] = useState([]);
   const [favorites, setFavorites] = useState([]);
+  const [storageHydrated, setStorageHydrated] = useState(false);
   // Home screen collapse state - lifted here so it survives navigation
   const [favCollapsed, setFavCollapsed] = useState(true);
   const [recentCollapsed, setRecentCollapsed] = useState(true);
@@ -340,13 +350,26 @@ export default function WorkoutApp() {
       setActivePaletteId(storedPaletteId);
       setCustomPalettes(storedCustoms);
       setPaletteHydrated(true);
+      setStorageHydrated(true);
     })();
   }, []);
 
-  useEffect(() => { if (library) storage.set('library', library); }, [library]);
-  useEffect(() => { storage.set('restConfig', restConfig); }, [restConfig]);
-  useEffect(() => { storage.set('history', history); }, [history]);
-  useEffect(() => { storage.set('favorites', favorites); }, [favorites]);
+  useEffect(() => {
+    if (!storageHydrated || !library) return;
+    storage.set('library', library);
+  }, [library, storageHydrated]);
+  useEffect(() => {
+    if (!storageHydrated) return;
+    storage.set('restConfig', restConfig);
+  }, [restConfig, storageHydrated]);
+  useEffect(() => {
+    if (!storageHydrated) return;
+    storage.set('history', history);
+  }, [history, storageHydrated]);
+  useEffect(() => {
+    if (!storageHydrated) return;
+    storage.set('favorites', favorites);
+  }, [favorites, storageHydrated]);
   useEffect(() => {
     if (!settingsHydrated) return;
     storage.set('settings', settings);

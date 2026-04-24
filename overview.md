@@ -107,7 +107,7 @@ Persisted keys:
 
 Do not rename these keys without a deliberate migration plan. Existing user data depends on them.
 
-Hydration happens once on app load. Follow-up `useEffect` calls persist changes back to localStorage. Some state, such as settings, palette, and home collapse state, has hydration guards to avoid overwriting stored values before initial reads complete.
+Hydration happens once on app load. Follow-up `useEffect` calls persist changes back to localStorage. Persisted write-back is guarded until initial reads complete so default in-memory state cannot overwrite saved library, history, favorites, rest settings, app settings, palette, or home collapse data during startup.
 
 ## Workout Logic
 
