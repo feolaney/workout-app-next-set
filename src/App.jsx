@@ -117,9 +117,18 @@ const MODES = [
 
 const MODE_LABELS = MODES.reduce((acc, m) => ({ ...acc, [m.key]: m.label }), {});
 
-const APP_VERSION = '2.3';
+const APP_VERSION = '2.4';
 
 const APP_VERSION_HISTORY = [
+  {
+    version: '2.4',
+    date: '2026-04-24',
+    type: 'Bug fix / mobile',
+    changes: [
+      'Changed app screen containers from static viewport height to dynamic viewport height on mobile.',
+      'Prevented short pages from becoming slightly taller than the visible iPhone screen.',
+    ],
+  },
   {
     version: '2.3',
     date: '2026-04-24',
@@ -408,7 +417,7 @@ export default function WorkoutApp() {
 
   if (!library) {
     return (
-      <div style={{ minHeight: '100vh', background: 'var(--bg)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--accent)', fontFamily: 'monospace' }}>
+      <div style={{ minHeight: '100dvh', background: 'var(--bg)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--accent)', fontFamily: 'monospace' }}>
         LOADING...
       </div>
     );
@@ -511,7 +520,7 @@ export default function WorkoutApp() {
   };
 
   return (
-    <div style={{ ...paletteVars, minHeight: '100vh', background: 'var(--bg)', color: 'var(--fg)', fontFamily: '"JetBrains Mono", "Fira Code", monospace', position: 'relative', overflow: 'hidden' }}>
+    <div style={{ ...paletteVars, minHeight: '100dvh', background: 'var(--bg)', color: 'var(--fg)', fontFamily: '"JetBrains Mono", "Fira Code", monospace', position: 'relative', overflow: 'hidden' }}>
       <GlobalStyles />
       {screen === 'colorSettings' && (
         <ColorSettingsScreen
@@ -848,7 +857,7 @@ function ColorSettingsScreen({ activePaletteId, setActivePaletteId, customPalett
   const canAddMoreCustoms = customPalettes.length < 3;
 
   return (
-    <div className="slide-in" style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column', position: 'relative', zIndex: 2 }}>
+    <div className="slide-in" style={{ minHeight: '100dvh', display: 'flex', flexDirection: 'column', position: 'relative', zIndex: 2 }}>
       <div style={{ padding: '20px 24px 12px' }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px' }}>
           <button onClick={onBack} style={{ display: 'flex', alignItems: 'center', gap: '6px', color: '#888', padding: '4px 0' }}>
@@ -1019,7 +1028,7 @@ function CustomPaletteEditor({ palette, onChange, onSave, onDelete, onCancel }) 
   };
 
   return (
-    <div className="slide-in" style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column', position: 'relative', zIndex: 2, background: palette.bg }}>
+    <div className="slide-in" style={{ minHeight: '100dvh', display: 'flex', flexDirection: 'column', position: 'relative', zIndex: 2, background: palette.bg }}>
       <div style={{ padding: '20px 24px 12px' }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px' }}>
           <button onClick={onCancel} style={{ display: 'flex', alignItems: 'center', gap: '6px', color: palette.fg, opacity: 0.6, padding: '4px 0' }}>
@@ -1254,7 +1263,7 @@ function HomeScreen({ onStart, onHistory, onFavorites, onColorSettings, onRerun,
   };
 
   return (
-    <div className="slide-in" style={{ minHeight: '100vh', padding: '24px', display: 'flex', flexDirection: 'column', position: 'relative', zIndex: 2 }}>
+    <div className="slide-in" style={{ minHeight: '100dvh', padding: '24px', display: 'flex', flexDirection: 'column', position: 'relative', zIndex: 2 }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '32px' }}>
         <div>
           <div className="mono" style={{ fontSize: '11px', color: 'var(--accent)', marginBottom: '4px' }}>// NO EXCUSES</div>
@@ -1785,7 +1794,7 @@ function HistoryScreen({ history, onBack, onRerun, onClear, findMatchingFavorite
   };
 
   return (
-    <div className="slide-in" style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column', position: 'relative', zIndex: 2 }}>
+    <div className="slide-in" style={{ minHeight: '100dvh', display: 'flex', flexDirection: 'column', position: 'relative', zIndex: 2 }}>
       <div style={{ padding: '20px 24px 12px' }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px' }}>
           <button onClick={onBack} style={{ display: 'flex', alignItems: 'center', gap: '6px', color: '#888', padding: '4px 0' }}>
@@ -1849,7 +1858,7 @@ function FavoritesScreen({ favorites, onBack, onRerun, removeFavorite }) {
   const [infoFor, setInfoFor] = useState(null);
 
   return (
-    <div className="slide-in" style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column', position: 'relative', zIndex: 2 }}>
+    <div className="slide-in" style={{ minHeight: '100dvh', display: 'flex', flexDirection: 'column', position: 'relative', zIndex: 2 }}>
       <div style={{ padding: '20px 24px 12px' }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px' }}>
           <button onClick={onBack} style={{ display: 'flex', alignItems: 'center', gap: '6px', color: '#888', padding: '4px 0' }}>
@@ -1905,7 +1914,7 @@ function CategoryScreen({ selectedCategories, setSelectedCategories, selectedMod
   };
 
   return (
-    <div className="slide-in" style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column', position: 'relative', zIndex: 2 }}>
+    <div className="slide-in" style={{ minHeight: '100dvh', display: 'flex', flexDirection: 'column', position: 'relative', zIndex: 2 }}>
       <Header step={1} total={4} title="TARGETS" onBack={onBack} />
       <div style={{ padding: '0 24px 24px', flex: 1, overflowY: 'auto' }}>
         <div className="mono" style={{ fontSize: '12px', color: '#666', marginBottom: '16px' }}>
@@ -2079,7 +2088,7 @@ function ExerciseScreen({ library, setLibrary, categories, modifiers, selected, 
   };
 
   return (
-    <div className="slide-in" style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column', position: 'relative', zIndex: 2 }}>
+    <div className="slide-in" style={{ minHeight: '100dvh', display: 'flex', flexDirection: 'column', position: 'relative', zIndex: 2 }}>
       <Header step={2} total={4} title="EXERCISES" onBack={onBack} />
       <div style={{ padding: '0 24px 24px', flex: 1, overflowY: 'auto' }}>
         <div className="mono" style={{ fontSize: '12px', color: '#666', marginBottom: '16px' }}>
@@ -2271,7 +2280,7 @@ function ModeScreen({ mode, setMode, modeConfig, setModeConfig, exercises, setEx
   const canProceed = mode && (mode !== 'manual' || (modeConfig.manualQueue && modeConfig.manualQueue.length > 0));
 
   return (
-    <div className="slide-in" style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column', position: 'relative', zIndex: 2 }}>
+    <div className="slide-in" style={{ minHeight: '100dvh', display: 'flex', flexDirection: 'column', position: 'relative', zIndex: 2 }}>
       <Header step={3} total={4} title="FORMAT" onBack={onBack} />
       <div style={{ padding: '0 24px 24px', flex: 1, overflowY: 'auto' }}>
         <div className="mono" style={{ fontSize: '12px', color: '#666', marginBottom: '16px' }}>
@@ -2804,7 +2813,7 @@ function ManualBuilder({ exercises, queue, setQueue }) {
 
 function RestScreen({ restConfig, setRestConfig, onBack, onNext }) {
   return (
-    <div className="slide-in" style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column', position: 'relative', zIndex: 2 }}>
+    <div className="slide-in" style={{ minHeight: '100dvh', display: 'flex', flexDirection: 'column', position: 'relative', zIndex: 2 }}>
       <Header step={4} total={4} title="REST" onBack={onBack} />
       <div style={{ padding: '0 24px 24px', flex: 1, overflowY: 'auto' }}>
         <div className="mono" style={{ fontSize: '12px', color: '#666', marginBottom: '20px' }}>
@@ -3230,7 +3239,7 @@ function ActiveWorkout({ queue, idx, setIdx, restConfig, onExit, onEdit, onCompl
   const progress = ((idx + (phase === 'rest' ? 1 : 0)) / queue.length) * 100;
 
   return (
-    <div style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column', position: 'relative', zIndex: 2 }}>
+    <div style={{ minHeight: '100dvh', display: 'flex', flexDirection: 'column', position: 'relative', zIndex: 2 }}>
       <div style={{ padding: '16px 20px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <button onClick={onExit} style={{ padding: '8px', color: '#888', display: 'flex', alignItems: 'center', gap: '4px' }}>
           <X size={18} />
@@ -3595,7 +3604,7 @@ function DoneScreen({ onHome, queueLen }) {
   const variant = DONE_VARIANTS[idx];
 
   return (
-    <div className="slide-in" style={{ minHeight: '100vh', padding: '24px', display: 'flex', flexDirection: 'column', position: 'relative', zIndex: 2 }}>
+    <div className="slide-in" style={{ minHeight: '100dvh', padding: '24px', display: 'flex', flexDirection: 'column', position: 'relative', zIndex: 2 }}>
       <div style={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
         <div className="mono" style={{ fontSize: '12px', color: 'var(--accent)', marginBottom: '16px' }}>
           // SESSION COMPLETE

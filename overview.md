@@ -11,7 +11,7 @@ Use this document as the first orientation point for future sessions. Keep it cu
 - There is no server, auth, database, routing library, Tailwind setup, TypeScript setup, or external storage service.
 - Persistence is browser-native `localStorage`, wrapped by an async adapter so the rest of the app can call `storage.get(key, fallback)` and `storage.set(key, value)`.
 - The visual system is inline-style driven inside React components, with global font/import/keyframe rules injected by `GlobalStyles`.
-- The app background is currently fixed to solid `#0E0E0E`; palette selection still controls surface, foreground, accent, secondary accent, and warning colors. The document, body, root, and mobile browser theme color also use `#0E0E0E` so safe areas and overscroll regions blend with the app.
+- The app background is currently fixed to solid `#0E0E0E`; palette selection still controls surface, foreground, accent, secondary accent, and warning colors. The document, body, root, and mobile browser theme color also use `#0E0E0E` so safe areas and overscroll regions blend with the app. Screen containers use dynamic viewport height (`100dvh`) so short pages fit the visible mobile viewport without unnecessary page scroll.
 - The visible app version is controlled by `APP_VERSION` in `src/App.jsx`, and Settings exposes `APP_VERSION_HISTORY` so users can see released changes from version 2.1 onward.
 
 ## Project Structure
