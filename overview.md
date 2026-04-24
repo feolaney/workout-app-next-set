@@ -138,6 +138,8 @@ The active workout preview derives an upcoming timeline from the queue at render
 
 Completing a set either advances immediately, starts a rest timer, or finishes the workout depending on position and `restConfig`.
 
+Editing a current workout opens the normal setup stages with the current selections intact. The app records the active queue position and elapsed time before leaving the active screen. At the rest-settings step, `Continue` rebuilds the queue and resumes at the saved position, clamped to the rebuilt queue length, while preserving elapsed time. `Start Over` rebuilds the edited workout from the beginning with a fresh timer.
+
 Rest modes:
 
 - `none`: skip rest entirely

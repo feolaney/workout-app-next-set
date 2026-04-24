@@ -117,9 +117,18 @@ const MODES = [
 
 const MODE_LABELS = MODES.reduce((acc, m) => ({ ...acc, [m.key]: m.label }), {});
 
-const APP_VERSION = '2.7';
+const APP_VERSION = '2.8';
 
 const APP_VERSION_HISTORY = [
+  {
+    version: '2.8',
+    date: '2026-04-24',
+    type: 'Feature / workflow',
+    changes: [
+      'Added Continue Workout and Start Over choices after editing a current workout rest settings.',
+      'Kept Continue Workout on the current workout position with elapsed time preserved, while Start Over rebuilds from the beginning.',
+    ],
+  },
   {
     version: '2.7',
     date: '2026-04-24',
@@ -362,6 +371,8 @@ export default function WorkoutApp() {
   const [restConfig, setRestConfig] = useState({ type: 'fixed', short: 30, long: 90, longEvery: 4 });
   const [queue, setQueue] = useState([]);
   const [queueIdx, setQueueIdx] = useState(0);
+  const [activeInitialElapsed, setActiveInitialElapsed] = useState(0);
+  const [editResume, setEditResume] = useState(null);
   const [history, setHistory] = useState([]);
   const [favorites, setFavorites] = useState([]);
   const [storageHydrated, setStorageHydrated] = useState(false);
@@ -468,9 +479,12 @@ export default function WorkoutApp() {
     setModeConfig({});
     setQueue([]);
     setQueueIdx(0);
+    setActiveInitialElapsed(0);
+    setEditResume(null);
   };
 
   const rerunFromHistory = (entry) => {
+    setEditResume(null);
     setSelectedCategories(entry.categories || []);
     setSelectedModifiers(entry.modifiers || []);
     setSelectedExercises(entry.exercises || []);
@@ -479,6 +493,7 @@ export default function WorkoutApp() {
     const q = buildQueue(entry.exercises, entry.mode, entry.modeConfig);
     setQueue(q);
     setQueueIdx(0);
+    setActiveInitialElapsed(0);
     setScreen('active');
   };
 
@@ -522,6 +537,22 @@ export default function WorkoutApp() {
     exercises: selectedExercises,
     totalItems: queue.length,
   });
+
+  const startEditingActiveWorkout = ({ idx: activeIdx = queueIdx, phase = 'exercise', elapsed = 0 } = {}) => {
+    const resumeIdx = phase === 'rest' ? activeIdx + 1 : activeIdx;
+    const boundedIdx = queue.length > 0 ? Math.min(Math.max(resumeIdx, 0), queue.length - 1) : 0;
+    setEditResume({ idx: boundedIdx, elapsed });
+    setScreen('categories');
+  };
+
+  const applyWorkoutSetup = ({ startIdx = 0, initialElapsed = 0 } = {}) => {
+    const q = buildQueue(selectedExercises, mode, modeConfig);
+    setQueue(q);
+    setQueueIdx(q.length > 0 ? Math.min(Math.max(startIdx, 0), q.length - 1) : 0);
+    setActiveInitialElapsed(initialElapsed);
+    setEditResume(null);
+    setScreen('active');
+  };
 
   // Resolve active palette and build CSS variables for it
   const activePalette = resolvePalette(activePaletteId, customPalettes);
@@ -570,7 +601,11 @@ export default function WorkoutApp() {
       )}
       {screen === 'home' && (
         <HomeScreen
-          onStart={() => setScreen('categories')}
+          onStart={() => {
+            setEditResume(null);
+            setActiveInitialElapsed(0);
+            setScreen('categories');
+          }}
           onHistory={() => setScreen('history')}
           onFavorites={() => setScreen('favorites')}
           onColorSettings={() => setScreen('colorSettings')}
@@ -646,12 +681,10 @@ export default function WorkoutApp() {
           restConfig={restConfig}
           setRestConfig={setRestConfig}
           onBack={() => setScreen('mode')}
-          onNext={() => {
-            const q = buildQueue(selectedExercises, mode, modeConfig);
-            setQueue(q);
-            setQueueIdx(0);
-            setScreen('active');
-          }}
+          editingCurrentWorkout={!!editResume}
+          onNext={() => applyWorkoutSetup({ startIdx: 0, initialElapsed: 0 })}
+          onContinue={() => applyWorkoutSetup({ startIdx: editResume?.idx || 0, initialElapsed: editResume?.elapsed || 0 })}
+          onStartOver={() => applyWorkoutSetup({ startIdx: 0, initialElapsed: 0 })}
         />
       )}
       {screen === 'active' && (
@@ -660,8 +693,9 @@ export default function WorkoutApp() {
           idx={queueIdx}
           setIdx={setQueueIdx}
           restConfig={restConfig}
+          initialElapsed={activeInitialElapsed}
           onExit={goHome}
-          onEdit={() => setScreen('categories')}
+          onEdit={startEditingActiveWorkout}
           currentEntry={currentWorkoutAsEntry()}
           findMatchingFavorite={findMatchingFavorite}
           addFavorite={addFavorite}
@@ -2905,7 +2939,7 @@ function ManualBuilder({ exercises, queue, setQueue }) {
   );
 }
 
-function RestScreen({ restConfig, setRestConfig, onBack, onNext }) {
+function RestScreen({ restConfig, setRestConfig, onBack, onNext, editingCurrentWorkout = false, onContinue, onStartOver }) {
   return (
     <div className="slide-in" style={{ minHeight: '100dvh', display: 'flex', flexDirection: 'column', position: 'relative', zIndex: 2 }}>
       <Header step={4} total={4} title="REST" onBack={onBack} />
@@ -2961,7 +2995,42 @@ function RestScreen({ restConfig, setRestConfig, onBack, onNext }) {
           TIP: You can always hit DONE to skip the rest timer early, or hit +15 to extend.
         </div>
       </div>
-      <BottomBar disabled={false} onNext={onNext} label="START WORKOUT" primary />
+      {editingCurrentWorkout ? (
+        <EditWorkoutActionBar onContinue={onContinue} onStartOver={onStartOver} />
+      ) : (
+        <BottomBar disabled={false} onNext={onNext} label="START WORKOUT" primary />
+      )}
+    </div>
+  );
+}
+
+function EditWorkoutActionBar({ onContinue, onStartOver }) {
+  return (
+    <div style={{ padding: '16px 24px 24px', borderTop: '1px solid #1A1A1A', background: 'var(--bg)', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
+      <button
+        onClick={onStartOver}
+        style={{
+          padding: '18px 12px', background: '#1A1A1A', color: '#AAA',
+          fontSize: '13px', fontWeight: 900, fontFamily: 'Archivo Black, sans-serif',
+          letterSpacing: '0.02em', borderRadius: '2px', display: 'flex',
+          alignItems: 'center', justifyContent: 'center', gap: '8px',
+        }}
+      >
+        <Play size={16} fill="#AAA" />
+        START OVER
+      </button>
+      <button
+        onClick={onContinue}
+        style={{
+          padding: '18px 12px', background: 'var(--accent2)', color: '#0A0A0A',
+          fontSize: '13px', fontWeight: 900, fontFamily: 'Archivo Black, sans-serif',
+          letterSpacing: '0.02em', borderRadius: '2px', display: 'flex',
+          alignItems: 'center', justifyContent: 'center', gap: '8px',
+        }}
+      >
+        <Check size={18} strokeWidth={3} />
+        CONTINUE
+      </button>
     </div>
   );
 }
@@ -3254,13 +3323,13 @@ function WorkoutMenu({ onClose, currentEntry, findMatchingFavorite, onFavoriteTo
   );
 }
 
-function ActiveWorkout({ queue, idx, setIdx, restConfig, onExit, onEdit, onComplete, currentEntry, findMatchingFavorite, addFavorite, removeFavorite }) {
+function ActiveWorkout({ queue, idx, setIdx, restConfig, initialElapsed = 0, onExit, onEdit, onComplete, currentEntry, findMatchingFavorite, addFavorite, removeFavorite }) {
   const [phase, setPhase] = useState('exercise');
   const [restRemaining, setRestRemaining] = useState(0);
-  const [elapsed, setElapsed] = useState(0);
+  const [elapsed, setElapsed] = useState(initialElapsed);
   const [menuOpen, setMenuOpen] = useState(false);
   const [namingEntry, setNamingEntry] = useState(null);
-  const startRef = useRef(Date.now());
+  const startRef = useRef(Date.now() - initialElapsed * 1000);
   const intervalRef = useRef(null);
   const contentRef = useRef(null);
 
@@ -3394,7 +3463,7 @@ function ActiveWorkout({ queue, idx, setIdx, restConfig, onExit, onEdit, onCompl
           }}
           onEdit={() => {
             setMenuOpen(false);
-            onEdit();
+            onEdit({ idx, phase, elapsed });
           }}
         />
       )}
