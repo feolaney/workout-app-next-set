@@ -117,9 +117,18 @@ const MODES = [
 
 const MODE_LABELS = MODES.reduce((acc, m) => ({ ...acc, [m.key]: m.label }), {});
 
-const APP_VERSION = '2.2';
+const APP_VERSION = '2.3';
 
 const APP_VERSION_HISTORY = [
+  {
+    version: '2.3',
+    date: '2026-04-24',
+    type: 'UI / mobile',
+    changes: [
+      'Matched the document, root, and mobile overscroll backgrounds to the app background.',
+      'Reduced white safe-area and bounce-scroll flashes around the app on mobile browsers.',
+    ],
+  },
   {
     version: '2.2',
     date: '2026-04-24',
@@ -637,7 +646,21 @@ function GlobalStyles() {
     <style>{`
       @import url('https://fonts.googleapis.com/css2?family=Archivo+Black&family=JetBrains+Mono:wght@400;500;700&family=Bebas+Neue&display=swap');
       * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
-      body { margin: 0; overscroll-behavior: none; }
+      html {
+        margin: 0;
+        min-height: 100%;
+        background: #0E0E0E;
+      }
+      body {
+        margin: 0;
+        min-height: 100dvh;
+        background: #0E0E0E;
+        overscroll-behavior: none;
+      }
+      #root {
+        min-height: 100dvh;
+        background: #0E0E0E;
+      }
       button { font-family: inherit; cursor: pointer; border: none; background: none; color: inherit; }
       .display { font-family: 'Archivo Black', sans-serif; letter-spacing: -0.02em; }
       .stencil { font-family: 'Bebas Neue', sans-serif; letter-spacing: 0.05em; }
