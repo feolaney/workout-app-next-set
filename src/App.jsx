@@ -138,9 +138,17 @@ const MODES = [
 
 const MODE_LABELS = MODES.reduce((acc, m) => ({ ...acc, [m.key]: m.label }), {});
 
-const APP_VERSION = '2.15';
+const APP_VERSION = '2.16';
 
 const APP_VERSION_HISTORY = [
+  {
+    version: '2.16',
+    date: '2026-04-25',
+    type: 'UI',
+    changes: [
+      'Renamed grouped exercise variant controls from Advanced to Alternatives while keeping standalone advanced bucket labels unchanged.',
+    ],
+  },
   {
     version: '2.15',
     date: '2026-04-25',
@@ -2551,7 +2559,7 @@ function CategoryRandomPicker({ catKey, catColor, maxCount, value, onValueChange
               size={12}
               style={{ transition: 'transform 0.2s', transform: advancedOpen ? 'rotate(180deg)' : 'rotate(0deg)' }}
             />
-            {advancedOpen ? 'HIDE ALL ADVANCED' : 'SHOW ALL ADVANCED'}
+            {advancedOpen ? 'HIDE ALL ALTERNATIVES' : 'SHOW ALL ALTERNATIVES'}
           </button>
         )}
         <button onClick={onRandom} style={{
@@ -3021,7 +3029,7 @@ function ExercisePickerRow({ exercise, selected, revealed = false, groupExpanded
               display: 'flex', alignItems: 'center', gap: '3px',
             }}
           >
-            {groupExpanded ? 'HIDE' : 'ADVANCED'}
+            {groupExpanded ? 'HIDE' : 'ALTERNATIVES'}
             <ChevronDown
               size={11}
               style={{ transition: 'transform 0.2s', transform: groupExpanded ? 'rotate(180deg)' : 'rotate(0deg)' }}
