@@ -117,9 +117,9 @@ Workout setup starts with categories and equipment modifiers. Categories choose 
 
 Exercises can be manually selected, randomly selected per category, or added as custom exercises. Custom exercises are stored in `library`, so they persist with the rest of the exercise library.
 
-CSV exercise metadata includes body section, equipment type, exercise group, difficulty, and direct source URL. In the picker, exercise groups with multiple variants show only the primary exercise by default; its Advanced/Hide control reveals or collapses the other variants in that group. Standalone exercises with advanced difficulty and no exercise group are hidden behind section-and-equipment Advanced/Hide controls, such as advanced upper body weight or advanced lower dumbbell. Revealed rows use a slightly lighter background so they remain visually associated with the dropdown that exposed them. Random category picks use the currently visible exercise pool, so hidden advanced variants are only eligible after being expanded.
+CSV exercise metadata includes body section, equipment type, exercise group, difficulty, direct source URL, and description. In the picker, exercise groups with multiple variants show only the primary exercise by default; its Advanced/Hide control reveals or collapses the other variants in that group. Standalone exercises with advanced difficulty and no exercise group are hidden behind section-and-equipment Advanced/Hide controls, such as advanced upper body weight or advanced lower dumbbell. Revealed rows use a slightly lighter background so they remain visually associated with the dropdown that exposed them. Random category picks use the currently visible exercise pool, so hidden advanced variants are only eligible after being expanded.
 
-Default exercises with a direct source URL show a small info icon in selection, setup details, workout info, and the active workout. Pressing it opens the source URL in a new tab/window. Custom exercises do not show this icon unless they later gain source metadata.
+Default exercises with details show a small info icon in selection, setup details, workout info, and the active workout. Pressing it opens an in-app description window with Back and More Details actions; More Details opens the source URL in a new tab/window. Custom exercises do not show this icon unless they later gain source or description metadata.
 
 The selected mode determines how `buildQueue(exercises, mode, cfg)` expands selected exercises into active workout items:
 
@@ -129,7 +129,7 @@ The selected mode determines how `buildQueue(exercises, mode, cfg)` expands sele
 - `addon`: round 1 includes exercise 1, round 2 includes exercises 1 and 2, and so on
 - `manual`: use the user-edited `modeConfig.manualQueue`
 
-Each queue item carries enough display data for the active workout: exercise id/name, reps or seconds, unit, equipment, source URL metadata, round/set metadata, total set count, and a `positionLabel` used to show the current set/round/group with totals.
+Each queue item carries enough display data for the active workout: exercise id/name, reps or seconds, unit, equipment, source URL and description metadata, round/set metadata, total set count, and a `positionLabel` used to show the current set/round/group with totals.
 
 The active workout preview derives an upcoming timeline from the queue at render time. The persisted queue remains exercise-only, but the preview inserts long-rest markers for interval workouts when the rest would occur after a future exercise. Short rests are intentionally omitted from this preview.
 

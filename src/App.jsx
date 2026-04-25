@@ -138,9 +138,18 @@ const MODES = [
 
 const MODE_LABELS = MODES.reduce((acc, m) => ({ ...acc, [m.key]: m.label }), {});
 
-const APP_VERSION = '2.11';
+const APP_VERSION = '2.12';
 
 const APP_VERSION_HISTORY = [
+  {
+    version: '2.12',
+    date: '2026-04-25',
+    type: 'Feature / UI',
+    changes: [
+      'Changed exercise info buttons to open an in-app description window with Back and More Details actions.',
+      'Loaded exercise descriptions from the support CSV and carried them into workout queues.',
+    ],
+  },
   {
     version: '2.11',
     date: '2026-04-25',
@@ -520,6 +529,7 @@ function buildDefaultExerciseLibrary(csvText) {
       sourceQuality: record['Source Quality'] || '',
       sourceUrl: record['Direct URL'] || '',
       notes: record.Notes || '',
+      description: record.Description || '',
       csvOrder: idx,
     };
   }).filter(Boolean);
@@ -629,6 +639,7 @@ function enrichModeConfigWithExercises(modeConfig, exercises) {
       return {
         ...item,
         sourceUrl: item.sourceUrl || ex.sourceUrl,
+        description: item.description || ex.description,
         difficulty: item.difficulty || ex.difficulty,
         exerciseGroup: item.exerciseGroup || ex.exerciseGroup,
       };
@@ -979,11 +990,13 @@ export default function WorkoutApp() {
           setRecentCollapsed={setRecentCollapsed}
           settings={settings}
           setSettings={setSettings}
+          library={library}
         />
       )}
       {screen === 'history' && (
         <HistoryScreen
           history={history}
+          library={library}
           onBack={() => setScreen('home')}
           onRerun={rerunFromHistory}
           onClear={() => setHistory([])}
@@ -995,6 +1008,7 @@ export default function WorkoutApp() {
       {screen === 'favorites' && (
         <FavoritesScreen
           favorites={favorites}
+          library={library}
           onBack={() => setScreen('home')}
           onRerun={rerunFromHistory}
           removeFavorite={removeFavorite}
@@ -1725,7 +1739,7 @@ function ColorPickerModal({ slot, value, palette, onChange, onClose }) {
   );
 }
 
-function HomeScreen({ onStart, onHistory, onFavorites, onColorSettings, onRerun, history, favorites, findMatchingFavorite, addFavorite, removeFavorite, favCollapsed, setFavCollapsed, recentCollapsed, setRecentCollapsed, settings, setSettings }) {
+function HomeScreen({ onStart, onHistory, onFavorites, onColorSettings, onRerun, history, favorites, findMatchingFavorite, addFavorite, removeFavorite, favCollapsed, setFavCollapsed, recentCollapsed, setRecentCollapsed, settings, setSettings, library }) {
   const [infoFor, setInfoFor] = useState(null);
   const [namingEntry, setNamingEntry] = useState(null); // entry being named for favoriting
   const [settingsOpen, setSettingsOpen] = useState(false);
@@ -1872,7 +1886,7 @@ function HomeScreen({ onStart, onHistory, onFavorites, onColorSettings, onRerun,
         <Play size={24} fill="#0A0A0A" />
       </button>
 
-      {infoFor && <WorkoutInfoModal entry={infoFor} onClose={() => setInfoFor(null)} onRun={() => { onRerun(infoFor); setInfoFor(null); }} />}
+      {infoFor && <WorkoutInfoModal entry={infoFor} library={library} onClose={() => setInfoFor(null)} onRun={() => { onRerun(infoFor); setInfoFor(null); }} />}
       {namingEntry && (
         <NameFavoriteModal
           entry={namingEntry}
@@ -2181,10 +2195,10 @@ function RecentWorkoutCard({ entry, opacity, onRun, onInfo, onStarToggle, findMa
   );
 }
 
-function WorkoutInfoModal({ entry, onClose, onRun }) {
+function WorkoutInfoModal({ entry, library, onClose, onRun }) {
   const cats = entry.categories || [];
   const mods = entry.modifiers || [];
-  const exercises = entry.exercises || [];
+  const exercises = enrichExercisesWithLibrary(entry.exercises || [], library);
   const modeLabel = MODE_LABELS[entry.mode] || (entry.mode && entry.mode.toUpperCase());
 
   return (
@@ -2266,7 +2280,7 @@ function WorkoutInfoModal({ entry, onClose, onRun }) {
   );
 }
 
-function HistoryScreen({ history, onBack, onRerun, onClear, findMatchingFavorite, addFavorite, removeFavorite }) {
+function HistoryScreen({ history, library, onBack, onRerun, onClear, findMatchingFavorite, addFavorite, removeFavorite }) {
   const [infoFor, setInfoFor] = useState(null);
   const [confirmClear, setConfirmClear] = useState(false);
   const [namingEntry, setNamingEntry] = useState(null);
@@ -2329,7 +2343,7 @@ function HistoryScreen({ history, onBack, onRerun, onClear, findMatchingFavorite
         )}
       </div>
 
-      {infoFor && <WorkoutInfoModal entry={infoFor} onClose={() => setInfoFor(null)} onRun={() => { onRerun(infoFor); setInfoFor(null); }} />}
+      {infoFor && <WorkoutInfoModal entry={infoFor} library={library} onClose={() => setInfoFor(null)} onRun={() => { onRerun(infoFor); setInfoFor(null); }} />}
       {namingEntry && (
         <NameFavoriteModal
           entry={namingEntry}
@@ -2341,7 +2355,7 @@ function HistoryScreen({ history, onBack, onRerun, onClear, findMatchingFavorite
   );
 }
 
-function FavoritesScreen({ favorites, onBack, onRerun, removeFavorite }) {
+function FavoritesScreen({ favorites, library, onBack, onRerun, removeFavorite }) {
   const [infoFor, setInfoFor] = useState(null);
 
   return (
@@ -2387,7 +2401,7 @@ function FavoritesScreen({ favorites, onBack, onRerun, removeFavorite }) {
         )}
       </div>
 
-      {infoFor && <WorkoutInfoModal entry={infoFor} onClose={() => setInfoFor(null)} onRun={() => { onRerun(infoFor); setInfoFor(null); }} />}
+      {infoFor && <WorkoutInfoModal entry={infoFor} library={library} onClose={() => setInfoFor(null)} onRun={() => { onRerun(infoFor); setInfoFor(null); }} />}
     </div>
   );
 }
@@ -2750,34 +2764,117 @@ function ExerciseScreen({ library, setLibrary, categories, modifiers, selected, 
 }
 
 function SourceInfoButton({ exercise, size = 14, color = '#666', activeColor = 'var(--accent)', style = {} }) {
-  const hasSource = !!(exercise?.sourceUrl || exercise?.directUrl);
-  if (!hasSource) return null;
+  const [detailsOpen, setDetailsOpen] = useState(false);
+  const hasDetails = !!(exercise?.description || exercise?.sourceUrl || exercise?.directUrl);
+  if (!hasDetails) return null;
 
   return (
-    <button
-      type="button"
-      aria-label={`Open source for ${exercise.name}`}
-      title={`Open source for ${exercise.name}`}
+    <>
+      <button
+        type="button"
+        aria-label={`Open details for ${exercise.name}`}
+        title={`Open details for ${exercise.name}`}
+        onClick={(e) => {
+          e.stopPropagation();
+          setDetailsOpen(true);
+        }}
+        style={{
+          width: `${size + 14}px`,
+          height: `${size + 14}px`,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          color,
+          borderRadius: '2px',
+          flexShrink: 0,
+          ...style,
+        }}
+        onMouseEnter={e => { e.currentTarget.style.color = activeColor; }}
+        onMouseLeave={e => { e.currentTarget.style.color = color; }}
+      >
+        <Info size={size} />
+      </button>
+      {detailsOpen && (
+        <ExerciseDescriptionModal
+          exercise={exercise}
+          accentColor={activeColor}
+          onClose={() => setDetailsOpen(false)}
+        />
+      )}
+    </>
+  );
+}
+
+function ExerciseDescriptionModal({ exercise, accentColor = 'var(--accent)', onClose }) {
+  const sourceUrl = exercise?.sourceUrl || exercise?.directUrl;
+  const description = exercise?.description || 'No description is available for this exercise yet.';
+
+  return (
+    <div
       onClick={(e) => {
         e.stopPropagation();
-        openExerciseSource(exercise);
+        onClose();
       }}
+      className="fade-in"
       style={{
-        width: `${size + 14}px`,
-        height: `${size + 14}px`,
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        color,
-        borderRadius: '2px',
-        flexShrink: 0,
-        ...style,
+        position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.88)', zIndex: 260,
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+        padding: `calc(20px + env(safe-area-inset-top, 0px)) 20px 20px`,
       }}
-      onMouseEnter={e => { e.currentTarget.style.color = activeColor; }}
-      onMouseLeave={e => { e.currentTarget.style.color = color; }}
     >
-      <Info size={size} />
-    </button>
+      <div
+        onClick={e => e.stopPropagation()}
+        style={{
+          width: '100%', maxWidth: '560px',
+          height: 'min(760px, calc(100dvh - 56px))',
+          background: 'var(--surface)', border: `2px solid ${accentColor}`, borderRadius: '2px',
+          display: 'flex', flexDirection: 'column', overflow: 'hidden',
+        }}
+      >
+        <div style={{ padding: '20px 20px 12px', borderBottom: '1px solid #222' }}>
+          <div className="mono" style={{ fontSize: '10px', color: accentColor, marginBottom: '8px', letterSpacing: '0.1em' }}>
+            // EXERCISE DETAILS
+          </div>
+          <div className="stencil" style={{ fontSize: '28px', color: 'var(--fg)', lineHeight: 1 }}>
+            {exercise.name}
+          </div>
+        </div>
+
+        <div style={{ flex: 1, overflowY: 'auto', padding: '20px' }}>
+          <div style={{
+            fontSize: '15px', lineHeight: 1.65, color: '#DDD',
+            whiteSpace: 'pre-wrap',
+          }}>
+            {description}
+          </div>
+        </div>
+
+        <div style={{ padding: '16px 20px 20px', borderTop: '1px solid #222', display: 'grid', gridTemplateColumns: '1fr 1.35fr', gap: '8px' }}>
+          <button
+            onClick={onClose}
+            style={{
+              padding: '16px 12px', background: '#1A1A1A', color: '#AAA',
+              fontSize: '13px', fontWeight: 900, fontFamily: 'Archivo Black, sans-serif',
+              letterSpacing: '0.02em', borderRadius: '2px',
+            }}
+          >
+            BACK
+          </button>
+          <button
+            onClick={() => openExerciseSource(exercise)}
+            disabled={!sourceUrl}
+            style={{
+              padding: '16px 12px', background: sourceUrl ? accentColor : '#1A1A1A',
+              color: sourceUrl ? '#0A0A0A' : '#444',
+              fontSize: '13px', fontWeight: 900, fontFamily: 'Archivo Black, sans-serif',
+              letterSpacing: '0.02em', borderRadius: '2px', opacity: sourceUrl ? 1 : 0.6,
+            }}
+          >
+            MORE DETAILS
+          </button>
+        </div>
+      </div>
+    </div>
   );
 }
 
@@ -2897,6 +2994,7 @@ function ModeScreen({ mode, setMode, modeConfig, setModeConfig, exercises, setEx
               unit: item.unit,
               equipment: item.equipment,
               sourceUrl: item.sourceUrl,
+              description: item.description,
               difficulty: item.difficulty,
               exerciseGroup: item.exerciseGroup,
               min: libEx ? libEx.min : undefined,
@@ -3324,7 +3422,7 @@ function ManualBuilder({ exercises, queue, setQueue }) {
       id: 'q-' + Date.now() + '-' + Math.random(),
       exId: ex.id, name: ex.name, reps: ex.default || ex.defaultReps || 10,
       unit: ex.unit, equipment: ex.equipment, sourceUrl: ex.sourceUrl,
-      difficulty: ex.difficulty, exerciseGroup: ex.exerciseGroup,
+      description: ex.description, difficulty: ex.difficulty, exerciseGroup: ex.exerciseGroup,
       min: ex.min, max: ex.max,
     };
     setQueue([...queue, item]);
@@ -3676,6 +3774,7 @@ function buildQueue(exercises, mode, cfg) {
     unit: ex.unit,
     equipment: ex.equipment,
     sourceUrl: ex.sourceUrl,
+    description: ex.description,
     difficulty: ex.difficulty,
     exerciseGroup: ex.exerciseGroup,
   });
