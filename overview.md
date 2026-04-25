@@ -109,7 +109,7 @@ Persisted keys:
 
 Do not rename these keys without a deliberate migration plan. Existing user data depends on them.
 
-Hydration happens once on app load. The default library is built from `support files/workout_exercise_library.csv`, then merged with the saved `library` value so new default exercises and metadata are added without removing custom exercises. Follow-up `useEffect` calls persist changes back to localStorage. Persisted write-back is guarded until initial reads complete so default in-memory state cannot overwrite saved library, history, favorites, rest settings, app settings, palette, or home collapse data during startup.
+Hydration happens once on app load. The default library is built from `support files/workout_exercise_library.csv`, then merged with the saved `library` value so new default exercises and metadata are added without removing custom exercises. Default rows removed from the CSV are not restored from saved non-custom library entries, so the CSV remains the source of truth for bundled exercises. Follow-up `useEffect` calls persist changes back to localStorage. Persisted write-back is guarded until initial reads complete so default in-memory state cannot overwrite saved library, history, favorites, rest settings, app settings, palette, or home collapse data during startup.
 
 ## Workout Logic
 

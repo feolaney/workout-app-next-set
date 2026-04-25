@@ -138,9 +138,18 @@ const MODES = [
 
 const MODE_LABELS = MODES.reduce((acc, m) => ({ ...acc, [m.key]: m.label }), {});
 
-const APP_VERSION = '2.13';
+const APP_VERSION = '2.14';
 
 const APP_VERSION_HISTORY = [
+  {
+    version: '2.14',
+    date: '2026-04-25',
+    type: 'Maintenance',
+    changes: [
+      'Updated the default exercise library from the support CSV.',
+      'Kept saved custom exercises while honoring CSV removals during library hydration.',
+    ],
+  },
   {
     version: '2.13',
     date: '2026-04-25',
@@ -577,6 +586,10 @@ function cloneExerciseLibrary(library) {
   };
 }
 
+function isSavedCustomExercise(exercise) {
+  return Boolean(exercise?.custom || String(exercise?.id || '').startsWith('custom-'));
+}
+
 function mergeDefaultExerciseLibrary(storedLibrary) {
   const merged = cloneExerciseLibrary(DEFAULT_EXERCISES);
   if (!storedLibrary) return merged;
@@ -589,9 +602,9 @@ function mergeDefaultExerciseLibrary(storedLibrary) {
 
     (storedLibrary[category] || []).forEach(storedEx => {
       if (!storedEx) return;
-      if (storedEx.custom) {
+      if (isSavedCustomExercise(storedEx)) {
         if (!knownIds.has(storedEx.id)) {
-          customExercises.push({ ...storedEx });
+          customExercises.push({ ...storedEx, custom: true });
           knownIds.add(storedEx.id);
         }
         return;
@@ -605,9 +618,6 @@ function mergeDefaultExerciseLibrary(storedLibrary) {
 
       const lookup = exerciseLookupKey(storedEx.category || category, storedEx.equipment || 'bodyweight', storedEx.name);
       if (defaultsByLookup.has(lookup)) return;
-
-      merged[category].push({ ...storedEx });
-      knownIds.add(storedEx.id);
     });
 
     merged[category].push(...customExercises);
