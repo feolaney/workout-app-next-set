@@ -1,100 +1,121 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { ChevronLeft, ChevronDown, ChevronRight, Play, SkipForward, SkipBack, Check, Plus, Minus, X, Dumbbell, Hexagon, GripVertical, History, Shuffle, Target, Layers, TrendingUp, Info, Weight, ArrowUpToLine, Star, Settings, Palette, Trash2, Pencil } from 'lucide-react';
+import WORKOUT_EXERCISE_LIBRARY_CSV from '../support files/workout_exercise_library.csv?raw';
 
 // ============ EQUIPMENT TAGS ============
 const EQUIP = {
   bodyweight: { key: 'bodyweight', label: 'BW', color: '#888', name: 'BODYWEIGHT' },
-  weights: { key: 'weights', label: 'WT', color: '#FF4D8F', icon: Weight, name: 'WEIGHTS' },
-  pullup: { key: 'pullup', label: 'BAR', color: '#7C5CFF', icon: ArrowUpToLine, name: 'PULL-UP BAR' },
+  weights: { key: 'weights', label: 'WT', color: '#FF4D8F', icon: Weight, name: 'DUMBBELL' },
+  pullup: { key: 'pullup', label: 'BAR', color: '#7C5CFF', icon: ArrowUpToLine, name: 'BAR' },
 };
 
 // ============ DEFAULT EXERCISE LIBRARY ============
-const DEFAULT_EXERCISES = {
-  upper: [
-    { id: 'u1', name: 'Push-ups', category: 'upper', equipment: 'bodyweight', unit: 'reps', min: 10, max: 50, default: 20 },
-    { id: 'u2', name: 'Diamond Push-ups', category: 'upper', equipment: 'bodyweight', unit: 'reps', min: 10, max: 30, default: 12 },
-    { id: 'u3', name: 'Pike Push-ups', category: 'upper', equipment: 'bodyweight', unit: 'reps', min: 10, max: 30, default: 12 },
-    { id: 'u4', name: 'Decline Push-ups', category: 'upper', equipment: 'bodyweight', unit: 'reps', min: 10, max: 30, default: 15 },
-    { id: 'u5', name: 'Wide Push-ups', category: 'upper', equipment: 'bodyweight', unit: 'reps', min: 10, max: 40, default: 15 },
-    { id: 'u6', name: 'Dips (Chair/Bench)', category: 'upper', equipment: 'bodyweight', unit: 'reps', min: 10, max: 30, default: 15 },
-    { id: 'u7', name: 'Shoulder Taps', category: 'upper', equipment: 'bodyweight', unit: 'reps', min: 10, max: 30, default: 20 },
-    { id: 'u8', name: 'Pseudo Planche Push-ups', category: 'upper', equipment: 'bodyweight', unit: 'reps', min: 10, max: 25, default: 10 },
-    { id: 'u9', name: 'Archer Push-ups', category: 'upper', equipment: 'bodyweight', unit: 'reps', min: 10, max: 20, default: 10 },
-    { id: 'u10', name: 'Plank to Push-up', category: 'upper', equipment: 'bodyweight', unit: 'reps', min: 10, max: 30, default: 15 },
-    { id: 'u-w1', name: 'Dumbbell Curls', category: 'upper', equipment: 'weights', unit: 'reps', min: 5, max: 20, default: 12 },
-    { id: 'u-w2', name: 'Hammer Curls', category: 'upper', equipment: 'weights', unit: 'reps', min: 5, max: 20, default: 12 },
-    { id: 'u-w3', name: 'Overhead Press', category: 'upper', equipment: 'weights', unit: 'reps', min: 5, max: 20, default: 10 },
-    { id: 'u-w4', name: 'Lateral Raises', category: 'upper', equipment: 'weights', unit: 'reps', min: 5, max: 20, default: 12 },
-    { id: 'u-w5', name: 'Front Raises', category: 'upper', equipment: 'weights', unit: 'reps', min: 5, max: 20, default: 12 },
-    { id: 'u-w6', name: 'Bent-Over Rows', category: 'upper', equipment: 'weights', unit: 'reps', min: 5, max: 20, default: 12 },
-    { id: 'u-w7', name: 'Single-Arm Row', category: 'upper', equipment: 'weights', unit: 'reps', min: 5, max: 20, default: 10 },
-    { id: 'u-w8', name: 'Tricep Kickbacks', category: 'upper', equipment: 'weights', unit: 'reps', min: 5, max: 20, default: 12 },
-    { id: 'u-w9', name: 'Dumbbell Floor Press', category: 'upper', equipment: 'weights', unit: 'reps', min: 5, max: 20, default: 10 },
-    { id: 'u-w10', name: 'Upright Rows', category: 'upper', equipment: 'weights', unit: 'reps', min: 5, max: 20, default: 12 },
-    { id: 'u-w11', name: 'Arnold Press', category: 'upper', equipment: 'weights', unit: 'reps', min: 5, max: 20, default: 10 },
-    { id: 'u-w12', name: 'Renegade Rows', category: 'upper', equipment: 'weights', unit: 'reps', min: 5, max: 20, default: 12 },
-    { id: 'u-p1', name: 'Pull-ups', category: 'upper', equipment: 'pullup', unit: 'reps', min: 5, max: 20, default: 8 },
-    { id: 'u-p2', name: 'Chin-ups', category: 'upper', equipment: 'pullup', unit: 'reps', min: 5, max: 20, default: 8 },
-    { id: 'u-p3', name: 'Wide-Grip Pull-ups', category: 'upper', equipment: 'pullup', unit: 'reps', min: 5, max: 15, default: 6 },
-    { id: 'u-p4', name: 'Commando Pull-ups', category: 'upper', equipment: 'pullup', unit: 'reps', min: 5, max: 15, default: 6 },
-    { id: 'u-p5', name: 'Dead Hang', category: 'upper', equipment: 'pullup', unit: 'sec', min: 15, max: 90, default: 30 },
-    { id: 'u-p6', name: 'Negative Pull-ups', category: 'upper', equipment: 'pullup', unit: 'reps', min: 5, max: 15, default: 6 },
-    { id: 'u-p7', name: 'Scapular Pull-ups', category: 'upper', equipment: 'pullup', unit: 'reps', min: 5, max: 20, default: 10 },
-    { id: 'u-p8', name: 'Archer Pull-ups', category: 'upper', equipment: 'pullup', unit: 'reps', min: 5, max: 15, default: 5 },
-  ],
-  lower: [
-    { id: 'l1', name: 'Bodyweight Squats', category: 'lower', equipment: 'bodyweight', unit: 'reps', min: 10, max: 30, default: 20 },
-    { id: 'l2', name: 'Lunges', category: 'lower', equipment: 'bodyweight', unit: 'reps', min: 10, max: 30, default: 20 },
-    { id: 'l3', name: 'Reverse Lunges', category: 'lower', equipment: 'bodyweight', unit: 'reps', min: 10, max: 30, default: 16 },
-    { id: 'l4', name: 'Bulgarian Split Squats', category: 'lower', equipment: 'bodyweight', unit: 'reps', min: 10, max: 30, default: 12 },
-    { id: 'l5', name: 'Jump Squats', category: 'lower', equipment: 'bodyweight', unit: 'reps', min: 10, max: 30, default: 15 },
-    { id: 'l6', name: 'Pistol Squats', category: 'lower', equipment: 'bodyweight', unit: 'reps', min: 10, max: 20, default: 10 },
-    { id: 'l7', name: 'Calf Raises', category: 'lower', equipment: 'bodyweight', unit: 'reps', min: 10, max: 30, default: 25 },
-    { id: 'l8', name: 'Wall Sit', category: 'lower', equipment: 'bodyweight', unit: 'sec', min: 20, max: 120, default: 45 },
-    { id: 'l9', name: 'Glute Bridges', category: 'lower', equipment: 'bodyweight', unit: 'reps', min: 10, max: 30, default: 20 },
-    { id: 'l10', name: 'Single-Leg Glute Bridge', category: 'lower', equipment: 'bodyweight', unit: 'reps', min: 10, max: 25, default: 12 },
-    { id: 'l11', name: 'Step-ups', category: 'lower', equipment: 'bodyweight', unit: 'reps', min: 10, max: 30, default: 16 },
-    { id: 'l12', name: 'Curtsy Lunges', category: 'lower', equipment: 'bodyweight', unit: 'reps', min: 10, max: 30, default: 16 },
-    { id: 'l13', name: 'Broad Jumps', category: 'lower', equipment: 'bodyweight', unit: 'reps', min: 10, max: 25, default: 10 },
-    { id: 'l-w1', name: 'Goblet Squats', category: 'lower', equipment: 'weights', unit: 'reps', min: 5, max: 20, default: 15 },
-    { id: 'l-w2', name: 'Weighted Lunges', category: 'lower', equipment: 'weights', unit: 'reps', min: 5, max: 20, default: 12 },
-    { id: 'l-w3', name: 'Romanian Deadlifts', category: 'lower', equipment: 'weights', unit: 'reps', min: 5, max: 20, default: 12 },
-    { id: 'l-w4', name: 'Sumo Deadlifts', category: 'lower', equipment: 'weights', unit: 'reps', min: 5, max: 20, default: 10 },
-    { id: 'l-w5', name: 'Dumbbell Step-ups', category: 'lower', equipment: 'weights', unit: 'reps', min: 5, max: 20, default: 12 },
-    { id: 'l-w6', name: 'Weighted Calf Raises', category: 'lower', equipment: 'weights', unit: 'reps', min: 5, max: 20, default: 20 },
-    { id: 'l-w7', name: 'Weighted Bulgarian Splits', category: 'lower', equipment: 'weights', unit: 'reps', min: 5, max: 20, default: 10 },
-    { id: 'l-w8', name: 'Farmer Carries', category: 'lower', equipment: 'weights', unit: 'sec', min: 20, max: 90, default: 45 },
-    { id: 'l-w9', name: 'Kettlebell Swings', category: 'lower', equipment: 'weights', unit: 'reps', min: 5, max: 20, default: 15 },
-    { id: 'l-w10', name: 'Front Squats', category: 'lower', equipment: 'weights', unit: 'reps', min: 5, max: 20, default: 10 },
-  ],
-  core: [
-    { id: 'c1', name: 'Plank', category: 'core', equipment: 'bodyweight', unit: 'sec', min: 20, max: 180, default: 60 },
-    { id: 'c2', name: 'Side Plank', category: 'core', equipment: 'bodyweight', unit: 'sec', min: 20, max: 120, default: 45 },
-    { id: 'c3', name: 'Sit-ups', category: 'core', equipment: 'bodyweight', unit: 'reps', min: 10, max: 30, default: 20 },
-    { id: 'c4', name: 'Crunches', category: 'core', equipment: 'bodyweight', unit: 'reps', min: 10, max: 30, default: 25 },
-    { id: 'c5', name: 'Russian Twists', category: 'core', equipment: 'bodyweight', unit: 'reps', min: 10, max: 30, default: 30 },
-    { id: 'c6', name: 'Leg Raises', category: 'core', equipment: 'bodyweight', unit: 'reps', min: 10, max: 25, default: 15 },
-    { id: 'c7', name: 'Mountain Climbers', category: 'core', equipment: 'bodyweight', unit: 'reps', min: 10, max: 30, default: 30 },
-    { id: 'c8', name: 'Dead Bug', category: 'core', equipment: 'bodyweight', unit: 'reps', min: 10, max: 30, default: 16 },
-    { id: 'c9', name: 'Hollow Body Hold', category: 'core', equipment: 'bodyweight', unit: 'sec', min: 15, max: 90, default: 30 },
-    { id: 'c10', name: 'Bicycle Crunches', category: 'core', equipment: 'bodyweight', unit: 'reps', min: 10, max: 30, default: 24 },
-    { id: 'c11', name: 'Flutter Kicks', category: 'core', equipment: 'bodyweight', unit: 'reps', min: 10, max: 30, default: 30 },
-    { id: 'c12', name: 'V-ups', category: 'core', equipment: 'bodyweight', unit: 'reps', min: 10, max: 25, default: 12 },
-    { id: 'c13', name: 'Bird Dog', category: 'core', equipment: 'bodyweight', unit: 'reps', min: 10, max: 25, default: 16 },
-    { id: 'c14', name: 'Superman', category: 'core', equipment: 'bodyweight', unit: 'reps', min: 10, max: 25, default: 15 },
-    { id: 'c-w1', name: 'Weighted Russian Twists', category: 'core', equipment: 'weights', unit: 'reps', min: 5, max: 20, default: 20 },
-    { id: 'c-w2', name: 'Weighted Sit-ups', category: 'core', equipment: 'weights', unit: 'reps', min: 5, max: 20, default: 15 },
-    { id: 'c-w3', name: 'Turkish Get-ups', category: 'core', equipment: 'weights', unit: 'reps', min: 5, max: 15, default: 6 },
-    { id: 'c-w4', name: 'Weighted Plank', category: 'core', equipment: 'weights', unit: 'sec', min: 15, max: 90, default: 30 },
-    { id: 'c-w5', name: 'Woodchoppers', category: 'core', equipment: 'weights', unit: 'reps', min: 5, max: 20, default: 12 },
-    { id: 'c-w6', name: 'Suitcase Carries', category: 'core', equipment: 'weights', unit: 'sec', min: 20, max: 90, default: 45 },
-    { id: 'c-p1', name: 'Hanging Knee Raises', category: 'core', equipment: 'pullup', unit: 'reps', min: 5, max: 20, default: 12 },
-    { id: 'c-p2', name: 'Hanging Leg Raises', category: 'core', equipment: 'pullup', unit: 'reps', min: 5, max: 20, default: 10 },
-    { id: 'c-p3', name: 'Toes-to-Bar', category: 'core', equipment: 'pullup', unit: 'reps', min: 5, max: 15, default: 8 },
-    { id: 'c-p4', name: 'L-Sit Hang', category: 'core', equipment: 'pullup', unit: 'sec', min: 10, max: 60, default: 15 },
-    { id: 'c-p5', name: 'Windshield Wipers', category: 'core', equipment: 'pullup', unit: 'reps', min: 5, max: 15, default: 8 },
-  ],
+const CSV_BODY_SECTION_TO_CATEGORY = {
+  Upper: 'upper',
+  Lower: 'lower',
+  Core: 'core',
 };
+
+const CSV_EQUIPMENT_TO_KEY = {
+  BW: 'bodyweight',
+  WT: 'weights',
+  BAR: 'pullup',
+};
+
+const EQUIPMENT_RENDER_ORDER = ['bodyweight', 'weights', 'pullup'];
+const EQUIPMENT_ADVANCED_LABELS = {
+  bodyweight: 'BODY WEIGHT',
+  weights: 'DUMBBELL',
+  pullup: 'BAR',
+};
+const CATEGORY_ADVANCED_LABELS = {
+  upper: 'UPPER BODY',
+  lower: 'LOWER BODY',
+  core: 'CORE',
+};
+
+const LEGACY_EXERCISE_IDS_BY_KEY = {
+  [exerciseLookupKey('upper', 'bodyweight', 'Push-up')]: 'u1',
+  [exerciseLookupKey('upper', 'bodyweight', 'Diamond Push-up')]: 'u2',
+  [exerciseLookupKey('upper', 'bodyweight', 'Pike Push-up')]: 'u3',
+  [exerciseLookupKey('upper', 'bodyweight', 'Decline Push-up')]: 'u4',
+  [exerciseLookupKey('upper', 'bodyweight', 'Wide Push-up')]: 'u5',
+  [exerciseLookupKey('upper', 'bodyweight', 'Bench Dip')]: 'u6',
+  [exerciseLookupKey('upper', 'bodyweight', 'Shoulder Taps')]: 'u7',
+  [exerciseLookupKey('upper', 'bodyweight', 'Pseudo Planche Push-up')]: 'u8',
+  [exerciseLookupKey('upper', 'bodyweight', 'Archer Push-up')]: 'u9',
+  [exerciseLookupKey('upper', 'bodyweight', 'Plank to Push-up')]: 'u10',
+  [exerciseLookupKey('upper', 'weights', 'Dumbbell Curl')]: 'u-w1',
+  [exerciseLookupKey('upper', 'weights', 'Hammer Curl')]: 'u-w2',
+  [exerciseLookupKey('upper', 'weights', 'Overhead Press')]: 'u-w3',
+  [exerciseLookupKey('upper', 'weights', 'Lateral Raise')]: 'u-w4',
+  [exerciseLookupKey('upper', 'weights', 'Front Raise')]: 'u-w5',
+  [exerciseLookupKey('upper', 'weights', 'Bent-Over Row')]: 'u-w6',
+  [exerciseLookupKey('upper', 'weights', 'Single-Arm Row')]: 'u-w7',
+  [exerciseLookupKey('upper', 'weights', 'Tricep Kickback')]: 'u-w8',
+  [exerciseLookupKey('upper', 'weights', 'Dumbbell Floor Press')]: 'u-w9',
+  [exerciseLookupKey('upper', 'weights', 'Upright Row')]: 'u-w10',
+  [exerciseLookupKey('upper', 'weights', 'Arnold Press')]: 'u-w11',
+  [exerciseLookupKey('upper', 'weights', 'Renegade Row')]: 'u-w12',
+  [exerciseLookupKey('upper', 'pullup', 'Pull-up')]: 'u-p1',
+  [exerciseLookupKey('upper', 'pullup', 'Chin-up')]: 'u-p2',
+  [exerciseLookupKey('upper', 'pullup', 'Wide-Grip Pull-up')]: 'u-p3',
+  [exerciseLookupKey('upper', 'pullup', 'Commando Pull-up')]: 'u-p4',
+  [exerciseLookupKey('upper', 'pullup', 'Dead Hang')]: 'u-p5',
+  [exerciseLookupKey('upper', 'pullup', 'Negative Pull-up')]: 'u-p6',
+  [exerciseLookupKey('upper', 'pullup', 'Scapular Pull-up')]: 'u-p7',
+  [exerciseLookupKey('upper', 'pullup', 'Archer Pull-up')]: 'u-p8',
+  [exerciseLookupKey('lower', 'bodyweight', 'Bodyweight Squat')]: 'l1',
+  [exerciseLookupKey('lower', 'bodyweight', 'Lunge')]: 'l2',
+  [exerciseLookupKey('lower', 'bodyweight', 'Reverse Lunge')]: 'l3',
+  [exerciseLookupKey('lower', 'bodyweight', 'Bulgarian Split Squat')]: 'l4',
+  [exerciseLookupKey('lower', 'bodyweight', 'Jump Squat')]: 'l5',
+  [exerciseLookupKey('lower', 'bodyweight', 'Pistol Squat')]: 'l6',
+  [exerciseLookupKey('lower', 'bodyweight', 'Calf Raise')]: 'l7',
+  [exerciseLookupKey('lower', 'bodyweight', 'Wall Sit')]: 'l8',
+  [exerciseLookupKey('lower', 'bodyweight', 'Glute Bridge')]: 'l9',
+  [exerciseLookupKey('lower', 'bodyweight', 'Single-Leg Glute Bridge')]: 'l10',
+  [exerciseLookupKey('lower', 'bodyweight', 'Step-up')]: 'l11',
+  [exerciseLookupKey('lower', 'bodyweight', 'Curtsy Lunge')]: 'l12',
+  [exerciseLookupKey('lower', 'bodyweight', 'Broad Jump')]: 'l13',
+  [exerciseLookupKey('lower', 'weights', 'Goblet Squat')]: 'l-w1',
+  [exerciseLookupKey('lower', 'weights', 'Weighted Lunge')]: 'l-w2',
+  [exerciseLookupKey('lower', 'weights', 'Dumbbell Romanian Deadlift')]: 'l-w3',
+  [exerciseLookupKey('lower', 'weights', 'Sumo Deadlift')]: 'l-w4',
+  [exerciseLookupKey('lower', 'weights', 'Dumbbell Step-up')]: 'l-w5',
+  [exerciseLookupKey('lower', 'weights', 'Weighted Calf Raise')]: 'l-w6',
+  [exerciseLookupKey('lower', 'weights', 'Weighted Bulgarian Split Squat')]: 'l-w7',
+  [exerciseLookupKey('lower', 'weights', 'Farmer Carry')]: 'l-w8',
+  [exerciseLookupKey('lower', 'weights', 'Kettlebell Swing')]: 'l-w9',
+  [exerciseLookupKey('lower', 'weights', 'Dumbbell Front Squat')]: 'l-w10',
+  [exerciseLookupKey('core', 'bodyweight', 'Plank')]: 'c1',
+  [exerciseLookupKey('core', 'bodyweight', 'Side Plank')]: 'c2',
+  [exerciseLookupKey('core', 'bodyweight', 'Sit-up')]: 'c3',
+  [exerciseLookupKey('core', 'bodyweight', 'Crunch')]: 'c4',
+  [exerciseLookupKey('core', 'bodyweight', 'Russian Twist')]: 'c5',
+  [exerciseLookupKey('core', 'bodyweight', 'Leg Raise')]: 'c6',
+  [exerciseLookupKey('core', 'bodyweight', 'Mountain Climber')]: 'c7',
+  [exerciseLookupKey('core', 'bodyweight', 'Dead Bug')]: 'c8',
+  [exerciseLookupKey('core', 'bodyweight', 'Hollow Body Hold')]: 'c9',
+  [exerciseLookupKey('core', 'bodyweight', 'Bicycle Crunch')]: 'c10',
+  [exerciseLookupKey('core', 'bodyweight', 'Flutter Kick')]: 'c11',
+  [exerciseLookupKey('core', 'bodyweight', 'V-up')]: 'c12',
+  [exerciseLookupKey('core', 'bodyweight', 'Bird Dog')]: 'c13',
+  [exerciseLookupKey('core', 'bodyweight', 'Superman')]: 'c14',
+  [exerciseLookupKey('core', 'weights', 'Weighted Russian Twist')]: 'c-w1',
+  [exerciseLookupKey('core', 'weights', 'Weighted Sit-up')]: 'c-w2',
+  [exerciseLookupKey('core', 'weights', 'Turkish Get-up')]: 'c-w3',
+  [exerciseLookupKey('core', 'weights', 'Weighted Plank')]: 'c-w4',
+  [exerciseLookupKey('core', 'weights', 'Woodchopper')]: 'c-w5',
+  [exerciseLookupKey('core', 'weights', 'Suitcase Carry')]: 'c-w6',
+  [exerciseLookupKey('core', 'pullup', 'Hanging Knee Raise')]: 'c-p1',
+  [exerciseLookupKey('core', 'pullup', 'Hanging Leg Raise')]: 'c-p2',
+  [exerciseLookupKey('core', 'pullup', 'Toes-to-Bar')]: 'c-p3',
+  [exerciseLookupKey('core', 'pullup', 'L-Sit Hang/L-Sit')]: 'c-p4',
+  [exerciseLookupKey('core', 'pullup', 'Windshield Wiper')]: 'c-p5',
+};
+
+const DEFAULT_EXERCISES = buildDefaultExerciseLibrary(WORKOUT_EXERCISE_LIBRARY_CSV);
 
 const CATEGORIES = [
   { key: 'upper', label: 'UPPER', icon: Dumbbell, color: 'var(--accent)' },
@@ -103,8 +124,8 @@ const CATEGORIES = [
 ];
 
 const MODIFIERS = [
-  { key: 'weights', label: 'WEIGHTS', icon: Weight, color: '#FF4D8F', desc: 'Unlock dumbbell and kettlebell variants' },
-  { key: 'pullup', label: 'PULL-UP BAR', icon: ArrowUpToLine, color: '#7C5CFF', desc: 'Unlock bar and hanging variants' },
+  { key: 'weights', label: 'DUMBBELL', icon: Weight, color: '#FF4D8F', desc: 'Unlock dumbbell and kettlebell variants' },
+  { key: 'pullup', label: 'BAR', icon: ArrowUpToLine, color: '#7C5CFF', desc: 'Unlock pull-up, hanging, and barbell variants' },
 ];
 
 const MODES = [
@@ -117,9 +138,19 @@ const MODES = [
 
 const MODE_LABELS = MODES.reduce((acc, m) => ({ ...acc, [m.key]: m.label }), {});
 
-const APP_VERSION = '2.8';
+const APP_VERSION = '2.9';
 
 const APP_VERSION_HISTORY = [
+  {
+    version: '2.9',
+    date: '2026-04-24',
+    type: 'Feature',
+    changes: [
+      'Loaded the expanded exercise library from the support CSV while preserving saved custom exercises.',
+      'Added Advanced and Hide controls for grouped variants and standalone advanced exercises by section and equipment.',
+      'Added source info buttons in exercise selection, setup details, workout info, and active workouts.',
+    ],
+  },
   {
     version: '2.8',
     date: '2026-04-24',
@@ -287,6 +318,314 @@ const storage = {
   },
 };
 
+function parseCsvRows(csvText) {
+  const rows = [];
+  let row = [];
+  let field = '';
+  let inQuotes = false;
+
+  for (let i = 0; i < csvText.length; i++) {
+    const ch = csvText[i];
+    const next = csvText[i + 1];
+
+    if (ch === '"') {
+      if (inQuotes && next === '"') {
+        field += '"';
+        i++;
+      } else {
+        inQuotes = !inQuotes;
+      }
+      continue;
+    }
+
+    if (ch === ',' && !inQuotes) {
+      row.push(field);
+      field = '';
+      continue;
+    }
+
+    if ((ch === '\n' || ch === '\r') && !inQuotes) {
+      if (ch === '\r' && next === '\n') i++;
+      row.push(field);
+      if (row.some(value => value.trim() !== '')) rows.push(row);
+      row = [];
+      field = '';
+      continue;
+    }
+
+    field += ch;
+  }
+
+  row.push(field);
+  if (row.some(value => value.trim() !== '')) rows.push(row);
+  return rows;
+}
+
+function csvToRecords(csvText) {
+  const [headers, ...rows] = parseCsvRows(csvText);
+  if (!headers) return [];
+  const cleanHeaders = headers.map(header => header.trim());
+  return rows.map(row => cleanHeaders.reduce((record, header, i) => {
+    record[header] = (row[i] || '').trim();
+    return record;
+  }, {}));
+}
+
+function normalizeExerciseName(name) {
+  return String(name || '')
+    .toLowerCase()
+    .replace(/&/g, ' and ')
+    .replace(/\([^)]*\)/g, '')
+    .replace(/[/-]/g, ' ')
+    .replace(/[^a-z0-9\s]/g, '')
+    .replace(/\bpush ups\b/g, 'push up')
+    .replace(/\bpull ups\b/g, 'pull up')
+    .replace(/\bchin ups\b/g, 'chin up')
+    .replace(/\bsquats\b/g, 'squat')
+    .replace(/\blunges\b/g, 'lunge')
+    .replace(/\braises\b/g, 'raise')
+    .replace(/\brows\b/g, 'row')
+    .replace(/\bcurls\b/g, 'curl')
+    .replace(/\btwists\b/g, 'twist')
+    .replace(/\bclimbers\b/g, 'climber')
+    .replace(/\bkicks\b/g, 'kick')
+    .replace(/\bsit ups\b/g, 'sit up')
+    .replace(/\bv ups\b/g, 'v up')
+    .replace(/\bcarries\b/g, 'carry')
+    .replace(/\bdeadlifts\b/g, 'deadlift')
+    .replace(/\bbridges\b/g, 'bridge')
+    .replace(/\bjumps\b/g, 'jump')
+    .replace(/\bwipers\b/g, 'wiper')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+function exerciseLookupKey(category, equipment, name) {
+  return `${category}|${equipment}|${normalizeExerciseName(name)}`;
+}
+
+function slugifyExerciseId(name) {
+  return normalizeExerciseName(name).replace(/\s+/g, '-').replace(/^-|-$/g, '');
+}
+
+function makeExerciseGroupKey(category, equipment, group) {
+  return `${category}:${equipment}:${slugifyExerciseId(group)}`;
+}
+
+function makeAdvancedBucketKey(category, equipment) {
+  return `${category}:${equipment}`;
+}
+
+function isAdvancedDifficulty(difficulty) {
+  return /\badvanced\b/i.test(difficulty || '');
+}
+
+function inferExerciseUnit(name) {
+  const normalized = normalizeExerciseName(name);
+  const timedExact = new Set([
+    'plank',
+    'high plank',
+    'side plank',
+    'reverse plank',
+    'rkc plank',
+    'weighted plank',
+    'hollow body hold',
+    'dumbbell hollow hold',
+    'wall sit',
+    'dead hang',
+    'active hang',
+    'l sit hang l sit',
+    'l sit drills',
+    'handstand hold against wall',
+    'bear crawl hold',
+  ]);
+  if (timedExact.has(normalized)) return 'sec';
+  if (/\bhold\b|\bcarry\b/.test(normalized)) return 'sec';
+  return 'reps';
+}
+
+function inferExerciseRepConfig(name, category, equipment, difficulty) {
+  const unit = inferExerciseUnit(name);
+  const normalized = normalizeExerciseName(name);
+  const advanced = isAdvancedDifficulty(difficulty);
+
+  if (unit === 'sec') {
+    if (normalized.includes('plank')) return { unit, min: 15, max: 120, default: 45 };
+    if (normalized.includes('wall sit')) return { unit, min: 20, max: 120, default: 45 };
+    if (normalized.includes('carry')) return { unit, min: 20, max: 90, default: 45 };
+    if (normalized.includes('hang') || normalized.includes('hold')) return { unit, min: 10, max: 90, default: 30 };
+    return { unit, min: 15, max: 90, default: 30 };
+  }
+
+  if (equipment === 'bodyweight') {
+    if (category === 'core') return { unit, min: 10, max: 30, default: advanced ? 12 : 20 };
+    if (category === 'lower') return { unit, min: 10, max: 30, default: advanced ? 10 : 16 };
+    return { unit, min: 8, max: normalized === 'push up' ? 50 : 30, default: advanced ? 10 : 15 };
+  }
+
+  if (equipment === 'pullup') return { unit, min: 5, max: advanced ? 15 : 20, default: advanced ? 6 : 8 };
+  return { unit, min: 5, max: 20, default: advanced ? 10 : 12 };
+}
+
+function buildDefaultExerciseLibrary(csvText) {
+  const records = csvToRecords(csvText);
+  const usedIds = new Set();
+  const rawExercises = records.map((record, idx) => {
+    const category = CSV_BODY_SECTION_TO_CATEGORY[record['Body Section']];
+    const equipment = CSV_EQUIPMENT_TO_KEY[record['Equipment Type']];
+    const name = record.Exercise;
+    if (!category || !equipment || !name) return null;
+
+    const lookupKey = exerciseLookupKey(category, equipment, name);
+    const idBase = LEGACY_EXERCISE_IDS_BY_KEY[lookupKey] || `csv-${category[0]}-${equipment[0]}-${slugifyExerciseId(name)}`;
+    let id = idBase;
+    let suffix = 2;
+    while (usedIds.has(id)) {
+      id = `${idBase}-${suffix}`;
+      suffix++;
+    }
+    usedIds.add(id);
+
+    const exerciseGroup = record['Exercise Group'] || '';
+    const groupKey = exerciseGroup ? makeExerciseGroupKey(category, equipment, exerciseGroup) : '';
+    const difficulty = record.Difficulty || '';
+    const repConfig = inferExerciseRepConfig(name, category, equipment, difficulty);
+
+    return {
+      id,
+      name,
+      category,
+      equipment,
+      ...repConfig,
+      difficulty,
+      exerciseGroup,
+      groupKey,
+      source: record.Source || '',
+      sourceQuality: record['Source Quality'] || '',
+      sourceUrl: record['Direct URL'] || '',
+      notes: record.Notes || '',
+      csvOrder: idx,
+    };
+  }).filter(Boolean);
+
+  const groupCounts = rawExercises.reduce((counts, ex) => {
+    if (!ex.groupKey) return counts;
+    counts.set(ex.groupKey, (counts.get(ex.groupKey) || 0) + 1);
+    return counts;
+  }, new Map());
+  const seenGroups = new Set();
+
+  return rawExercises.reduce((library, ex) => {
+    const groupSize = ex.groupKey ? groupCounts.get(ex.groupKey) || 0 : 0;
+    const hasGroupVariants = groupSize >= 2;
+    const groupPrimary = hasGroupVariants && !seenGroups.has(ex.groupKey);
+    if (groupPrimary) seenGroups.add(ex.groupKey);
+    const standaloneAdvanced = !ex.exerciseGroup && isAdvancedDifficulty(ex.difficulty);
+
+    library[ex.category].push({
+      ...ex,
+      groupSize,
+      hasGroupVariants,
+      groupPrimary,
+      standaloneAdvanced,
+      advancedBucketKey: standaloneAdvanced ? makeAdvancedBucketKey(ex.category, ex.equipment) : '',
+    });
+    return library;
+  }, { upper: [], lower: [], core: [] });
+}
+
+function cloneExerciseLibrary(library) {
+  return {
+    upper: (library?.upper || []).map(ex => ({ ...ex })),
+    lower: (library?.lower || []).map(ex => ({ ...ex })),
+    core: (library?.core || []).map(ex => ({ ...ex })),
+  };
+}
+
+function mergeDefaultExerciseLibrary(storedLibrary) {
+  const merged = cloneExerciseLibrary(DEFAULT_EXERCISES);
+  if (!storedLibrary) return merged;
+
+  Object.keys(merged).forEach(category => {
+    const defaultsById = new Map(merged[category].map(ex => [ex.id, ex]));
+    const defaultsByLookup = new Map(merged[category].map(ex => [exerciseLookupKey(ex.category, ex.equipment, ex.name), ex]));
+    const customExercises = [];
+    const knownIds = new Set(merged[category].map(ex => ex.id));
+
+    (storedLibrary[category] || []).forEach(storedEx => {
+      if (!storedEx) return;
+      if (storedEx.custom) {
+        if (!knownIds.has(storedEx.id)) {
+          customExercises.push({ ...storedEx });
+          knownIds.add(storedEx.id);
+        }
+        return;
+      }
+
+      const defaultById = defaultsById.get(storedEx.id);
+      if (defaultById) {
+        Object.assign(defaultById, { ...storedEx, ...defaultById });
+        return;
+      }
+
+      const lookup = exerciseLookupKey(storedEx.category || category, storedEx.equipment || 'bodyweight', storedEx.name);
+      if (defaultsByLookup.has(lookup)) return;
+
+      merged[category].push({ ...storedEx });
+      knownIds.add(storedEx.id);
+    });
+
+    merged[category].push(...customExercises);
+  });
+
+  return merged;
+}
+
+function flattenLibrary(library) {
+  return [...(library?.upper || []), ...(library?.lower || []), ...(library?.core || [])];
+}
+
+function enrichExerciseFromLibrary(exercise, library) {
+  if (!exercise || !library) return exercise;
+  const all = flattenLibrary(library);
+  const byId = all.find(item => item.id === exercise.id);
+  if (byId) return { ...exercise, ...byId };
+  const byLookup = all.find(item => (
+    exerciseLookupKey(item.category, item.equipment, item.name) ===
+    exerciseLookupKey(exercise.category, exercise.equipment, exercise.name)
+  ));
+  return byLookup ? { ...exercise, ...byLookup } : exercise;
+}
+
+function enrichExercisesWithLibrary(exercises, library) {
+  return (exercises || []).map(ex => enrichExerciseFromLibrary(ex, library));
+}
+
+function enrichModeConfigWithExercises(modeConfig, exercises) {
+  const cfg = modeConfig || {};
+  if (!cfg.manualQueue) return cfg;
+  const exercisesById = new Map((exercises || []).map(ex => [ex.id, ex]));
+  return {
+    ...cfg,
+    manualQueue: cfg.manualQueue.map(item => {
+      const ex = exercisesById.get(item.exId);
+      if (!ex) return item;
+      return {
+        ...item,
+        sourceUrl: item.sourceUrl || ex.sourceUrl,
+        difficulty: item.difficulty || ex.difficulty,
+        exerciseGroup: item.exerciseGroup || ex.exerciseGroup,
+      };
+    }),
+  };
+}
+
+function openExerciseSource(exercise) {
+  const url = exercise?.sourceUrl || exercise?.directUrl;
+  if (!url || typeof window === 'undefined') return;
+  window.open(url, '_blank', 'noopener,noreferrer');
+}
+
 // ============ MUSCLE GROUP CLASSIFIER ============
 // Classifies exercises as push/pull/legs/core for "opposing muscle" superset pairing.
 // Pattern-matches against exercise name so we don't have to tag every item by hand.
@@ -390,7 +729,8 @@ export default function WorkoutApp() {
 
   useEffect(() => {
     (async () => {
-      const lib = await storage.get('library', DEFAULT_EXERCISES);
+      const storedLib = await storage.get('library', null);
+      const lib = mergeDefaultExerciseLibrary(storedLib);
       setLibrary(lib);
       const hist = await storage.get('history', []);
       setHistory(hist);
@@ -484,13 +824,15 @@ export default function WorkoutApp() {
   };
 
   const rerunFromHistory = (entry) => {
+    const hydratedExercises = enrichExercisesWithLibrary(entry.exercises || [], library);
+    const hydratedModeConfig = enrichModeConfigWithExercises(entry.modeConfig, hydratedExercises);
     setEditResume(null);
     setSelectedCategories(entry.categories || []);
     setSelectedModifiers(entry.modifiers || []);
-    setSelectedExercises(entry.exercises || []);
+    setSelectedExercises(hydratedExercises);
     setMode(entry.mode);
-    setModeConfig(entry.modeConfig || {});
-    const q = buildQueue(entry.exercises, entry.mode, entry.modeConfig);
+    setModeConfig(hydratedModeConfig);
+    const q = buildQueue(hydratedExercises, entry.mode, hydratedModeConfig);
     setQueue(q);
     setQueueIdx(0);
     setActiveInitialElapsed(0);
@@ -1889,6 +2231,7 @@ function WorkoutInfoModal({ entry, onClose, onRun }) {
                   color: equip.color, borderRadius: '2px', fontWeight: 700, minWidth: '30px', textAlign: 'center',
                 }}>{equip.label}</span>
                 <div style={{ flex: 1, fontSize: '13px' }}>{ex.name}</div>
+                <SourceInfoButton exercise={ex} size={13} color="#555" activeColor={equip.color} />
                 <div className="mono" style={{ fontSize: '11px', color: '#888' }}>{reps} {ex.unit}</div>
               </div>
             );
@@ -2174,8 +2517,29 @@ function ExerciseScreen({ library, setLibrary, categories, modifiers, selected, 
   const [newUnit, setNewUnit] = useState('reps');
   // Per-category random-pick counts (how many to randomly select)
   const [randomCounts, setRandomCounts] = useState({});
+  const [expandedExerciseGroups, setExpandedExerciseGroups] = useState({});
+  const [expandedAdvancedBuckets, setExpandedAdvancedBuckets] = useState({});
 
   const allowedEquip = new Set(['bodyweight', ...modifiers]);
+
+  const isExerciseVisibleInPicker = (ex) => {
+    if (!allowedEquip.has(ex.equipment)) return false;
+    if (ex.standaloneAdvanced) return !!expandedAdvancedBuckets[ex.advancedBucketKey];
+    if (ex.hasGroupVariants && !ex.groupPrimary) return !!expandedExerciseGroups[ex.groupKey];
+    return true;
+  };
+
+  const getSelectableExercisesForCategory = (catKey) => (
+    library[catKey].filter(ex => isExerciseVisibleInPicker(ex))
+  );
+
+  const toggleExerciseGroup = (groupKey) => {
+    setExpandedExerciseGroups(prev => ({ ...prev, [groupKey]: !prev[groupKey] }));
+  };
+
+  const toggleAdvancedBucket = (bucketKey) => {
+    setExpandedAdvancedBuckets(prev => ({ ...prev, [bucketKey]: !prev[bucketKey] }));
+  };
 
   const toggle = (ex) => {
     setSelected(prev => {
@@ -2187,7 +2551,7 @@ function ExerciseScreen({ library, setLibrary, categories, modifiers, selected, 
   // Randomly pick N exercises from this category's available pool,
   // REPLACING any currently-selected exercises in that category
   const randomizePicksForCategory = (catKey, n) => {
-    const pool = library[catKey].filter(ex => allowedEquip.has(ex.equipment));
+    const pool = getSelectableExercisesForCategory(catKey);
     if (pool.length === 0) return;
     const count = Math.min(n, pool.length);
     const shuffled = shuffleArr(pool).slice(0, count);
@@ -2235,7 +2599,7 @@ function ExerciseScreen({ library, setLibrary, categories, modifiers, selected, 
         {categories.map(catKey => {
           const cat = CATEGORIES.find(c => c.key === catKey);
           const Icon = cat.icon;
-          const visibleExs = library[catKey].filter(ex => allowedEquip.has(ex.equipment));
+          const visibleExs = getSelectableExercisesForCategory(catKey);
           return (
             <div key={catKey} style={{ marginBottom: '28px' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '12px', borderBottom: `2px solid ${cat.color}`, paddingBottom: '8px' }}>
@@ -2254,47 +2618,62 @@ function ExerciseScreen({ library, setLibrary, categories, modifiers, selected, 
                 onRandom={() => randomizePicksForCategory(catKey, randomCounts[catKey] ?? Math.min(5, visibleExs.length))}
               />
 
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                {visibleExs.map(ex => {
-                  const on = selected.find(e => e.id === ex.id);
-                  const equip = EQUIP[ex.equipment] || EQUIP.bodyweight;
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                {EQUIPMENT_RENDER_ORDER.filter(equipKey => allowedEquip.has(equipKey)).map(equipKey => {
+                  const equip = EQUIP[equipKey] || EQUIP.bodyweight;
+                  const equipmentExercises = library[catKey].filter(ex => ex.equipment === equipKey && allowedEquip.has(ex.equipment));
+                  const mainRows = equipmentExercises.filter(ex => !ex.standaloneAdvanced && isExerciseVisibleInPicker(ex));
+                  const advancedRows = equipmentExercises.filter(ex => ex.standaloneAdvanced);
+                  const bucketKey = makeAdvancedBucketKey(catKey, equipKey);
+                  const advancedExpanded = !!expandedAdvancedBuckets[bucketKey];
+                  if (mainRows.length === 0 && advancedRows.length === 0) return null;
+
                   return (
-                    <button
-                      key={ex.id}
-                      onClick={() => toggle(ex)}
-                      style={{
-                        padding: '12px 14px', display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-                        background: on ? '#F5F1E8' : '#121212', color: on ? '#0A0A0A' : '#F5F1E8',
-                        border: `1px solid ${on ? '#F5F1E8' : '#222'}`, borderRadius: '2px', textAlign: 'left',
-                      }}
-                    >
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flex: 1, minWidth: 0 }}>
-                        <div style={{
-                          width: '18px', height: '18px', border: `2px solid ${on ? '#0A0A0A' : '#444'}`,
-                          display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: '2px',
-                          flexShrink: 0,
-                        }}>
-                          {on && <Check size={12} strokeWidth={3} />}
-                        </div>
-                        <div style={{ fontWeight: 600, fontSize: '14px', flex: 1, overflow: 'hidden', textOverflow: 'ellipsis' }}>{ex.name}</div>
+                    <div key={equipKey} style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                      <div className="mono" style={{ fontSize: '10px', color: equip.color, letterSpacing: '0.08em', marginTop: '2px' }}>
+                        // {EQUIPMENT_ADVANCED_LABELS[equipKey]}
                       </div>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0 }}>
-                        <span className="mono" style={{
-                          fontSize: '9px', padding: '2px 6px',
-                          background: on ? '#0A0A0A' : '#1F1F1F',
-                          color: equip.color,
-                          borderRadius: '2px', fontWeight: 700, letterSpacing: '0.05em',
-                        }}>{equip.label}</span>
-                        {ex.custom && (
-                          <div
-                            onClick={(e) => { e.stopPropagation(); removeCustom(ex); }}
-                            style={{ padding: '4px', opacity: 0.5 }}
-                          >
-                            <X size={14} />
-                          </div>
-                        )}
-                      </div>
-                    </button>
+                      {mainRows.map(ex => (
+                        <ExercisePickerRow
+                          key={ex.id}
+                          exercise={ex}
+                          selected={!!selected.find(e => e.id === ex.id)}
+                          groupExpanded={!!expandedExerciseGroups[ex.groupKey]}
+                          onToggle={() => toggle(ex)}
+                          onToggleGroup={() => toggleExerciseGroup(ex.groupKey)}
+                          onRemoveCustom={() => removeCustom(ex)}
+                        />
+                      ))}
+                      {advancedRows.length > 0 && (
+                        <button
+                          onClick={() => toggleAdvancedBucket(bucketKey)}
+                          style={{
+                            padding: '10px 12px', display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                            background: advancedExpanded ? equip.color : '#0F0F0F',
+                            color: advancedExpanded ? '#0A0A0A' : equip.color,
+                            border: `1px dashed ${equip.color}66`, borderRadius: '2px',
+                            fontFamily: 'Archivo Black, sans-serif', fontSize: '11px', letterSpacing: '0.03em',
+                          }}
+                        >
+                          <span>{advancedExpanded ? 'HIDE' : 'ADVANCED'} {CATEGORY_ADVANCED_LABELS[catKey]} {EQUIPMENT_ADVANCED_LABELS[equipKey]}</span>
+                          <ChevronDown
+                            size={16}
+                            style={{ transition: 'transform 0.2s', transform: advancedExpanded ? 'rotate(180deg)' : 'rotate(0deg)' }}
+                          />
+                        </button>
+                      )}
+                      {advancedExpanded && advancedRows.map(ex => (
+                        <ExercisePickerRow
+                          key={ex.id}
+                          exercise={ex}
+                          selected={!!selected.find(e => e.id === ex.id)}
+                          groupExpanded={!!expandedExerciseGroups[ex.groupKey]}
+                          onToggle={() => toggle(ex)}
+                          onToggleGroup={() => toggleExerciseGroup(ex.groupKey)}
+                          onRemoveCustom={() => removeCustom(ex)}
+                        />
+                      ))}
+                    </div>
                   );
                 })}
                 {addingTo === catKey ? (
@@ -2307,8 +2686,8 @@ function ExerciseScreen({ library, setLibrary, categories, modifiers, selected, 
                     <div style={{ display: 'flex', gap: '6px', marginBottom: '8px' }}>
                       <select value={newEquip} onChange={e => setNewEquip(e.target.value)} style={{ flex: 1, padding: '8px', background: '#000', color: 'var(--fg)', border: '1px solid #333', fontFamily: 'inherit', borderRadius: '2px', fontSize: '11px' }}>
                         <option value="bodyweight">Bodyweight</option>
-                        {allowedEquip.has('weights') && <option value="weights">Weights</option>}
-                        {allowedEquip.has('pullup') && <option value="pullup">Pull-up Bar</option>}
+                        {allowedEquip.has('weights') && <option value="weights">Dumbbell</option>}
+                        {allowedEquip.has('pullup') && <option value="pullup">Bar</option>}
                       </select>
                       <select value={newUnit} onChange={e => setNewUnit(e.target.value)} style={{ padding: '8px', background: '#000', color: 'var(--fg)', border: '1px solid #333', fontFamily: 'inherit', borderRadius: '2px', fontSize: '11px' }}>
                         <option value="reps">reps</option>
@@ -2352,6 +2731,112 @@ function ExerciseScreen({ library, setLibrary, categories, modifiers, selected, 
   );
 }
 
+function SourceInfoButton({ exercise, size = 14, color = '#666', activeColor = 'var(--accent)', style = {} }) {
+  const hasSource = !!(exercise?.sourceUrl || exercise?.directUrl);
+  if (!hasSource) return null;
+
+  return (
+    <button
+      type="button"
+      aria-label={`Open source for ${exercise.name}`}
+      title={`Open source for ${exercise.name}`}
+      onClick={(e) => {
+        e.stopPropagation();
+        openExerciseSource(exercise);
+      }}
+      style={{
+        width: `${size + 14}px`,
+        height: `${size + 14}px`,
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        color,
+        borderRadius: '2px',
+        flexShrink: 0,
+        ...style,
+      }}
+      onMouseEnter={e => { e.currentTarget.style.color = activeColor; }}
+      onMouseLeave={e => { e.currentTarget.style.color = color; }}
+    >
+      <Info size={size} />
+    </button>
+  );
+}
+
+function ExercisePickerRow({ exercise, selected, groupExpanded, onToggle, onToggleGroup, onRemoveCustom }) {
+  const equip = EQUIP[exercise.equipment] || EQUIP.bodyweight;
+  const canExpandGroup = exercise.hasGroupVariants && exercise.groupPrimary;
+
+  return (
+    <div
+      style={{
+        display: 'flex', alignItems: 'stretch', overflow: 'hidden',
+        background: selected ? '#F5F1E8' : '#121212',
+        color: selected ? '#0A0A0A' : '#F5F1E8',
+        border: `1px solid ${selected ? '#F5F1E8' : '#222'}`,
+        borderRadius: '2px',
+      }}
+    >
+      <button
+        onClick={onToggle}
+        style={{
+          padding: '12px 8px 12px 14px', display: 'flex', alignItems: 'center', gap: '12px',
+          flex: 1, minWidth: 0, textAlign: 'left',
+        }}
+      >
+        <div style={{
+          width: '18px', height: '18px', border: `2px solid ${selected ? '#0A0A0A' : '#444'}`,
+          display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: '2px',
+          flexShrink: 0,
+        }}>
+          {selected && <Check size={12} strokeWidth={3} />}
+        </div>
+        <div style={{ fontWeight: 600, fontSize: '14px', flex: 1, overflow: 'hidden', textOverflow: 'ellipsis' }}>
+          {exercise.name}
+        </div>
+      </button>
+
+      <div style={{ display: 'flex', alignItems: 'center', gap: '4px', paddingRight: '8px', flexShrink: 0 }}>
+        <span className="mono" style={{
+          fontSize: '9px', padding: '2px 6px',
+          background: selected ? '#0A0A0A' : '#1F1F1F',
+          color: equip.color,
+          borderRadius: '2px', fontWeight: 700, letterSpacing: '0.05em',
+        }}>{equip.label}</span>
+        {canExpandGroup && (
+          <button
+            type="button"
+            onClick={onToggleGroup}
+            className="mono"
+            style={{
+              padding: '5px 7px', background: groupExpanded ? equip.color : '#1F1F1F',
+              color: groupExpanded ? '#0A0A0A' : equip.color,
+              borderRadius: '2px', fontSize: '9px', fontWeight: 900, letterSpacing: '0.04em',
+              display: 'flex', alignItems: 'center', gap: '3px',
+            }}
+          >
+            {groupExpanded ? 'HIDE' : 'ADVANCED'}
+            <ChevronDown
+              size={11}
+              style={{ transition: 'transform 0.2s', transform: groupExpanded ? 'rotate(180deg)' : 'rotate(0deg)' }}
+            />
+          </button>
+        )}
+        <SourceInfoButton exercise={exercise} size={14} color={selected ? '#333' : '#666'} activeColor={equip.color} />
+        {exercise.custom && (
+          <button
+            type="button"
+            onClick={onRemoveCustom}
+            style={{ padding: '4px', opacity: 0.5, color: selected ? '#0A0A0A' : '#F5F1E8' }}
+          >
+            <X size={14} />
+          </button>
+        )}
+      </div>
+    </div>
+  );
+}
+
 function ModeScreen({ mode, setMode, modeConfig, setModeConfig, exercises, setExercises, onBack, onNext }) {
   // Track previous mode so we know what to seed from when switching to manual
   const prevModeRef = React.useRef(mode);
@@ -2391,6 +2876,9 @@ function ModeScreen({ mode, setMode, modeConfig, setModeConfig, exercises, setEx
               reps: item.reps,
               unit: item.unit,
               equipment: item.equipment,
+              sourceUrl: item.sourceUrl,
+              difficulty: item.difficulty,
+              exerciseGroup: item.exerciseGroup,
               min: libEx ? libEx.min : undefined,
               max: libEx ? libEx.max : undefined,
             };
@@ -2757,6 +3245,7 @@ function RepSlider({ exercise, value, onChange }) {
             color: equip.color, borderRadius: '2px', fontWeight: 700, flexShrink: 0,
           }}>{equip.label}</span>
           <div style={{ fontSize: '13px', fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{exercise.name}</div>
+          <SourceInfoButton exercise={exercise} size={12} color="#555" activeColor={equip.color} />
         </div>
         <div className="display" style={{ fontSize: '20px', color: 'var(--accent)', lineHeight: 1, flexShrink: 0, marginLeft: '8px' }}>
           {currentValue}<span className="mono" style={{ fontSize: '10px', color: '#666', marginLeft: '3px', fontWeight: 400 }}>{exercise.unit}</span>
@@ -2814,7 +3303,9 @@ function ManualBuilder({ exercises, queue, setQueue }) {
     const item = {
       id: 'q-' + Date.now() + '-' + Math.random(),
       exId: ex.id, name: ex.name, reps: ex.default || ex.defaultReps || 10,
-      unit: ex.unit, equipment: ex.equipment, min: ex.min, max: ex.max,
+      unit: ex.unit, equipment: ex.equipment, sourceUrl: ex.sourceUrl,
+      difficulty: ex.difficulty, exerciseGroup: ex.exerciseGroup,
+      min: ex.min, max: ex.max,
     };
     setQueue([...queue, item]);
     setPickerOpen(false);
@@ -3159,6 +3650,15 @@ function TimeField({ label, value, onChange }) {
 function buildQueue(exercises, mode, cfg) {
   const q = [];
   const getReps = (ex) => (cfg.exerciseSets && cfg.exerciseSets[ex.id]) || ex.default || ex.defaultReps || 10;
+  const queueFields = (ex) => ({
+    exId: ex.id,
+    name: ex.name,
+    unit: ex.unit,
+    equipment: ex.equipment,
+    sourceUrl: ex.sourceUrl,
+    difficulty: ex.difficulty,
+    exerciseGroup: ex.exerciseGroup,
+  });
 
   if (mode === 'manual') {
     const manualQueue = cfg.manualQueue || [];
@@ -3172,7 +3672,7 @@ function buildQueue(exercises, mode, cfg) {
       const sets = cfg.sets || 3;
       for (let s = 0; s < sets; s++) {
         q.push({
-          exId: ex.id, name: ex.name, reps: getReps(ex), unit: ex.unit, equipment: ex.equipment,
+          ...queueFields(ex), reps: getReps(ex),
           round: s + 1, setNum: q.length + 1, positionLabel: `SET ${s + 1}/${sets}`,
         });
       }
@@ -3184,7 +3684,7 @@ function buildQueue(exercises, mode, cfg) {
     for (let r = 0; r < rounds; r++) {
       exercises.forEach(ex => {
         q.push({
-          exId: ex.id, name: ex.name, reps: getReps(ex), unit: ex.unit, equipment: ex.equipment,
+          ...queueFields(ex), reps: getReps(ex),
           round: r + 1, setNum: q.length + 1, positionLabel: `ROUND ${r + 1}/${rounds}`,
         });
       });
@@ -3202,7 +3702,7 @@ function buildQueue(exercises, mode, cfg) {
       for (let s = 0; s < sets; s++) {
         group.forEach(ex => {
           q.push({
-            exId: ex.id, name: ex.name, reps: getReps(ex), unit: ex.unit, equipment: ex.equipment,
+            ...queueFields(ex), reps: getReps(ex),
             round: s + 1, setNum: q.length + 1, groupLabel: 'Group ' + (gi + 1),
             positionLabel: `ROUND ${s + 1}/${sets} GROUP ${gi + 1}/${groups.length}`,
           });
@@ -3217,7 +3717,7 @@ function buildQueue(exercises, mode, cfg) {
       for (let i = 0; i < round; i++) {
         const ex = exercises[i];
         q.push({
-          exId: ex.id, name: ex.name, reps: getReps(ex), unit: ex.unit, equipment: ex.equipment,
+          ...queueFields(ex), reps: getReps(ex),
           round, setNum: q.length + 1, positionLabel: `ROUND ${round}/${rounds}`,
         });
       }
@@ -3585,6 +4085,13 @@ function ExerciseView({ current, next, upcomingItems = [], contentRef }) {
           fontSize: 'var(--active-equip-size)', padding: '2px 7px', background: equip.color + '22',
           color: equip.color, borderRadius: '2px', fontWeight: 700, letterSpacing: '0.05em',
         }}>{equip.label}</span>
+        <SourceInfoButton
+          exercise={current}
+          size={16}
+          color="#666"
+          activeColor={equip.color}
+          style={{ background: 'var(--surface)', border: '1px solid #222' }}
+        />
       </div>
       <div className="display" style={{
         fontSize: 'var(--active-title-size)', lineHeight: 0.9, color: 'var(--fg)', marginBottom: 'var(--active-title-margin)',
