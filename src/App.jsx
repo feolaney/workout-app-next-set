@@ -139,10 +139,23 @@ const MODES = [
 
 const MODE_LABELS = MODES.reduce((acc, m) => ({ ...acc, [m.key]: m.label }), {});
 const IOS_CUSTOM_ICON_SHORTCUT_URL = 'https://www.icloud.com/shortcuts/bda50f91bc534d649c495f6999fb9cc2';
+const DEFAULT_SETTINGS = {
+  rememberSectionState: true,
+  homeScreenPromptSeen: false,
+};
 
-const APP_VERSION = '2.20';
+const APP_VERSION = '2.21';
 
 const APP_VERSION_HISTORY = [
+  {
+    version: '2.21',
+    date: '2026-04-25',
+    type: 'Feature / UI',
+    changes: [
+      'Added a one-time mobile iOS Home Screen setup prompt that points users to Settings.',
+      'Saved the prompt dismissed state in app settings so it only appears once.',
+    ],
+  },
   {
     version: '2.20',
     date: '2026-04-25',
@@ -881,6 +894,24 @@ function shuffleByOpposing(exercises) {
   return final;
 }
 
+function shouldShowHomeScreenInstallPrompt() {
+  if (typeof window === 'undefined' || typeof navigator === 'undefined') return false;
+
+  const ua = navigator.userAgent || '';
+  const platform = navigator.platform || '';
+  const maxTouchPoints = navigator.maxTouchPoints || 0;
+  const isIos = /iPad|iPhone|iPod/i.test(ua) || (platform === 'MacIntel' && maxTouchPoints > 1);
+  if (isIos) return true;
+
+  const isKnownNonIosMobile = /Android|Windows Phone|IEMobile|Opera Mini/i.test(ua);
+  const isMobileViewport = typeof window.matchMedia === 'function'
+    && window.matchMedia('(pointer: coarse)').matches
+    && window.innerWidth <= 900;
+  const isMobile = /Mobi|Mobile/i.test(ua) || isMobileViewport;
+
+  return isMobile && !isKnownNonIosMobile;
+}
+
 export default function WorkoutApp() {
   const [screen, setScreen] = useState('home');
   const [library, setLibrary] = useState(null);
@@ -904,7 +935,7 @@ export default function WorkoutApp() {
   const [recentCollapsed, setRecentCollapsed] = useState(true);
   const [collapseHydrated, setCollapseHydrated] = useState(false);
   // App-wide settings
-  const [settings, setSettings] = useState({ rememberSectionState: true });
+  const [settings, setSettings] = useState(DEFAULT_SETTINGS);
   const [settingsHydrated, setSettingsHydrated] = useState(false);
   // Color palette state
   const [activePaletteId, setActivePaletteId] = useState(DEFAULT_PALETTE_ID);
@@ -922,8 +953,8 @@ export default function WorkoutApp() {
       setFavorites(favs);
       const rest = await storage.get('restConfig', null);
       if (rest) setRestConfig(rest);
-      const loadedSettings = await storage.get('settings', { rememberSectionState: true });
-      setSettings({ rememberSectionState: true, ...loadedSettings });
+      const loadedSettings = await storage.get('settings', DEFAULT_SETTINGS);
+      setSettings({ ...DEFAULT_SETTINGS, ...loadedSettings });
       setSettingsHydrated(true);
       // Only apply stored collapse state if rememberSectionState is ON
       const willRemember = loadedSettings.rememberSectionState !== false;
@@ -1214,6 +1245,7 @@ export default function WorkoutApp() {
           recentCollapsed={recentCollapsed}
           setRecentCollapsed={setRecentCollapsed}
           settings={settings}
+          settingsHydrated={settingsHydrated}
           setSettings={setSettings}
           library={library}
         />
@@ -1349,6 +1381,15 @@ function GlobalStyles() {
       @keyframes pulse-ring { 0% { transform: scale(1); opacity: 0.8; } 100% { transform: scale(1.4); opacity: 0; } }
       @keyframes slide-up { from { opacity: 0; } to { opacity: 1; } }
       @keyframes fade-in { from { opacity: 0; } to { opacity: 1; } }
+      @keyframes settings-callout-ring {
+        0% { transform: scale(0.88); opacity: 1; }
+        70% { transform: scale(1.24); opacity: 0.18; }
+        100% { transform: scale(1.32); opacity: 0; }
+      }
+      @keyframes welcome-card-in {
+        0% { transform: translateY(18px) scale(0.96); opacity: 0; }
+        100% { transform: translateY(0) scale(1); opacity: 1; }
+      }
       @keyframes title-in-top {
         0% { transform: translateX(-110%); opacity: 0; }
         60% { transform: translateX(8px); opacity: 1; }
@@ -1969,14 +2010,28 @@ function ColorPickerModal({ slot, value, palette, onChange, onClose }) {
   );
 }
 
-function HomeScreen({ onStart, onHistory, onFavorites, onColorSettings, onRerun, history, favorites, findMatchingFavorite, addFavorite, removeFavorite, favCollapsed, setFavCollapsed, recentCollapsed, setRecentCollapsed, settings, setSettings, library }) {
+function HomeScreen({ onStart, onHistory, onFavorites, onColorSettings, onRerun, history, favorites, findMatchingFavorite, addFavorite, removeFavorite, favCollapsed, setFavCollapsed, recentCollapsed, setRecentCollapsed, settings, settingsHydrated, setSettings, library }) {
   const [infoFor, setInfoFor] = useState(null);
   const [namingEntry, setNamingEntry] = useState(null); // entry being named for favoriting
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [showHomeScreenPrompt, setShowHomeScreenPrompt] = useState(false);
 
   const recent = history.filter(entry => !isPartialHistoryEntry(entry)).slice(0, 5);
   const favs = favorites.slice(0, 5);
   const hasFavorites = favorites.length > 0;
+
+  useEffect(() => {
+    if (!settingsHydrated) return undefined;
+    if (settingsOpen) return undefined;
+    if (settings.homeScreenPromptSeen) {
+      setShowHomeScreenPrompt(false);
+      return undefined;
+    }
+    if (!shouldShowHomeScreenInstallPrompt()) return undefined;
+
+    const timer = window.setTimeout(() => setShowHomeScreenPrompt(true), 500);
+    return () => window.clearTimeout(timer);
+  }, [settingsHydrated, settings.homeScreenPromptSeen, settingsOpen]);
 
   const handleStarToggle = (entry) => {
     const existing = findMatchingFavorite(entry);
@@ -1990,6 +2045,23 @@ function HomeScreen({ onStart, onHistory, onFavorites, onColorSettings, onRerun,
   const saveFavoriteName = (name) => {
     if (namingEntry) addFavorite(namingEntry, name);
     setNamingEntry(null);
+  };
+
+  const dismissHomeScreenPrompt = () => {
+    setShowHomeScreenPrompt(false);
+    setSettings(prev => ({ ...prev, homeScreenPromptSeen: true }));
+  };
+
+  const openSettings = () => {
+    setSettingsOpen(true);
+    if (settingsHydrated && !settings.homeScreenPromptSeen && shouldShowHomeScreenInstallPrompt()) {
+      setSettings(prev => ({ ...prev, homeScreenPromptSeen: true }));
+    }
+  };
+
+  const openSettingsFromPrompt = () => {
+    dismissHomeScreenPrompt();
+    setSettingsOpen(true);
   };
 
   return (
@@ -2016,7 +2088,7 @@ function HomeScreen({ onStart, onHistory, onFavorites, onColorSettings, onRerun,
             <History size={14} />
             <span className="mono" style={{ fontSize: '11px' }}>HISTORY</span>
           </button>
-          <button onClick={() => setSettingsOpen(true)} style={{
+          <button onClick={openSettings} style={{
             padding: '10px 12px', background: 'var(--surface)', border: '1px solid #222',
             borderRadius: '2px', display: 'flex', alignItems: 'center', color: '#AAA',
           }}>
@@ -2158,6 +2230,87 @@ function HomeScreen({ onStart, onHistory, onFavorites, onColorSettings, onRerun,
           onClose={() => setSettingsOpen(false)}
         />
       )}
+      {showHomeScreenPrompt && (
+        <HomeScreenInstallPrompt
+          onDismiss={dismissHomeScreenPrompt}
+          onOpenSettings={openSettingsFromPrompt}
+        />
+      )}
+    </div>
+  );
+}
+
+function HomeScreenInstallPrompt({ onDismiss, onOpenSettings }) {
+  return (
+    <div
+      className="fade-in"
+      onClick={onDismiss}
+      style={{
+        position: 'fixed', inset: 0, zIndex: 120, background: 'rgba(0,0,0,0.58)',
+        backdropFilter: 'blur(8px)', WebkitBackdropFilter: 'blur(8px)',
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+        padding: `${SAFE_TOP_24} 22px 24px`,
+      }}
+    >
+      <div
+        aria-hidden="true"
+        style={{
+          position: 'absolute', top: 'calc(env(safe-area-inset-top) + 14px)', right: '16px',
+          width: '58px', height: '58px', borderRadius: '999px',
+          border: '2px solid var(--accent)', boxShadow: '0 0 28px var(--accent)',
+          animation: 'settings-callout-ring 1.25s ease-out infinite',
+        }}
+      />
+      <div
+        aria-hidden="true"
+        style={{
+          position: 'absolute', top: 'calc(env(safe-area-inset-top) + 24px)', right: '26px',
+          width: '38px', height: '38px', borderRadius: '2px', background: 'var(--surface)',
+          border: '1px solid var(--accent)', display: 'flex', alignItems: 'center',
+          justifyContent: 'center', color: 'var(--accent)',
+        }}
+      >
+        <Settings size={18} />
+      </div>
+
+      <div
+        onClick={e => e.stopPropagation()}
+        style={{
+          width: 'min(100%, 360px)', background: 'rgba(14,14,14,0.96)',
+          border: '2px solid var(--accent)', borderRadius: '2px', padding: '22px',
+          boxShadow: '0 18px 60px rgba(0,0,0,0.45)',
+          animation: 'welcome-card-in 0.46s cubic-bezier(0.22, 1, 0.36, 1) both',
+        }}
+      >
+        <div className="display" style={{ fontSize: 'clamp(46px, 13vw, 68px)', lineHeight: 0.85, color: 'var(--fg)', marginBottom: '12px' }}>
+          WELCOME
+        </div>
+        <div className="mono" style={{ fontSize: '12px', color: '#AAA', lineHeight: 1.55, marginBottom: '18px' }}>
+          Go to Settings to learn how to add this to your phone's Home Screen.
+        </div>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 0.75fr', gap: '8px' }}>
+          <button
+            onClick={onOpenSettings}
+            style={{
+              padding: '13px 12px', background: 'var(--accent)', color: '#0A0A0A',
+              borderRadius: '2px', fontFamily: 'Archivo Black, sans-serif',
+              fontSize: '12px',
+            }}
+          >
+            OPEN SETTINGS
+          </button>
+          <button
+            onClick={onDismiss}
+            style={{
+              padding: '13px 12px', background: '#181818', color: '#999',
+              border: '1px solid #333', borderRadius: '2px',
+              fontSize: '11px', fontWeight: 900,
+            }}
+          >
+            GOT IT
+          </button>
+        </div>
+      </div>
     </div>
   );
 }

@@ -65,7 +65,7 @@ Secondary screens:
 - `favorites`
 - `colorSettings`
 
-The home screen can start a new workout, rerun recent workouts, rerun favorites, open history, open favorites, and open settings/color controls.
+The home screen can start a new workout, rerun recent workouts, rerun favorites, open history, open favorites, and open settings/color controls. On first launch for iOS or ambiguous mobile devices, the home screen shows a one-time blurred welcome prompt that points users to Settings for Home Screen bookmark setup.
 
 The settings modal includes app preferences, color customization, an iOS Home Screen install guide, and an app version history view. The home header displays only the current app version.
 
@@ -84,7 +84,7 @@ Top-level state in `WorkoutApp` is the app's source of truth during a session:
 - `queueIdx`: current queue position
 - `history`: completed workout sessions and resumable partial workout entries
 - `favorites`: saved workout templates
-- `settings`: app settings, currently `rememberSectionState`
+- `settings`: app settings, currently `rememberSectionState` and `homeScreenPromptSeen`
 - `activePaletteId` and `customPalettes`: palette selection and custom palette data
 
 Most child components receive state and callbacks through props rather than owning shared app state themselves.
@@ -123,7 +123,7 @@ CSV exercise metadata includes body section, equipment type, exercise group, dif
 
 Default exercises with details show a small info icon in selection, setup details, workout info, and the active workout. Pressing it opens an in-app description window with Back and More Details actions; More Details opens the source URL in a new tab/window. Custom exercises do not show this icon unless they later gain source or description metadata.
 
-Settings includes an iOS-only Add to Home Screen guide that imports `support files/Images/ios_how_to_add_to_homescreen.gif` as a Vite asset and shows it in a full-screen walkthrough. The guide also links to an optional iOS Shortcut for custom Home Screen bookmark images and explains the Safari share-sheet flow for running that shortcut before adding the bookmark. Android users are directed to their own browser/device install instructions.
+Settings includes an iOS-only Add to Home Screen guide that imports `support files/Images/ios_how_to_add_to_homescreen.gif` as a Vite asset and shows it in a full-screen walkthrough. A one-time iOS/mobile welcome prompt points users to the Settings button and stores its dismissed state as `homeScreenPromptSeen` inside the persisted `settings` object. The guide also links to an optional iOS Shortcut for custom Home Screen bookmark images and explains the Safari share-sheet flow for running that shortcut before adding the bookmark. Android users are directed to their own browser/device install instructions.
 
 The selected mode determines how `buildQueue(exercises, mode, cfg)` expands selected exercises into active workout items:
 
