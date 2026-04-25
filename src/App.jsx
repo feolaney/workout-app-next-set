@@ -138,9 +138,17 @@ const MODES = [
 
 const MODE_LABELS = MODES.reduce((acc, m) => ({ ...acc, [m.key]: m.label }), {});
 
-const APP_VERSION = '2.9';
+const APP_VERSION = '2.10';
 
 const APP_VERSION_HISTORY = [
+  {
+    version: '2.10',
+    date: '2026-04-25',
+    type: 'UI',
+    changes: [
+      'Gave exercises revealed by Advanced controls a lighter row background so their dropdown association is clearer.',
+    ],
+  },
   {
     version: '2.9',
     date: '2026-04-24',
@@ -2638,6 +2646,7 @@ function ExerciseScreen({ library, setLibrary, categories, modifiers, selected, 
                           key={ex.id}
                           exercise={ex}
                           selected={!!selected.find(e => e.id === ex.id)}
+                          revealed={ex.hasGroupVariants && !ex.groupPrimary}
                           groupExpanded={!!expandedExerciseGroups[ex.groupKey]}
                           onToggle={() => toggle(ex)}
                           onToggleGroup={() => toggleExerciseGroup(ex.groupKey)}
@@ -2667,6 +2676,7 @@ function ExerciseScreen({ library, setLibrary, categories, modifiers, selected, 
                           key={ex.id}
                           exercise={ex}
                           selected={!!selected.find(e => e.id === ex.id)}
+                          revealed
                           groupExpanded={!!expandedExerciseGroups[ex.groupKey]}
                           onToggle={() => toggle(ex)}
                           onToggleGroup={() => toggleExerciseGroup(ex.groupKey)}
@@ -2763,17 +2773,19 @@ function SourceInfoButton({ exercise, size = 14, color = '#666', activeColor = '
   );
 }
 
-function ExercisePickerRow({ exercise, selected, groupExpanded, onToggle, onToggleGroup, onRemoveCustom }) {
+function ExercisePickerRow({ exercise, selected, revealed = false, groupExpanded, onToggle, onToggleGroup, onRemoveCustom }) {
   const equip = EQUIP[exercise.equipment] || EQUIP.bodyweight;
   const canExpandGroup = exercise.hasGroupVariants && exercise.groupPrimary;
+  const background = selected ? '#F5F1E8' : (revealed ? '#1A1A1A' : '#121212');
+  const borderColor = selected ? '#F5F1E8' : (revealed ? '#333' : '#222');
 
   return (
     <div
       style={{
         display: 'flex', alignItems: 'stretch', overflow: 'hidden',
-        background: selected ? '#F5F1E8' : '#121212',
+        background,
         color: selected ? '#0A0A0A' : '#F5F1E8',
-        border: `1px solid ${selected ? '#F5F1E8' : '#222'}`,
+        border: `1px solid ${borderColor}`,
         borderRadius: '2px',
       }}
     >
