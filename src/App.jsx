@@ -138,9 +138,17 @@ const MODES = [
 
 const MODE_LABELS = MODES.reduce((acc, m) => ({ ...acc, [m.key]: m.label }), {});
 
-const APP_VERSION = '2.14';
+const APP_VERSION = '2.15';
 
 const APP_VERSION_HISTORY = [
+  {
+    version: '2.15',
+    date: '2026-04-25',
+    type: 'Maintenance',
+    changes: [
+      'Refreshed default exercise library source metadata from the support CSV.',
+    ],
+  },
   {
     version: '2.14',
     date: '2026-04-25',
