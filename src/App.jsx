@@ -140,9 +140,18 @@ const MODES = [
 const MODE_LABELS = MODES.reduce((acc, m) => ({ ...acc, [m.key]: m.label }), {});
 const IOS_CUSTOM_ICON_SHORTCUT_URL = 'https://www.icloud.com/shortcuts/bda50f91bc534d649c495f6999fb9cc2';
 
-const APP_VERSION = '2.19';
+const APP_VERSION = '2.20';
 
 const APP_VERSION_HISTORY = [
+  {
+    version: '2.20',
+    date: '2026-04-25',
+    type: 'Feature / UI',
+    changes: [
+      'Changed Home Favorites and Recent sections to show five-item previews with Show All shortcuts.',
+      'Moved favorite reordering into the full Favorites screen and added favorite rename and delete confirmation controls.',
+    ],
+  },
   {
     version: '2.19',
     date: '2026-04-25',
@@ -1058,6 +1067,17 @@ export default function WorkoutApp() {
     setFavorites(prev => prev.filter(f => makeSignature(f) !== sig));
   };
 
+  const renameFavorite = (entry, name) => {
+    const nextName = (name || '').trim();
+    if (!nextName) return;
+    const sig = makeSignature(entry);
+    setFavorites(prev => prev.map(f => (
+      (entry.favId && f.favId === entry.favId) || makeSignature(f) === sig
+        ? { ...f, name: nextName }
+        : f
+    )));
+  };
+
   const reorderFavorites = (nextFavorites) => {
     setFavorites(nextFavorites);
   };
@@ -1189,7 +1209,6 @@ export default function WorkoutApp() {
           findMatchingFavorite={findMatchingFavorite}
           addFavorite={addFavorite}
           removeFavorite={removeFavorite}
-          reorderFavorites={reorderFavorites}
           favCollapsed={favCollapsed}
           setFavCollapsed={setFavCollapsed}
           recentCollapsed={recentCollapsed}
@@ -1219,6 +1238,7 @@ export default function WorkoutApp() {
           onBack={() => setScreen('home')}
           onRerun={rerunFromHistory}
           removeFavorite={removeFavorite}
+          renameFavorite={renameFavorite}
           reorderFavorites={reorderFavorites}
         />
       )}
@@ -1949,12 +1969,13 @@ function ColorPickerModal({ slot, value, palette, onChange, onClose }) {
   );
 }
 
-function HomeScreen({ onStart, onHistory, onFavorites, onColorSettings, onRerun, history, favorites, findMatchingFavorite, addFavorite, removeFavorite, reorderFavorites, favCollapsed, setFavCollapsed, recentCollapsed, setRecentCollapsed, settings, setSettings, library }) {
+function HomeScreen({ onStart, onHistory, onFavorites, onColorSettings, onRerun, history, favorites, findMatchingFavorite, addFavorite, removeFavorite, favCollapsed, setFavCollapsed, recentCollapsed, setRecentCollapsed, settings, setSettings, library }) {
   const [infoFor, setInfoFor] = useState(null);
   const [namingEntry, setNamingEntry] = useState(null); // entry being named for favoriting
   const [settingsOpen, setSettingsOpen] = useState(false);
 
-  const recent = history.filter(entry => !isPartialHistoryEntry(entry)).slice(0, 3);
+  const recent = history.filter(entry => !isPartialHistoryEntry(entry)).slice(0, 5);
+  const favs = favorites.slice(0, 5);
   const hasFavorites = favorites.length > 0;
 
   const handleStarToggle = (entry) => {
@@ -2013,34 +2034,48 @@ function HomeScreen({ onStart, onHistory, onFavorites, onColorSettings, onRerun,
 
       {hasFavorites && (
         <div style={{ marginBottom: '12px' }}>
-          <button
-            onClick={() => setFavCollapsed(v => !v)}
-            style={{
-              width: '100%', padding: '6px 0', marginBottom: favCollapsed ? 0 : '8px',
-              display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-              color: '#FFB800',
-            }}
-          >
-            <div className="mono" style={{ fontSize: '10px', letterSpacing: '0.1em', display: 'flex', alignItems: 'center', gap: '5px' }}>
-              <Star size={10} fill="#FFB800" /> FAVORITES
-              <span style={{ color: '#666', marginLeft: '4px' }}>({favorites.length})</span>
-            </div>
-            <ChevronDown
-              size={14}
-              style={{ transition: 'transform 0.2s', transform: favCollapsed ? 'rotate(-90deg)' : 'rotate(0deg)' }}
-            />
-          </button>
-          {!favCollapsed && (
-            <div style={{ maxHeight: 'min(42dvh, 360px)', overflowY: 'auto', paddingRight: '2px' }}>
-              <DraggableFavoriteList
-                favorites={favorites}
-                onReorder={reorderFavorites}
-                onRun={onRerun}
-                onInfo={setInfoFor}
-                onStarToggle={handleStarToggle}
-                findMatchingFavorite={findMatchingFavorite}
-                gap="6px"
+          <div style={{
+            width: '100%', padding: '6px 0', marginBottom: favCollapsed ? 0 : '8px',
+            display: 'flex', alignItems: 'center', gap: '8px',
+          }}>
+            <button
+              onClick={() => setFavCollapsed(v => !v)}
+              style={{ flex: 1, minWidth: 0, display: 'flex', alignItems: 'center', justifyContent: 'space-between', color: '#FFB800' }}
+            >
+              <div className="mono" style={{ fontSize: '10px', letterSpacing: '0.1em', display: 'flex', alignItems: 'center', gap: '5px' }}>
+                <Star size={10} fill="#FFB800" /> FAVORITES
+                <span style={{ color: '#666', marginLeft: '4px' }}>({favorites.length})</span>
+              </div>
+              <ChevronDown
+                size={14}
+                style={{ transition: 'transform 0.2s', transform: favCollapsed ? 'rotate(-90deg)' : 'rotate(0deg)' }}
               />
+            </button>
+            <button
+              onClick={onFavorites}
+              className="mono"
+              style={{
+                padding: '5px 7px', background: '#151515', border: '1px solid #FFB80044',
+                borderRadius: '2px', color: '#FFB800', fontSize: '9px', fontWeight: 900,
+                letterSpacing: '0.05em', flexShrink: 0,
+              }}
+            >
+              SHOW ALL FAVORITES
+            </button>
+          </div>
+          {!favCollapsed && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+              {favs.map((entry, i) => (
+                <RecentWorkoutCard
+                  key={entry.favId || entry.date}
+                  entry={entry}
+                  opacity={1 - i * 0.08}
+                  isFavorite
+                  onRun={() => onRerun(entry)}
+                  onInfo={() => setInfoFor(entry)}
+                  findMatchingFavorite={findMatchingFavorite}
+                />
+              ))}
             </div>
           )}
         </div>
@@ -2048,23 +2083,35 @@ function HomeScreen({ onStart, onHistory, onFavorites, onColorSettings, onRerun,
 
       {recent.length > 0 && (
         <div style={{ marginBottom: '16px' }}>
-          <button
-            onClick={() => setRecentCollapsed(v => !v)}
-            style={{
-              width: '100%', padding: '6px 0', marginBottom: recentCollapsed ? 0 : '8px',
-              display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-              color: '#666',
-            }}
-          >
-            <div className="mono" style={{ fontSize: '10px', letterSpacing: '0.1em' }}>
-              // RECENT
-              <span style={{ marginLeft: '6px', color: '#555' }}>({recent.length})</span>
-            </div>
-            <ChevronDown
-              size={14}
-              style={{ transition: 'transform 0.2s', transform: recentCollapsed ? 'rotate(-90deg)' : 'rotate(0deg)' }}
-            />
-          </button>
+          <div style={{
+            width: '100%', padding: '6px 0', marginBottom: recentCollapsed ? 0 : '8px',
+            display: 'flex', alignItems: 'center', gap: '8px',
+          }}>
+            <button
+              onClick={() => setRecentCollapsed(v => !v)}
+              style={{ flex: 1, minWidth: 0, display: 'flex', alignItems: 'center', justifyContent: 'space-between', color: '#666' }}
+            >
+              <div className="mono" style={{ fontSize: '10px', letterSpacing: '0.1em' }}>
+                // RECENT
+                <span style={{ marginLeft: '6px', color: '#555' }}>({recent.length})</span>
+              </div>
+              <ChevronDown
+                size={14}
+                style={{ transition: 'transform 0.2s', transform: recentCollapsed ? 'rotate(-90deg)' : 'rotate(0deg)' }}
+              />
+            </button>
+            <button
+              onClick={onHistory}
+              className="mono"
+              style={{
+                padding: '5px 7px', background: '#151515', border: '1px solid #333',
+                borderRadius: '2px', color: '#888', fontSize: '9px', fontWeight: 900,
+                letterSpacing: '0.05em', flexShrink: 0,
+              }}
+            >
+              SHOW ALL HISTORY
+            </button>
+          </div>
           {!recentCollapsed && (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
               {recent.map((entry, i) => (
@@ -2450,8 +2497,8 @@ function SettingsToggle({ label, description, checked, onToggle }) {
   );
 }
 
-function NameFavoriteModal({ entry, onCancel, onSave }) {
-  const [name, setName] = React.useState('');
+function NameFavoriteModal({ entry, onCancel, onSave, initialName = '', title = 'NAME THIS WORKOUT', saveLabel = 'SAVE' }) {
+  const [name, setName] = React.useState(initialName);
   const modeLabel = MODE_LABELS[entry.mode] || (entry.mode && entry.mode.toUpperCase());
   const defaultPlaceholder = `${modeLabel} · ${entry.exercises?.length || 0} exercises`;
 
@@ -2470,7 +2517,7 @@ function NameFavoriteModal({ entry, onCancel, onSave }) {
       >
         <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '16px' }}>
           <Star size={18} fill="#FFB800" color="#FFB800" />
-          <div className="stencil" style={{ fontSize: '22px', color: '#FFB800' }}>NAME THIS WORKOUT</div>
+          <div className="stencil" style={{ fontSize: '22px', color: '#FFB800' }}>{title}</div>
         </div>
         <div className="mono" style={{ fontSize: '11px', color: '#888', marginBottom: '12px', lineHeight: 1.5 }}>
           Give it a name so you can find it later.
@@ -2498,7 +2545,7 @@ function NameFavoriteModal({ entry, onCancel, onSave }) {
             fontFamily: 'Archivo Black, sans-serif', fontSize: '13px', borderRadius: '2px',
             display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px',
           }}>
-            <Star size={14} fill="#0A0A0A" /> SAVE
+            <Star size={14} fill="#0A0A0A" /> {saveLabel}
           </button>
         </div>
       </div>
@@ -2585,8 +2632,9 @@ function RecentWorkoutCard({ entry, opacity, onRun, onInfo, onStarToggle, findMa
   );
 }
 
-function DraggableFavoriteList({ favorites, onReorder, onRun, onInfo, onStarToggle, findMatchingFavorite, gap = '8px' }) {
+function DraggableFavoriteList({ favorites, onReorder, onRun, onInfo, onEdit, onDelete, findMatchingFavorite, gap = '8px' }) {
   const [dragState, setDragState] = useState(null);
+  const [confirmDeleteId, setConfirmDeleteId] = useState(null);
   const listRef = useRef(null);
 
   const getTargetIndex = (clientY) => {
@@ -2649,10 +2697,12 @@ function DraggableFavoriteList({ favorites, onReorder, onRun, onInfo, onStarTogg
       {favorites.map((entry, i) => {
         const isDragging = dragState && dragState.srcIdx === i;
         const isDropTarget = dragState && !isDragging && dragState.targetIdx === i;
+        const rowId = entry.favId || entry.date;
+        const confirmingDelete = confirmDeleteId === rowId;
 
         return (
           <div
-            key={entry.favId || entry.date}
+            key={rowId}
             data-favorite-row
             style={{
               display: 'flex', alignItems: 'stretch', gap: '6px',
@@ -2675,16 +2725,57 @@ function DraggableFavoriteList({ favorites, onReorder, onRun, onInfo, onStarTogg
             >
               <GripVertical size={18} />
             </button>
-            <div style={{ flex: 1, minWidth: 0 }}>
+            <div style={{
+              flex: 1, minWidth: 0,
+              transform: confirmingDelete ? 'translateX(-6px)' : 'translateX(0)',
+              transition: 'transform 0.18s ease',
+            }}>
               <RecentWorkoutCard
                 entry={entry}
                 opacity={1}
                 isFavorite
                 onRun={() => onRun(entry)}
                 onInfo={() => onInfo(entry)}
-                onStarToggle={() => onStarToggle(entry)}
                 findMatchingFavorite={findMatchingFavorite}
               />
+            </div>
+            <div style={{ display: 'flex', alignItems: 'stretch', gap: '4px', flexShrink: 0 }}>
+              <button
+                type="button"
+                onClick={() => onEdit(entry)}
+                aria-label="Edit favorite name"
+                style={{
+                  width: '34px', background: '#0F0F0F', border: '1px solid #222', borderRadius: '2px',
+                  color: '#888', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                }}
+              >
+                <Pencil size={15} />
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  if (confirmingDelete) {
+                    setConfirmDeleteId(null);
+                    onDelete(entry);
+                  } else {
+                    setConfirmDeleteId(rowId);
+                  }
+                }}
+                onBlur={() => setTimeout(() => setConfirmDeleteId(current => current === rowId ? null : current), 120)}
+                aria-label={confirmingDelete ? 'Confirm delete favorite' : 'Delete favorite'}
+                className="mono"
+                style={{
+                  width: confirmingDelete ? '74px' : '34px',
+                  background: confirmingDelete ? 'var(--warn)' : '#0F0F0F',
+                  border: `1px solid ${confirmingDelete ? 'var(--warn)' : '#222'}`,
+                  borderRadius: '2px', color: confirmingDelete ? '#0A0A0A' : '#888',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  fontSize: '10px', fontWeight: 900, letterSpacing: '0.04em',
+                  transition: 'width 0.18s ease, background 0.18s ease, color 0.18s ease',
+                }}
+              >
+                {confirmingDelete ? 'DELETE?' : <Trash2 size={15} />}
+              </button>
             </div>
           </div>
         );
@@ -2961,8 +3052,9 @@ function HistoryScreen({ history, library, onBack, onRerun, onContinuePartial, o
   );
 }
 
-function FavoritesScreen({ favorites, library, onBack, onRerun, removeFavorite, reorderFavorites }) {
+function FavoritesScreen({ favorites, library, onBack, onRerun, removeFavorite, renameFavorite, reorderFavorites }) {
   const [infoFor, setInfoFor] = useState(null);
+  const [editingFavorite, setEditingFavorite] = useState(null);
 
   return (
     <div className="slide-in" style={{ minHeight: '100dvh', display: 'flex', flexDirection: 'column', position: 'relative', zIndex: 2 }}>
@@ -2996,12 +3088,26 @@ function FavoritesScreen({ favorites, library, onBack, onRerun, removeFavorite, 
             onReorder={reorderFavorites}
             onRun={onRerun}
             onInfo={setInfoFor}
-            onStarToggle={removeFavorite}
+            onEdit={setEditingFavorite}
+            onDelete={removeFavorite}
           />
         )}
       </div>
 
       {infoFor && <WorkoutInfoModal entry={infoFor} library={library} onClose={() => setInfoFor(null)} onRun={() => { onRerun(infoFor); setInfoFor(null); }} />}
+      {editingFavorite && (
+        <NameFavoriteModal
+          entry={editingFavorite}
+          initialName={editingFavorite.name || ''}
+          title="EDIT FAVORITE NAME"
+          saveLabel="UPDATE"
+          onCancel={() => setEditingFavorite(null)}
+          onSave={(name) => {
+            renameFavorite(editingFavorite, name);
+            setEditingFavorite(null);
+          }}
+        />
+      )}
     </div>
   );
 }
