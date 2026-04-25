@@ -138,9 +138,17 @@ const MODES = [
 
 const MODE_LABELS = MODES.reduce((acc, m) => ({ ...acc, [m.key]: m.label }), {});
 
-const APP_VERSION = '2.10';
+const APP_VERSION = '2.11';
 
 const APP_VERSION_HISTORY = [
+  {
+    version: '2.11',
+    date: '2026-04-25',
+    type: 'UI',
+    changes: [
+      'Changed standalone advanced section hide buttons to keep the Advanced label when expanded.',
+    ],
+  },
   {
     version: '2.10',
     date: '2026-04-25',
@@ -2664,7 +2672,7 @@ function ExerciseScreen({ library, setLibrary, categories, modifiers, selected, 
                             fontFamily: 'Archivo Black, sans-serif', fontSize: '11px', letterSpacing: '0.03em',
                           }}
                         >
-                          <span>{advancedExpanded ? 'HIDE' : 'ADVANCED'} {CATEGORY_ADVANCED_LABELS[catKey]} {EQUIPMENT_ADVANCED_LABELS[equipKey]}</span>
+                          <span>{advancedExpanded ? 'HIDE ADVANCED' : 'ADVANCED'} {CATEGORY_ADVANCED_LABELS[catKey]} {EQUIPMENT_ADVANCED_LABELS[equipKey]}</span>
                           <ChevronDown
                             size={16}
                             style={{ transition: 'transform 0.2s', transform: advancedExpanded ? 'rotate(180deg)' : 'rotate(0deg)' }}
