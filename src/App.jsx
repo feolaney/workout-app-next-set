@@ -138,9 +138,18 @@ const MODES = [
 
 const MODE_LABELS = MODES.reduce((acc, m) => ({ ...acc, [m.key]: m.label }), {});
 
-const APP_VERSION = '2.12';
+const APP_VERSION = '2.13';
 
 const APP_VERSION_HISTORY = [
+  {
+    version: '2.13',
+    date: '2026-04-25',
+    type: 'Feature / UI',
+    changes: [
+      'Added Show All Advanced and Hide All Advanced controls beside each category random picker.',
+      'Made the category-level advanced toggle expand or collapse all available advanced groups for that section.',
+    ],
+  },
   {
     version: '2.12',
     date: '2026-04-25',
@@ -2495,7 +2504,7 @@ function CategoryScreen({ selectedCategories, setSelectedCategories, selectedMod
   );
 }
 
-function CategoryRandomPicker({ catKey, catColor, maxCount, value, onValueChange, onRandom }) {
+function CategoryRandomPicker({ catKey, catColor, maxCount, value, onValueChange, onRandom, hasAdvancedControls = false, advancedOpen = false, onToggleAdvanced }) {
   // If no exercises in this category, don't render
   if (maxCount === 0) return null;
   // Clamp value to valid range
@@ -2508,10 +2517,25 @@ function CategoryRandomPicker({ catKey, catColor, maxCount, value, onValueChange
       padding: '10px 12px', marginBottom: '10px',
       background: '#0F0F0F', border: `1px solid ${catColor}33`, borderRadius: '2px',
     }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '8px' }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px', flexWrap: 'wrap' }}>
         <div className="mono" style={{ fontSize: '10px', color: '#888', flex: 1 }}>
           PICK <span style={{ color: catColor, fontWeight: 700 }}>{safeValue}</span> AT RANDOM
         </div>
+        {hasAdvancedControls && (
+          <button onClick={onToggleAdvanced} style={{
+            padding: '6px 10px', background: advancedOpen ? '#1A1A1A' : '#0A0A0A',
+            color: catColor, border: `1px solid ${catColor}66`,
+            fontSize: '10px', fontWeight: 900, fontFamily: 'Archivo Black, sans-serif',
+            letterSpacing: '0.03em', borderRadius: '2px', display: 'flex',
+            alignItems: 'center', gap: '5px',
+          }}>
+            <ChevronDown
+              size={12}
+              style={{ transition: 'transform 0.2s', transform: advancedOpen ? 'rotate(180deg)' : 'rotate(0deg)' }}
+            />
+            {advancedOpen ? 'HIDE ALL ADVANCED' : 'SHOW ALL ADVANCED'}
+          </button>
+        )}
         <button onClick={onRandom} style={{
           padding: '6px 12px', background: catColor, color: '#0A0A0A',
           fontSize: '11px', fontWeight: 900, fontFamily: 'Archivo Black, sans-serif',
@@ -2569,6 +2593,48 @@ function ExerciseScreen({ library, setLibrary, categories, modifiers, selected, 
 
   const toggleAdvancedBucket = (bucketKey) => {
     setExpandedAdvancedBuckets(prev => ({ ...prev, [bucketKey]: !prev[bucketKey] }));
+  };
+
+  const getCategoryAdvancedKeys = (catKey) => {
+    const groupKeys = new Set();
+    const bucketKeys = new Set();
+
+    library[catKey].forEach(ex => {
+      if (!allowedEquip.has(ex.equipment)) return;
+      if (ex.hasGroupVariants && ex.groupKey) groupKeys.add(ex.groupKey);
+      if (ex.standaloneAdvanced && ex.advancedBucketKey) bucketKeys.add(ex.advancedBucketKey);
+    });
+
+    return { groupKeys: [...groupKeys], bucketKeys: [...bucketKeys] };
+  };
+
+  const hasCategoryAdvancedControls = (catKey) => {
+    const { groupKeys, bucketKeys } = getCategoryAdvancedKeys(catKey);
+    return groupKeys.length > 0 || bucketKeys.length > 0;
+  };
+
+  const isAnyCategoryAdvancedOpen = (catKey) => {
+    const { groupKeys, bucketKeys } = getCategoryAdvancedKeys(catKey);
+    return (
+      groupKeys.some(groupKey => !!expandedExerciseGroups[groupKey]) ||
+      bucketKeys.some(bucketKey => !!expandedAdvancedBuckets[bucketKey])
+    );
+  };
+
+  const toggleAllAdvancedForCategory = (catKey) => {
+    const { groupKeys, bucketKeys } = getCategoryAdvancedKeys(catKey);
+    const shouldHide = isAnyCategoryAdvancedOpen(catKey);
+
+    setExpandedExerciseGroups(prev => {
+      const next = { ...prev };
+      groupKeys.forEach(groupKey => { next[groupKey] = !shouldHide; });
+      return next;
+    });
+    setExpandedAdvancedBuckets(prev => {
+      const next = { ...prev };
+      bucketKeys.forEach(bucketKey => { next[bucketKey] = !shouldHide; });
+      return next;
+    });
   };
 
   const toggle = (ex) => {
@@ -2630,6 +2696,8 @@ function ExerciseScreen({ library, setLibrary, categories, modifiers, selected, 
           const cat = CATEGORIES.find(c => c.key === catKey);
           const Icon = cat.icon;
           const visibleExs = getSelectableExercisesForCategory(catKey);
+          const hasAdvancedControls = hasCategoryAdvancedControls(catKey);
+          const advancedOpen = isAnyCategoryAdvancedOpen(catKey);
           return (
             <div key={catKey} style={{ marginBottom: '28px' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '12px', borderBottom: `2px solid ${cat.color}`, paddingBottom: '8px' }}>
@@ -2646,6 +2714,9 @@ function ExerciseScreen({ library, setLibrary, categories, modifiers, selected, 
                 value={randomCounts[catKey] ?? Math.min(5, visibleExs.length)}
                 onValueChange={v => setRandomCounts(p => ({ ...p, [catKey]: v }))}
                 onRandom={() => randomizePicksForCategory(catKey, randomCounts[catKey] ?? Math.min(5, visibleExs.length))}
+                hasAdvancedControls={hasAdvancedControls}
+                advancedOpen={advancedOpen}
+                onToggleAdvanced={() => toggleAllAdvancedForCategory(catKey)}
               />
 
               <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
