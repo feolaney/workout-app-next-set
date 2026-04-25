@@ -140,9 +140,18 @@ const MODES = [
 const MODE_LABELS = MODES.reduce((acc, m) => ({ ...acc, [m.key]: m.label }), {});
 const IOS_CUSTOM_ICON_SHORTCUT_URL = 'https://www.icloud.com/shortcuts/bda50f91bc534d649c495f6999fb9cc2';
 
-const APP_VERSION = '2.18';
+const APP_VERSION = '2.19';
 
 const APP_VERSION_HISTORY = [
+  {
+    version: '2.19',
+    date: '2026-04-25',
+    type: 'Feature',
+    changes: [
+      'Added drag reordering for saved favorites from the Home favorites dropdown and Favorites screen.',
+      'Changed newly saved favorites to appear at the bottom of the favorites list by default.',
+    ],
+  },
   {
     version: '2.18',
     date: '2026-04-25',
@@ -1040,13 +1049,17 @@ export default function WorkoutApp() {
       name: (name || '').trim() || 'Untitled workout',
       favId: 'fav-' + Date.now(),
     };
-    setFavorites(prev => [fav, ...prev]);
+    setFavorites(prev => [...prev, fav]);
   };
 
   // Remove a favorite by matching signature
   const removeFavorite = (entry) => {
     const sig = makeSignature(entry);
     setFavorites(prev => prev.filter(f => makeSignature(f) !== sig));
+  };
+
+  const reorderFavorites = (nextFavorites) => {
+    setFavorites(nextFavorites);
   };
 
   // Build a workout entry from current active state (for starring mid-workout)
@@ -1176,6 +1189,7 @@ export default function WorkoutApp() {
           findMatchingFavorite={findMatchingFavorite}
           addFavorite={addFavorite}
           removeFavorite={removeFavorite}
+          reorderFavorites={reorderFavorites}
           favCollapsed={favCollapsed}
           setFavCollapsed={setFavCollapsed}
           recentCollapsed={recentCollapsed}
@@ -1205,6 +1219,7 @@ export default function WorkoutApp() {
           onBack={() => setScreen('home')}
           onRerun={rerunFromHistory}
           removeFavorite={removeFavorite}
+          reorderFavorites={reorderFavorites}
         />
       )}
       {screen === 'categories' && (
@@ -1934,14 +1949,13 @@ function ColorPickerModal({ slot, value, palette, onChange, onClose }) {
   );
 }
 
-function HomeScreen({ onStart, onHistory, onFavorites, onColorSettings, onRerun, history, favorites, findMatchingFavorite, addFavorite, removeFavorite, favCollapsed, setFavCollapsed, recentCollapsed, setRecentCollapsed, settings, setSettings, library }) {
+function HomeScreen({ onStart, onHistory, onFavorites, onColorSettings, onRerun, history, favorites, findMatchingFavorite, addFavorite, removeFavorite, reorderFavorites, favCollapsed, setFavCollapsed, recentCollapsed, setRecentCollapsed, settings, setSettings, library }) {
   const [infoFor, setInfoFor] = useState(null);
   const [namingEntry, setNamingEntry] = useState(null); // entry being named for favoriting
   const [settingsOpen, setSettingsOpen] = useState(false);
 
   const recent = history.filter(entry => !isPartialHistoryEntry(entry)).slice(0, 3);
-  const favs = favorites.slice(0, 3);
-  const hasFavorites = favs.length > 0;
+  const hasFavorites = favorites.length > 0;
 
   const handleStarToggle = (entry) => {
     const existing = findMatchingFavorite(entry);
@@ -2017,19 +2031,16 @@ function HomeScreen({ onStart, onHistory, onFavorites, onColorSettings, onRerun,
             />
           </button>
           {!favCollapsed && (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-              {favs.map((entry, i) => (
-                <RecentWorkoutCard
-                  key={entry.favId || entry.date}
-                  entry={entry}
-                  opacity={1 - i * 0.15}
-                  isFavorite
-                  onRun={() => onRerun(entry)}
-                  onInfo={() => setInfoFor(entry)}
-                  onStarToggle={() => handleStarToggle(entry)}
-                  findMatchingFavorite={findMatchingFavorite}
-                />
-              ))}
+            <div style={{ maxHeight: 'min(42dvh, 360px)', overflowY: 'auto', paddingRight: '2px' }}>
+              <DraggableFavoriteList
+                favorites={favorites}
+                onReorder={reorderFavorites}
+                onRun={onRerun}
+                onInfo={setInfoFor}
+                onStarToggle={handleStarToggle}
+                findMatchingFavorite={findMatchingFavorite}
+                gap="6px"
+              />
             </div>
           )}
         </div>
@@ -2574,6 +2585,114 @@ function RecentWorkoutCard({ entry, opacity, onRun, onInfo, onStarToggle, findMa
   );
 }
 
+function DraggableFavoriteList({ favorites, onReorder, onRun, onInfo, onStarToggle, findMatchingFavorite, gap = '8px' }) {
+  const [dragState, setDragState] = useState(null);
+  const listRef = useRef(null);
+
+  const getTargetIndex = (clientY) => {
+    const rows = Array.from(listRef.current?.querySelectorAll('[data-favorite-row]') || []);
+    if (rows.length === 0) return 0;
+    for (let i = 0; i < rows.length; i++) {
+      const rect = rows[i].getBoundingClientRect();
+      if (clientY < rect.top + rect.height / 2) return i;
+    }
+    return rows.length - 1;
+  };
+
+  const startDrag = (event, srcIdx) => {
+    const clientY = event.touches ? event.touches[0].clientY : event.clientY;
+    if (clientY == null) return;
+    event.preventDefault();
+    setDragState({ srcIdx, targetIdx: srcIdx });
+  };
+
+  useEffect(() => {
+    if (!dragState) return undefined;
+
+    const handleMove = (event) => {
+      const clientY = event.touches ? event.touches[0].clientY : event.clientY;
+      if (clientY == null) return;
+      if (event.cancelable) event.preventDefault();
+      const targetIdx = getTargetIndex(clientY);
+      setDragState(prev => prev ? { ...prev, targetIdx } : null);
+    };
+
+    const handleEnd = () => {
+      setDragState(current => {
+        if (current && current.srcIdx !== current.targetIdx) {
+          const next = [...favorites];
+          const [moved] = next.splice(current.srcIdx, 1);
+          next.splice(current.targetIdx, 0, moved);
+          onReorder(next);
+        }
+        return null;
+      });
+    };
+
+    document.addEventListener('touchmove', handleMove, { passive: false });
+    document.addEventListener('mousemove', handleMove);
+    document.addEventListener('touchend', handleEnd);
+    document.addEventListener('touchcancel', handleEnd);
+    document.addEventListener('mouseup', handleEnd);
+
+    return () => {
+      document.removeEventListener('touchmove', handleMove);
+      document.removeEventListener('mousemove', handleMove);
+      document.removeEventListener('touchend', handleEnd);
+      document.removeEventListener('touchcancel', handleEnd);
+      document.removeEventListener('mouseup', handleEnd);
+    };
+  }, [dragState ? dragState.srcIdx : null, favorites, onReorder]);
+
+  return (
+    <div ref={listRef} style={{ display: 'flex', flexDirection: 'column', gap, touchAction: dragState ? 'none' : 'auto' }}>
+      {favorites.map((entry, i) => {
+        const isDragging = dragState && dragState.srcIdx === i;
+        const isDropTarget = dragState && !isDragging && dragState.targetIdx === i;
+
+        return (
+          <div
+            key={entry.favId || entry.date}
+            data-favorite-row
+            style={{
+              display: 'flex', alignItems: 'stretch', gap: '6px',
+              opacity: isDragging ? 0.55 : 1,
+              boxShadow: isDropTarget ? 'inset 0 -2px 0 0 #FFB800' : 'none',
+              transition: dragState ? 'none' : 'opacity 0.15s',
+            }}
+          >
+            <button
+              type="button"
+              onMouseDown={e => startDrag(e, i)}
+              onTouchStart={e => startDrag(e, i)}
+              aria-label="Drag favorite"
+              style={{
+                width: '34px', flexShrink: 0, background: '#0F0F0F', border: '1px solid #222',
+                borderRadius: '2px', color: isDragging ? '#FFB800' : '#666',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                touchAction: 'none', cursor: 'grab',
+              }}
+            >
+              <GripVertical size={18} />
+            </button>
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <RecentWorkoutCard
+                entry={entry}
+                opacity={1}
+                isFavorite
+                onRun={() => onRun(entry)}
+                onInfo={() => onInfo(entry)}
+                onStarToggle={() => onStarToggle(entry)}
+                findMatchingFavorite={findMatchingFavorite}
+              />
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
 function WorkoutInfoModal({ entry, library, onClose, onRun, onContinue, onStartOver }) {
   const cats = entry.categories || [];
   const mods = entry.modifiers || [];
@@ -2842,7 +2961,7 @@ function HistoryScreen({ history, library, onBack, onRerun, onContinuePartial, o
   );
 }
 
-function FavoritesScreen({ favorites, library, onBack, onRerun, removeFavorite }) {
+function FavoritesScreen({ favorites, library, onBack, onRerun, removeFavorite, reorderFavorites }) {
   const [infoFor, setInfoFor] = useState(null);
 
   return (
@@ -2872,19 +2991,13 @@ function FavoritesScreen({ favorites, library, onBack, onRerun, removeFavorite }
             <div style={{ fontSize: '13px', marginTop: '8px' }}>Tap the star on any workout to favorite it.</div>
           </div>
         ) : (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-            {favorites.map(entry => (
-              <RecentWorkoutCard
-                key={entry.favId || entry.date}
-                entry={entry}
-                opacity={1}
-                isFavorite
-                onRun={() => onRerun(entry)}
-                onInfo={() => setInfoFor(entry)}
-                onStarToggle={() => removeFavorite(entry)}
-              />
-            ))}
-          </div>
+          <DraggableFavoriteList
+            favorites={favorites}
+            onReorder={reorderFavorites}
+            onRun={onRerun}
+            onInfo={setInfoFor}
+            onStarToggle={removeFavorite}
+          />
         )}
       </div>
 
