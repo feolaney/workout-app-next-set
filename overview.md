@@ -80,7 +80,7 @@ Top-level state in `WorkoutApp` is the app's source of truth during a session:
 - `restConfig`: rest behavior and durations
 - `queue`: generated active-workout queue
 - `queueIdx`: current queue position
-- `history`: completed workout sessions
+- `history`: completed workout sessions and resumable partial workout entries
 - `favorites`: saved workout templates
 - `settings`: app settings, currently `rememberSectionState`
 - `activePaletteId` and `customPalettes`: palette selection and custom palette data
@@ -152,13 +152,15 @@ Rest modes:
 - `fixed`: use the short rest duration
 - `interval`: use short rest normally and long rest every `longEvery` sets
 
-Completing the final item writes a workout entry into `history` and moves to `done`.
+Quitting an active workout writes or updates a partial entry in `history` with the current queue index, phase, elapsed time, and any remaining rest time, then returns home. Partial entries use the same persisted `history` key, are marked as partial in History, and can be continued from the saved position or started over. The app deduplicates partial entries by workout structure so quitting the same workout repeatedly updates the latest partial instead of adding duplicates. Completing that workout later removes the matching partial entry and writes the normal completed entry.
+
+Completing the final item writes a completed workout entry into `history` and moves to `done`.
 
 Exercise, short-rest, and long-rest views all show the primary next exercise plus a smaller upcoming preview when space allows. The smaller rows are measured against the remaining active content area so they fill available space without making the screen scroll. Up-next rows use a compact grid with fixed tag and value columns so reps and rest times stay near the names and line up vertically on wide screens.
 
 ## Favorites And History
 
-History stores completed workouts, capped to the latest 100 entries.
+History stores completed and partial workouts, capped to the latest 100 entries. Home's recent-completed section filters out partial entries, so partial workouts appear only in History until they are completed.
 
 Favorites are saved workout entries with a user-facing name and `favId`. Matching is based on a generated workout signature:
 

@@ -138,9 +138,18 @@ const MODES = [
 
 const MODE_LABELS = MODES.reduce((acc, m) => ({ ...acc, [m.key]: m.label }), {});
 
-const APP_VERSION = '2.16';
+const APP_VERSION = '2.17';
 
 const APP_VERSION_HISTORY = [
+  {
+    version: '2.17',
+    date: '2026-04-25',
+    type: 'Feature',
+    changes: [
+      'Saved quit workouts as partial history entries that can be continued or restarted from History.',
+      'Kept partial workouts out of the Home recent-completed list and updated matching partial entries instead of duplicating them.',
+    ],
+  },
   {
     version: '2.16',
     date: '2026-04-25',
@@ -682,6 +691,88 @@ function enrichModeConfigWithExercises(modeConfig, exercises) {
   };
 }
 
+function isPartialHistoryEntry(entry) {
+  return entry?.status === 'partial' || Boolean(entry?.partial);
+}
+
+function normalizeExerciseSets(exerciseSets, exerciseIds = []) {
+  const ids = exerciseIds.length ? exerciseIds : Object.keys(exerciseSets || {});
+  return ids
+    .filter(id => (exerciseSets || {})[id] !== undefined)
+    .sort()
+    .reduce((sets, id) => ({ ...sets, [id]: exerciseSets[id] }), {});
+}
+
+function normalizeManualQueue(manualQueue = []) {
+  return manualQueue.map(item => ({
+    exId: item.exId,
+    reps: item.reps,
+    unit: item.unit,
+  }));
+}
+
+function makeHistoryWorkoutKey(entry) {
+  const exerciseIds = (entry?.exercises || []).map(ex => ex.id);
+  const cfg = entry?.modeConfig || {};
+  const mode = entry?.mode || '';
+  return JSON.stringify({
+    mode,
+    categories: [...(entry?.categories || [])].sort(),
+    modifiers: [...(entry?.modifiers || [])].sort(),
+    exerciseIds,
+    sets: ['focus', 'circuit', 'superset'].includes(mode) ? (cfg.sets || null) : null,
+    supersetSize: mode === 'superset' ? (cfg.supersetSize || null) : null,
+    exerciseSets: normalizeExerciseSets(cfg.exerciseSets, exerciseIds),
+    manualQueue: mode === 'manual' ? normalizeManualQueue(cfg.manualQueue) : [],
+  });
+}
+
+function stripPartialHistoryState(entry) {
+  if (!entry) return entry;
+  const { status, partial, partialKey, ...rest } = entry;
+  return rest;
+}
+
+function getPartialResumeState(entry, queueLength = 0) {
+  const partial = entry?.partial || {};
+  const maxIdx = Math.max(0, queueLength - 1);
+  const rawIdx = Number(partial.idx);
+  const idx = queueLength > 0 ? Math.min(Math.max(Number.isFinite(rawIdx) ? rawIdx : 0, 0), maxIdx) : 0;
+  const elapsed = Math.max(0, Number(partial.elapsed) || 0);
+  const restRemaining = Math.max(0, Number(partial.restRemaining) || 0);
+  const phase = partial.phase === 'rest' && restRemaining > 0 ? 'rest' : 'exercise';
+  return { idx, phase, elapsed, restRemaining: phase === 'rest' ? restRemaining : 0 };
+}
+
+function getPartialCompletedCount(entry) {
+  const total = Math.max(0, Number(entry?.totalItems) || 0);
+  if (total === 0) return 0;
+  const partial = entry?.partial || {};
+  const rawIdx = Number(partial.idx);
+  const idx = Math.min(Math.max(Number.isFinite(rawIdx) ? rawIdx : 0, 0), total - 1);
+  const completed = partial.phase === 'rest' ? idx + 1 : idx;
+  return Math.min(Math.max(completed, 0), total);
+}
+
+function partialProgressLabel(entry) {
+  const total = Math.max(0, Number(entry?.totalItems) || 0);
+  if (!total) return 'Partial';
+  return `${getPartialCompletedCount(entry)}/${total} sets complete`;
+}
+
+function upsertPartialHistoryEntry(history, partialEntry) {
+  const key = partialEntry.partialKey || makeHistoryWorkoutKey(partialEntry);
+  return [
+    partialEntry,
+    ...(history || []).filter(entry => !(isPartialHistoryEntry(entry) && (entry.partialKey || makeHistoryWorkoutKey(entry)) === key)),
+  ].slice(0, 100);
+}
+
+function removeMatchingPartialHistory(history, completedEntry) {
+  const key = makeHistoryWorkoutKey(completedEntry);
+  return (history || []).filter(entry => !(isPartialHistoryEntry(entry) && (entry.partialKey || makeHistoryWorkoutKey(entry)) === key));
+}
+
 function openExerciseSource(exercise) {
   const url = exercise?.sourceUrl || exercise?.directUrl;
   if (!url || typeof window === 'undefined') return;
@@ -773,6 +864,8 @@ export default function WorkoutApp() {
   const [queue, setQueue] = useState([]);
   const [queueIdx, setQueueIdx] = useState(0);
   const [activeInitialElapsed, setActiveInitialElapsed] = useState(0);
+  const [activeInitialPhase, setActiveInitialPhase] = useState('exercise');
+  const [activeInitialRestRemaining, setActiveInitialRestRemaining] = useState(0);
   const [editResume, setEditResume] = useState(null);
   const [history, setHistory] = useState([]);
   const [favorites, setFavorites] = useState([]);
@@ -882,23 +975,36 @@ export default function WorkoutApp() {
     setQueue([]);
     setQueueIdx(0);
     setActiveInitialElapsed(0);
+    setActiveInitialPhase('exercise');
+    setActiveInitialRestRemaining(0);
     setEditResume(null);
   };
 
-  const rerunFromHistory = (entry) => {
+  const startWorkoutFromEntry = (entry, { continuePartial = false } = {}) => {
     const hydratedExercises = enrichExercisesWithLibrary(entry.exercises || [], library);
     const hydratedModeConfig = enrichModeConfigWithExercises(entry.modeConfig, hydratedExercises);
+    const q = buildQueue(hydratedExercises, entry.mode, hydratedModeConfig);
+    const resume = continuePartial && isPartialHistoryEntry(entry) ? getPartialResumeState(entry, q.length) : null;
     setEditResume(null);
     setSelectedCategories(entry.categories || []);
     setSelectedModifiers(entry.modifiers || []);
     setSelectedExercises(hydratedExercises);
     setMode(entry.mode);
     setModeConfig(hydratedModeConfig);
-    const q = buildQueue(hydratedExercises, entry.mode, hydratedModeConfig);
     setQueue(q);
-    setQueueIdx(0);
-    setActiveInitialElapsed(0);
+    setQueueIdx(resume ? resume.idx : 0);
+    setActiveInitialElapsed(resume ? resume.elapsed : 0);
+    setActiveInitialPhase(resume ? resume.phase : 'exercise');
+    setActiveInitialRestRemaining(resume ? resume.restRemaining : 0);
     setScreen('active');
+  };
+
+  const rerunFromHistory = (entry) => {
+    startWorkoutFromEntry(entry, { continuePartial: false });
+  };
+
+  const continueFromHistory = (entry) => {
+    startWorkoutFromEntry(entry, { continuePartial: true });
   };
 
   // Signature for matching a workout against favorites - based on mode + exercise IDs in order
@@ -916,8 +1022,9 @@ export default function WorkoutApp() {
 
   // Add a favorite with a name
   const addFavorite = (entry, name) => {
+    const template = stripPartialHistoryState(entry);
     const fav = {
-      ...entry,
+      ...template,
       favoritedAt: Date.now(),
       name: (name || '').trim() || 'Untitled workout',
       favId: 'fav-' + Date.now(),
@@ -942,6 +1049,41 @@ export default function WorkoutApp() {
     totalItems: queue.length,
   });
 
+  const savePartialWorkoutAndExit = ({ idx: activeIdx = queueIdx, phase = 'exercise', elapsed = 0, restRemaining = 0 } = {}) => {
+    if (!queue.length) {
+      goHome();
+      return;
+    }
+
+    const now = Date.now();
+    const boundedIdx = Math.min(Math.max(activeIdx, 0), queue.length - 1);
+    const baseEntry = {
+      date: now,
+      mode,
+      modeConfig,
+      categories: selectedCategories,
+      modifiers: selectedModifiers,
+      exercises: selectedExercises,
+      totalItems: queue.length,
+    };
+    const partialKey = makeHistoryWorkoutKey(baseEntry);
+    const partialEntry = {
+      ...baseEntry,
+      status: 'partial',
+      partialKey,
+      partial: {
+        idx: boundedIdx,
+        phase: phase === 'rest' ? 'rest' : 'exercise',
+        elapsed: Math.max(0, elapsed),
+        restRemaining: Math.max(0, restRemaining),
+        updatedAt: now,
+      },
+    };
+
+    setHistory(prev => upsertPartialHistoryEntry(prev, partialEntry));
+    goHome();
+  };
+
   const startEditingActiveWorkout = ({ idx: activeIdx = queueIdx, phase = 'exercise', elapsed = 0 } = {}) => {
     const resumeIdx = phase === 'rest' ? activeIdx + 1 : activeIdx;
     const boundedIdx = queue.length > 0 ? Math.min(Math.max(resumeIdx, 0), queue.length - 1) : 0;
@@ -954,6 +1096,8 @@ export default function WorkoutApp() {
     setQueue(q);
     setQueueIdx(q.length > 0 ? Math.min(Math.max(startIdx, 0), q.length - 1) : 0);
     setActiveInitialElapsed(initialElapsed);
+    setActiveInitialPhase('exercise');
+    setActiveInitialRestRemaining(0);
     setEditResume(null);
     setScreen('active');
   };
@@ -1008,6 +1152,8 @@ export default function WorkoutApp() {
           onStart={() => {
             setEditResume(null);
             setActiveInitialElapsed(0);
+            setActiveInitialPhase('exercise');
+            setActiveInitialRestRemaining(0);
             setScreen('categories');
           }}
           onHistory={() => setScreen('history')}
@@ -1034,6 +1180,7 @@ export default function WorkoutApp() {
           library={library}
           onBack={() => setScreen('home')}
           onRerun={rerunFromHistory}
+          onContinuePartial={continueFromHistory}
           onClear={() => setHistory([])}
           findMatchingFavorite={findMatchingFavorite}
           addFavorite={addFavorite}
@@ -1101,7 +1248,9 @@ export default function WorkoutApp() {
           setIdx={setQueueIdx}
           restConfig={restConfig}
           initialElapsed={activeInitialElapsed}
-          onExit={goHome}
+          initialPhase={activeInitialPhase}
+          initialRestRemaining={activeInitialRestRemaining}
+          onExit={savePartialWorkoutAndExit}
           onEdit={startEditingActiveWorkout}
           currentEntry={currentWorkoutAsEntry()}
           findMatchingFavorite={findMatchingFavorite}
@@ -1117,7 +1266,7 @@ export default function WorkoutApp() {
               exercises: selectedExercises,
               totalItems: queue.length,
             };
-            setHistory(prev => [entry, ...prev].slice(0, 100));
+            setHistory(prev => [entry, ...removeMatchingPartialHistory(prev, entry)].slice(0, 100));
             setScreen('done');
           }}
         />
@@ -1779,7 +1928,7 @@ function HomeScreen({ onStart, onHistory, onFavorites, onColorSettings, onRerun,
   const [namingEntry, setNamingEntry] = useState(null); // entry being named for favoriting
   const [settingsOpen, setSettingsOpen] = useState(false);
 
-  const recent = history.slice(0, 3);
+  const recent = history.filter(entry => !isPartialHistoryEntry(entry)).slice(0, 3);
   const favs = favorites.slice(0, 3);
   const hasFavorites = favs.length > 0;
 
@@ -2163,12 +2312,13 @@ function RecentWorkoutCard({ entry, opacity, onRun, onInfo, onStarToggle, findMa
   const mods = entry.modifiers || [];
   const modeLabel = MODE_LABELS[entry.mode] || (entry.mode && entry.mode.toUpperCase());
   const when = relativeTime(entry.date);
+  const partial = isPartialHistoryEntry(entry);
   // Determine if this entry is starred (either it's a favorite itself or matches one)
   const starred = isFavorite || (findMatchingFavorite && !!findMatchingFavorite(entry));
   // Show name on top if favorite (either the direct name or matched fav name)
   const matchedFav = findMatchingFavorite ? findMatchingFavorite(entry) : null;
   const displayName = entry.name || (matchedFav && matchedFav.name);
-  const borderColor = starred ? '#FFB80055' : '#222';
+  const borderColor = partial ? 'var(--accent2)' : (starred ? '#FFB80055' : '#222');
 
   return (
     <div style={{
@@ -2186,6 +2336,9 @@ function RecentWorkoutCard({ entry, opacity, onRun, onInfo, onStarToggle, findMa
         )}
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
           <div className="stencil" style={{ fontSize: displayName ? '14px' : '18px', color: 'var(--accent)', lineHeight: 1 }}>{modeLabel}</div>
+          {partial && (
+            <div className="mono" style={{ fontSize: '9px', color: 'var(--accent2)', fontWeight: 900, letterSpacing: '0.08em' }}>* PARTIAL</div>
+          )}
           <div className="mono" style={{ fontSize: '10px', color: '#666' }}>· {when}</div>
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap', marginTop: '4px' }}>
@@ -2210,6 +2363,9 @@ function RecentWorkoutCard({ entry, opacity, onRun, onInfo, onStarToggle, findMa
             );
           })}
           <span className="mono" style={{ fontSize: '9px', color: '#555' }}>{entry.totalItems} sets</span>
+          {partial && (
+            <span className="mono" style={{ fontSize: '9px', color: 'var(--accent2)' }}>{partialProgressLabel(entry)}</span>
+          )}
         </div>
       </button>
       {onStarToggle && (
@@ -2230,11 +2386,12 @@ function RecentWorkoutCard({ entry, opacity, onRun, onInfo, onStarToggle, findMa
   );
 }
 
-function WorkoutInfoModal({ entry, library, onClose, onRun }) {
+function WorkoutInfoModal({ entry, library, onClose, onRun, onContinue, onStartOver }) {
   const cats = entry.categories || [];
   const mods = entry.modifiers || [];
   const exercises = enrichExercisesWithLibrary(entry.exercises || [], library);
   const modeLabel = MODE_LABELS[entry.mode] || (entry.mode && entry.mode.toUpperCase());
+  const partial = isPartialHistoryEntry(entry);
 
   return (
     <div
@@ -2250,7 +2407,9 @@ function WorkoutInfoModal({ entry, library, onClose, onRun }) {
         }}
       >
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
-          <div className="mono" style={{ fontSize: '10px', color: '#666' }}>// {new Date(entry.date).toLocaleString()}</div>
+          <div className="mono" style={{ fontSize: '10px', color: '#666' }}>
+            // {new Date(entry.date).toLocaleString()}{partial ? ' · * PARTIAL' : ''}
+          </div>
           <button onClick={onClose} style={{ color: '#666' }}><X size={18} /></button>
         </div>
 
@@ -2258,7 +2417,7 @@ function WorkoutInfoModal({ entry, library, onClose, onRun }) {
           {modeLabel}
         </div>
         <div className="mono" style={{ fontSize: '12px', color: '#888', marginBottom: '16px' }}>
-          {entry.totalItems} total sets · {exercises.length} exercises
+          {entry.totalItems} total sets · {exercises.length} exercises{partial ? ` · ${partialProgressLabel(entry)}` : ''}
         </div>
 
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', marginBottom: '16px' }}>
@@ -2303,20 +2462,88 @@ function WorkoutInfoModal({ entry, library, onClose, onRun }) {
           })}
         </div>
 
-        <button onClick={onRun} style={{
-          width: '100%', padding: '20px', background: 'var(--accent)', color: '#0A0A0A',
-          fontSize: '16px', fontWeight: 900, fontFamily: 'Archivo Black, sans-serif',
-          borderRadius: '2px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '10px',
-        }}>
-          <Play size={18} fill="#0A0A0A" /> RUN AGAIN
-        </button>
+        {partial ? (
+          <div style={{ display: 'flex', gap: '8px' }}>
+            <button onClick={onStartOver || onRun} style={{
+              flex: 1, padding: '18px 12px', background: '#1A1A1A', color: '#888',
+              fontSize: '13px', fontWeight: 900, fontFamily: 'Archivo Black, sans-serif',
+              borderRadius: '2px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px',
+            }}>
+              <SkipBack size={16} /> START OVER
+            </button>
+            <button onClick={onContinue || onRun} style={{
+              flex: 1, padding: '18px 12px', background: 'var(--accent)', color: '#0A0A0A',
+              fontSize: '13px', fontWeight: 900, fontFamily: 'Archivo Black, sans-serif',
+              borderRadius: '2px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px',
+            }}>
+              <Play size={16} fill="#0A0A0A" /> CONTINUE
+            </button>
+          </div>
+        ) : (
+          <button onClick={onRun} style={{
+            width: '100%', padding: '20px', background: 'var(--accent)', color: '#0A0A0A',
+            fontSize: '16px', fontWeight: 900, fontFamily: 'Archivo Black, sans-serif',
+            borderRadius: '2px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '10px',
+          }}>
+            <Play size={18} fill="#0A0A0A" /> RUN AGAIN
+          </button>
+        )}
       </div>
     </div>
   );
 }
 
-function HistoryScreen({ history, library, onBack, onRerun, onClear, findMatchingFavorite, addFavorite, removeFavorite }) {
+function PartialWorkoutActionModal({ entry, onCancel, onContinue, onStartOver }) {
+  const modeLabel = MODE_LABELS[entry.mode] || (entry.mode && entry.mode.toUpperCase());
+
+  return (
+    <div
+      onClick={onCancel}
+      className="fade-in"
+      style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.88)', zIndex: 180, display: 'flex', alignItems: 'flex-end', padding: '20px' }}
+    >
+      <div
+        onClick={e => e.stopPropagation()}
+        style={{
+          width: '100%', background: 'var(--surface)', border: '2px solid var(--accent2)', borderRadius: '2px',
+          padding: '20px',
+        }}
+      >
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '12px', marginBottom: '18px' }}>
+          <div>
+            <div className="mono" style={{ fontSize: '10px', color: 'var(--accent2)', letterSpacing: '0.1em', marginBottom: '6px' }}>* PARTIAL</div>
+            <div className="display" style={{ fontSize: '32px', lineHeight: 0.9, color: 'var(--accent)', marginBottom: '6px' }}>
+              {modeLabel}
+            </div>
+            <div className="mono" style={{ fontSize: '11px', color: '#888' }}>{partialProgressLabel(entry)}</div>
+          </div>
+          <button onClick={onCancel} style={{ color: '#666' }}><X size={18} /></button>
+        </div>
+
+        <div style={{ display: 'flex', gap: '8px' }}>
+          <button onClick={onStartOver} style={{
+            flex: 1, padding: '18px 12px', background: '#1A1A1A', color: '#888',
+            fontSize: '13px', fontWeight: 900, fontFamily: 'Archivo Black, sans-serif',
+            borderRadius: '2px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px',
+          }}>
+            <SkipBack size={16} /> START OVER
+          </button>
+          <button onClick={onContinue} style={{
+            flex: 1, padding: '18px 12px', background: 'var(--accent)', color: '#0A0A0A',
+            fontSize: '13px', fontWeight: 900, fontFamily: 'Archivo Black, sans-serif',
+            borderRadius: '2px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px',
+          }}>
+            <Play size={16} fill="#0A0A0A" /> CONTINUE
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function HistoryScreen({ history, library, onBack, onRerun, onContinuePartial, onClear, findMatchingFavorite, addFavorite, removeFavorite }) {
   const [infoFor, setInfoFor] = useState(null);
+  const [partialActionFor, setPartialActionFor] = useState(null);
   const [confirmClear, setConfirmClear] = useState(false);
   const [namingEntry, setNamingEntry] = useState(null);
 
@@ -2327,6 +2554,26 @@ function HistoryScreen({ history, library, onBack, onRerun, onClear, findMatchin
     } else {
       setNamingEntry(entry);
     }
+  };
+
+  const startOverEntry = (entry) => {
+    setPartialActionFor(null);
+    setInfoFor(null);
+    onRerun(entry);
+  };
+
+  const continuePartialEntry = (entry) => {
+    setPartialActionFor(null);
+    setInfoFor(null);
+    onContinuePartial(entry);
+  };
+
+  const handleRunEntry = (entry) => {
+    if (isPartialHistoryEntry(entry)) {
+      setPartialActionFor(entry);
+      return;
+    }
+    onRerun(entry);
   };
 
   return (
@@ -2359,7 +2606,7 @@ function HistoryScreen({ history, library, onBack, onRerun, onClear, findMatchin
         {history.length === 0 ? (
           <div style={{ padding: '40px 20px', textAlign: 'center', color: '#444' }}>
             <div className="mono" style={{ fontSize: '12px' }}>// NOTHING HERE YET</div>
-            <div style={{ fontSize: '13px', marginTop: '8px' }}>Finish a workout and it'll show up.</div>
+            <div style={{ fontSize: '13px', marginTop: '8px' }}>Finish or quit a workout and it'll show up.</div>
           </div>
         ) : (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
@@ -2368,7 +2615,7 @@ function HistoryScreen({ history, library, onBack, onRerun, onClear, findMatchin
                 key={entry.date}
                 entry={entry}
                 opacity={1}
-                onRun={() => onRerun(entry)}
+                onRun={() => handleRunEntry(entry)}
                 onInfo={() => setInfoFor(entry)}
                 onStarToggle={() => handleStarToggle(entry)}
                 findMatchingFavorite={findMatchingFavorite}
@@ -2378,7 +2625,24 @@ function HistoryScreen({ history, library, onBack, onRerun, onClear, findMatchin
         )}
       </div>
 
-      {infoFor && <WorkoutInfoModal entry={infoFor} library={library} onClose={() => setInfoFor(null)} onRun={() => { onRerun(infoFor); setInfoFor(null); }} />}
+      {infoFor && (
+        <WorkoutInfoModal
+          entry={infoFor}
+          library={library}
+          onClose={() => setInfoFor(null)}
+          onRun={() => { onRerun(infoFor); setInfoFor(null); }}
+          onContinue={() => continuePartialEntry(infoFor)}
+          onStartOver={() => startOverEntry(infoFor)}
+        />
+      )}
+      {partialActionFor && (
+        <PartialWorkoutActionModal
+          entry={partialActionFor}
+          onCancel={() => setPartialActionFor(null)}
+          onContinue={() => continuePartialEntry(partialActionFor)}
+          onStartOver={() => startOverEntry(partialActionFor)}
+        />
+      )}
       {namingEntry && (
         <NameFavoriteModal
           entry={namingEntry}
@@ -4039,9 +4303,11 @@ function WorkoutMenu({ onClose, currentEntry, findMatchingFavorite, onFavoriteTo
   );
 }
 
-function ActiveWorkout({ queue, idx, setIdx, restConfig, initialElapsed = 0, onExit, onEdit, onComplete, currentEntry, findMatchingFavorite, addFavorite, removeFavorite }) {
-  const [phase, setPhase] = useState('exercise');
-  const [restRemaining, setRestRemaining] = useState(0);
+function ActiveWorkout({ queue, idx, setIdx, restConfig, initialElapsed = 0, initialPhase = 'exercise', initialRestRemaining = 0, onExit, onEdit, onComplete, currentEntry, findMatchingFavorite, addFavorite, removeFavorite }) {
+  const safeInitialRestRemaining = Math.max(0, Number(initialRestRemaining) || 0);
+  const safeInitialPhase = initialPhase === 'rest' && safeInitialRestRemaining > 0 ? 'rest' : 'exercise';
+  const [phase, setPhase] = useState(safeInitialPhase);
+  const [restRemaining, setRestRemaining] = useState(safeInitialPhase === 'rest' ? safeInitialRestRemaining : 0);
   const [elapsed, setElapsed] = useState(initialElapsed);
   const [menuOpen, setMenuOpen] = useState(false);
   const [namingEntry, setNamingEntry] = useState(null);
@@ -4130,6 +4396,11 @@ function ActiveWorkout({ queue, idx, setIdx, restConfig, initialElapsed = 0, onE
 
   if (!current) return null;
 
+  const quitWorkout = () => {
+    if (intervalRef.current) clearInterval(intervalRef.current);
+    onExit({ idx, phase, elapsed, restRemaining });
+  };
+
   const fmtTime = (s) => {
     const m = Math.floor(s / 60);
     const sec = s % 60;
@@ -4141,7 +4412,7 @@ function ActiveWorkout({ queue, idx, setIdx, restConfig, initialElapsed = 0, onE
   return (
     <div className="active-workout-screen" style={{ minHeight: '100dvh', display: 'flex', flexDirection: 'column', position: 'relative', zIndex: 2 }}>
       <div style={{ padding: `${SAFE_TOP_16} 20px 16px`, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-        <button onClick={onExit} style={{ padding: '8px', color: '#888', display: 'flex', alignItems: 'center', gap: '4px' }}>
+        <button onClick={quitWorkout} style={{ padding: '8px', color: '#888', display: 'flex', alignItems: 'center', gap: '4px' }}>
           <X size={18} />
           <span className="mono" style={{ fontSize: '11px' }}>QUIT</span>
         </button>
