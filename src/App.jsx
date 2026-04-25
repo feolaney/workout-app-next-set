@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { ChevronLeft, ChevronDown, ChevronRight, Play, SkipForward, SkipBack, Check, Plus, Minus, X, Dumbbell, Hexagon, GripVertical, History, Shuffle, Target, Layers, TrendingUp, Info, Weight, ArrowUpToLine, Star, Settings, Palette, Trash2, Pencil } from 'lucide-react';
+import { ChevronLeft, ChevronDown, ChevronRight, Play, SkipForward, SkipBack, Check, Plus, Minus, X, Dumbbell, Hexagon, GripVertical, History, Shuffle, Target, Layers, TrendingUp, Info, Weight, ArrowUpToLine, Star, Settings, Palette, Trash2, Pencil, Smartphone, ExternalLink, Image as ImageIcon } from 'lucide-react';
 import WORKOUT_EXERCISE_LIBRARY_CSV from '../support files/workout_exercise_library.csv?raw';
+import IOS_HOME_SCREEN_GIF from '../support files/Images/ios_how_to_add_to_homescreen.gif';
 
 // ============ EQUIPMENT TAGS ============
 const EQUIP = {
@@ -137,10 +138,20 @@ const MODES = [
 ];
 
 const MODE_LABELS = MODES.reduce((acc, m) => ({ ...acc, [m.key]: m.label }), {});
+const IOS_CUSTOM_ICON_SHORTCUT_URL = 'https://www.icloud.com/shortcuts/bda50f91bc534d649c495f6999fb9cc2';
 
-const APP_VERSION = '2.17';
+const APP_VERSION = '2.18';
 
 const APP_VERSION_HISTORY = [
+  {
+    version: '2.18',
+    date: '2026-04-25',
+    type: 'Feature / UI',
+    changes: [
+      'Added an iOS Home Screen install guide in Settings with the animated walkthrough GIF.',
+      'Added advanced custom Home Screen icon instructions for the iOS Shortcut workflow.',
+    ],
+  },
   {
     version: '2.17',
     date: '2026-04-25',
@@ -2094,67 +2105,244 @@ function HomeScreen({ onStart, onHistory, onFavorites, onColorSettings, onRerun,
 }
 
 function SettingsModal({ settings, setSettings, onOpenColorSettings, onClose }) {
-  const [showVersionHistory, setShowVersionHistory] = useState(false);
+  const [settingsView, setSettingsView] = useState('main');
+  const guideOpen = settingsView === 'homescreen' || settingsView === 'iconSetup';
+  const title = settingsView === 'version'
+    ? 'APP VERSION HISTORY'
+    : settingsView === 'homescreen'
+      ? 'ADD TO HOME SCREEN'
+      : settingsView === 'iconSetup'
+        ? 'CUSTOM ICON SETUP'
+        : 'SETTINGS';
 
   const toggle = (key) => {
     setSettings(prev => ({ ...prev, [key]: !prev[key] }));
+  };
+
+  const goBack = () => {
+    setSettingsView(settingsView === 'iconSetup' ? 'homescreen' : 'main');
   };
 
   return (
     <div
       onClick={onClose}
       className="fade-in"
-      style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.88)', zIndex: 100, display: 'flex', alignItems: 'flex-end', padding: '20px' }}
+      style={{
+        position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.88)', zIndex: 100,
+        display: 'flex', alignItems: guideOpen ? 'stretch' : 'flex-end', padding: guideOpen ? 0 : '20px',
+      }}
     >
       <div
         onClick={e => e.stopPropagation()}
         style={{
           width: '100%', background: 'var(--surface)', border: '2px solid var(--accent)', borderRadius: '2px',
-          padding: '20px', maxHeight: '80vh', overflowY: 'auto',
+          padding: guideOpen ? `${SAFE_TOP_20} 20px 20px` : '20px',
+          maxHeight: guideOpen ? '100dvh' : '80vh',
+          minHeight: guideOpen ? '100dvh' : 'auto',
+          overflow: 'hidden', display: 'flex', flexDirection: 'column',
         }}
       >
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px', flexShrink: 0 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-            {showVersionHistory ? (
-              <button onClick={() => setShowVersionHistory(false)} style={{ color: '#888', padding: '2px' }}>
+            {settingsView !== 'main' ? (
+              <button onClick={goBack} style={{ color: '#888', padding: '2px' }}>
                 <ChevronLeft size={18} />
               </button>
             ) : (
               <Settings size={18} color="var(--accent)" />
             )}
             <div className="stencil" style={{ fontSize: '22px', color: 'var(--accent)' }}>
-              {showVersionHistory ? 'APP VERSION HISTORY' : 'SETTINGS'}
+              {title}
             </div>
           </div>
           <button onClick={onClose} style={{ color: '#666' }}><X size={18} /></button>
         </div>
 
-        {showVersionHistory ? (
-          <VersionHistoryList />
-        ) : (
-          <>
-            <SettingsToggle
-              label="Remember section layout"
-              description="Keep Favorites and Recent collapse states between visits. When off, both start collapsed every time."
-              checked={!!settings.rememberSectionState}
-              onToggle={() => toggle('rememberSectionState')}
-            />
+        <div style={{ flex: 1, overflowY: 'auto', minHeight: 0 }}>
+          {settingsView === 'version' ? (
+            <VersionHistoryList />
+          ) : settingsView === 'homescreen' ? (
+            <IosHomeScreenGuide onAdvanced={() => setSettingsView('iconSetup')} />
+          ) : settingsView === 'iconSetup' ? (
+            <AdvancedHomeScreenIconGuide />
+          ) : (
+            <>
+              <SettingsToggle
+                label="Remember section layout"
+                description="Keep Favorites and Recent collapse states between visits. When off, both start collapsed every time."
+                checked={!!settings.rememberSectionState}
+                onToggle={() => toggle('rememberSectionState')}
+              />
 
-            <SettingsAction
-              icon={<Palette size={18} color="var(--accent)" />}
-              label="Customize colors"
-              description="Choose a palette or build your own."
-              onClick={onOpenColorSettings}
-            />
+              <SettingsAction
+                icon={<Palette size={18} color="var(--accent)" />}
+                label="Customize colors"
+                description="Choose a palette or build your own."
+                onClick={onOpenColorSettings}
+              />
 
-            <SettingsAction
-              icon={<Info size={18} color="var(--accent)" />}
-              label="App version history"
-              description="See released versions and what changed."
-              onClick={() => setShowVersionHistory(true)}
-            />
-          </>
-        )}
+              <SettingsAction
+                icon={<Smartphone size={18} color="var(--accent)" />}
+                label="Add to iOS Home Screen"
+                description="Animated iOS setup guide for an app-like bookmark."
+                onClick={() => setSettingsView('homescreen')}
+              />
+
+              <SettingsAction
+                icon={<Info size={18} color="var(--accent)" />}
+                label="App version history"
+                description="See released versions and what changed."
+                onClick={() => setSettingsView('version')}
+              />
+            </>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function GuideStep({ number, title, children }) {
+  return (
+    <div style={{
+      display: 'grid', gridTemplateColumns: '34px minmax(0, 1fr)', gap: '12px',
+      padding: '14px', background: '#0F0F0F', border: '1px solid #222', borderRadius: '2px',
+    }}>
+      <div className="display" style={{
+        width: '34px', height: '34px', background: 'var(--accent)', color: '#0A0A0A',
+        borderRadius: '2px', display: 'flex', alignItems: 'center', justifyContent: 'center',
+        fontSize: '18px', lineHeight: 1,
+      }}>
+        {number}
+      </div>
+      <div style={{ minWidth: 0 }}>
+        <div style={{ fontSize: '14px', fontWeight: 700, color: 'var(--fg)', marginBottom: '4px' }}>
+          {title}
+        </div>
+        <div className="mono" style={{ fontSize: '11px', color: '#888', lineHeight: 1.5 }}>
+          {children}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function IosHomeScreenGuide({ onAdvanced }) {
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '14px', paddingBottom: '8px' }}>
+      <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+        <span className="mono" style={{
+          fontSize: '10px', padding: '4px 8px', background: 'var(--accent)22',
+          color: 'var(--accent)', borderRadius: '2px', fontWeight: 900, letterSpacing: '0.08em',
+        }}>
+          iOS SAFARI
+        </span>
+        <span className="mono" style={{
+          fontSize: '10px', padding: '4px 8px', background: '#222',
+          color: '#888', borderRadius: '2px', fontWeight: 700, letterSpacing: '0.06em',
+        }}>
+          ANDROID: USE YOUR DEVICE INSTRUCTIONS
+        </span>
+      </div>
+
+      <div>
+        <div className="display" style={{ fontSize: 'clamp(38px, 11vw, 64px)', lineHeight: 0.86, color: 'var(--fg)', marginBottom: '8px' }}>
+          MAKE IT FEEL LIKE AN APP
+        </div>
+        <div className="mono" style={{ fontSize: '12px', color: '#888', lineHeight: 1.5, maxWidth: '520px' }}>
+          On iPhone, add this site to your Home Screen from Safari. The bookmark opens like a lightweight app.
+        </div>
+      </div>
+
+      <div style={{
+        background: '#050505', border: '1px solid #222', borderRadius: '2px',
+        padding: '10px', display: 'flex', justifyContent: 'center',
+      }}>
+        <img
+          src={IOS_HOME_SCREEN_GIF}
+          alt="iOS steps to add this app bookmark to the Home Screen"
+          style={{
+            width: '100%', maxWidth: '430px', maxHeight: '46dvh',
+            objectFit: 'contain', borderRadius: '2px', display: 'block',
+          }}
+        />
+      </div>
+
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+        <GuideStep number="1" title="Open in Safari">
+          Use Safari on iOS, then open the Share sheet.
+        </GuideStep>
+        <GuideStep number="2" title="Add to Home Screen">
+          Choose Add to Home Screen, then tap Add.
+        </GuideStep>
+        <GuideStep number="3" title="Launch from the icon">
+          Open it from your Home Screen for the app-style experience.
+        </GuideStep>
+      </div>
+
+      <button onClick={onAdvanced} style={{
+        width: '100%', padding: '16px', background: '#1A1A1A', color: 'var(--accent)',
+        border: '1px solid var(--accent)55', borderRadius: '2px',
+        display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px',
+      }}>
+        <span style={{ display: 'flex', alignItems: 'center', gap: '10px', minWidth: 0 }}>
+          <ImageIcon size={18} />
+          <span style={{ fontSize: '13px', fontWeight: 900, fontFamily: 'Archivo Black, sans-serif', letterSpacing: '0.02em', textAlign: 'left' }}>
+            ADVANCED HOMESCREEN BOOKMARK IMAGE SETUP
+          </span>
+        </span>
+        <ChevronRight size={18} />
+      </button>
+    </div>
+  );
+}
+
+function AdvancedHomeScreenIconGuide() {
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '14px', paddingBottom: '8px' }}>
+      <div>
+        <div className="display" style={{ fontSize: 'clamp(36px, 10vw, 58px)', lineHeight: 0.86, color: 'var(--fg)', marginBottom: '8px' }}>
+          CUSTOM ICON
+        </div>
+        <div className="mono" style={{ fontSize: '12px', color: '#888', lineHeight: 1.5, maxWidth: '560px' }}>
+          Optional iOS Shortcut workflow for choosing a bookmark image from Photos.
+        </div>
+      </div>
+
+      <a
+        href={IOS_CUSTOM_ICON_SHORTCUT_URL}
+        target="_blank"
+        rel="noopener noreferrer"
+        style={{
+          width: '100%', padding: '16px', background: 'var(--accent)', color: '#0A0A0A',
+          borderRadius: '2px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px',
+          textDecoration: 'none',
+        }}
+      >
+        <span style={{ minWidth: 0 }}>
+          <span style={{ display: 'block', fontSize: '14px', fontWeight: 900, fontFamily: 'Archivo Black, sans-serif', letterSpacing: '0.02em' }}>
+            INSTALL THE IOS SHORTCUT
+          </span>
+          <span className="mono" style={{ display: 'block', fontSize: '10px', marginTop: '4px', opacity: 0.8, wordBreak: 'break-word' }}>
+            {IOS_CUSTOM_ICON_SHORTCUT_URL}
+          </span>
+        </span>
+        <ExternalLink size={18} />
+      </a>
+
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+        <GuideStep number="1" title="Install the Shortcut">
+          Open the iCloud link above and add the iOS Shortcut.
+        </GuideStep>
+        <GuideStep number="2" title="Have an image ready">
+          Save the icon image you want in the Photos app.
+        </GuideStep>
+        <GuideStep number="3" title="Run it from Safari">
+          Open this app in Safari, open Share, then scroll to Customize Web App Icon.
+        </GuideStep>
+        <GuideStep number="4" title="Add the bookmark">
+          Pick your image, then use the Home Screen guide to add the bookmark.
+        </GuideStep>
       </div>
     </div>
   );

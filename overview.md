@@ -23,6 +23,8 @@ Use this document as the first orientation point for future sessions. Keep it cu
 ├── package-lock.json
 ├── README.md
 ├── support files
+│   ├── Images
+│   │   └── ios_how_to_add_to_homescreen.gif
 │   └── workout_exercise_library.csv
 ├── vite.config.js
 └── src
@@ -65,7 +67,7 @@ Secondary screens:
 
 The home screen can start a new workout, rerun recent workouts, rerun favorites, open history, open favorites, and open settings/color controls.
 
-The settings modal includes app preferences, color customization, and an app version history view. The home header displays only the current app version.
+The settings modal includes app preferences, color customization, an iOS Home Screen install guide, and an app version history view. The home header displays only the current app version.
 
 ## Core State
 
@@ -120,6 +122,8 @@ Exercises can be manually selected, randomly selected per category, or added as 
 CSV exercise metadata includes body section, equipment type, exercise group, difficulty, direct source URL, and description. In the picker, exercise groups with multiple variants show only the primary exercise by default; its Alternatives/Hide control reveals or collapses the other variants in that group. Standalone exercises with advanced difficulty and no exercise group are hidden behind section-and-equipment Advanced/Hide controls, such as advanced upper body weight or advanced lower dumbbell. Each category random picker also has a Show All Alternatives/Hide All Alternatives control when grouped variants or advanced rows are available; it opens or closes every grouped alternative and standalone advanced bucket for that section. Revealed rows use a slightly lighter background so they remain visually associated with the dropdown that exposed them. Random category picks use the currently visible exercise pool, so hidden variants and advanced rows are only eligible after being expanded.
 
 Default exercises with details show a small info icon in selection, setup details, workout info, and the active workout. Pressing it opens an in-app description window with Back and More Details actions; More Details opens the source URL in a new tab/window. Custom exercises do not show this icon unless they later gain source or description metadata.
+
+Settings includes an iOS-only Add to Home Screen guide that imports `support files/Images/ios_how_to_add_to_homescreen.gif` as a Vite asset and shows it in a full-screen walkthrough. The guide also links to an optional iOS Shortcut for custom Home Screen bookmark images and explains the Safari share-sheet flow for running that shortcut before adding the bookmark. Android users are directed to their own browser/device install instructions.
 
 The selected mode determines how `buildQueue(exercises, mode, cfg)` expands selected exercises into active workout items:
 
