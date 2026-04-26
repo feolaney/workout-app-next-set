@@ -3021,8 +3021,9 @@ function SettingsModal({ settings, setSettings, onOpenColorSettings, onClose }) 
 
   return (
     <div
-      onClick={onClose}
       className="fade-in"
+      role="dialog"
+      aria-modal="true"
       style={{
         position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.88)', zIndex: 100,
         display: 'flex', alignItems: guideOpen ? 'stretch' : 'flex-end', padding: guideOpen ? 0 : '20px',
@@ -3342,8 +3343,9 @@ function NameFavoriteModal({ entry, onCancel, onSave, initialName = '', title = 
 
   return (
     <div
-      onClick={onCancel}
       className="fade-in"
+      role="dialog"
+      aria-modal="true"
       style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.88)', zIndex: 200, display: 'flex', alignItems: 'flex-start', padding: '20px' }}
     >
       <div

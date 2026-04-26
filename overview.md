@@ -69,7 +69,7 @@ The home screen can start a new workout, rerun recent workouts, rerun favorites,
 
 Rainbow Mode is activated by a hidden secret action on the home title. Each tap on that title gives the words a slight tactile shake. Activation fades in `Kikis, this is for you`, waits for that message to fade away, then shows an oversized `RAINBOW MODE ACTIVATED` message as the animated rainbow background starts; the same hidden secret action disables it and fades in `rainbow mode deactivated`. This mode is intentionally separate from palette selection and has no visible control.
 
-The settings modal includes app preferences, color customization, an iOS Home Screen install guide, and an app version history view. The home header displays only the current app version.
+The settings modal includes app preferences, color customization, an iOS Home Screen install guide, and an app version history view. It closes only from explicit in-modal controls so backdrop clicks or mobile viewport retargeting cannot accidentally dismiss it. The home header displays only the current app version.
 
 The color customization screen shows preset and custom palette cards as full-card touch targets. Active palette cards use a separated static double-stroke highlight that is reserved inside each card slot so the active state does not overlap neighboring cards.
 
@@ -172,7 +172,7 @@ Exercise, short-rest, and long-rest views all show the primary next exercise plu
 
 History stores completed and partial workouts, capped to the latest 100 entries. Home's recent-completed section filters out partial entries, so partial workouts appear only in History until they are completed.
 
-Favorites are saved workout entries with a user-facing name and `favId`. New favorites are appended to the bottom of the saved list by default. The Home favorites dropdown shows the top five favorites in persisted order and links to the full Favorites screen. The Favorites screen renders the full persisted order with drag handles, rename controls, and a two-step delete confirmation.
+Favorites are saved workout entries with a user-facing name and `favId`. New favorites are appended to the bottom of the saved list by default. The favorite naming modal closes only through its Save and Cancel controls so mobile keyboard or viewport shifts cannot accidentally dismiss an in-progress name. The Home favorites dropdown shows the top five favorites in persisted order and links to the full Favorites screen. The Favorites screen renders the full persisted order with drag handles, rename controls, and a two-step delete confirmation.
 
 Favorite matching is based on a generated workout signature:
 
