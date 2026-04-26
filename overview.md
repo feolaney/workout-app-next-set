@@ -67,7 +67,7 @@ Secondary screens:
 
 The home screen can start a new workout, rerun recent workouts, rerun favorites, open history, open favorites, and open settings/color controls. On first launch for iOS or ambiguous mobile devices, the home screen shows a one-time blurred welcome prompt that points users to Settings for Home Screen bookmark setup.
 
-Rainbow Mode is activated by a hidden secret action. Activation fades in `Kikis, this is for you`, waits for that message to fade away, then shows an oversized `RAINBOW MODE ACTIVATED` message as the animated rainbow background starts; the same hidden secret action disables it and fades in `rainbow mode deactivated`. This mode is intentionally separate from palette selection and has no visible control.
+Rainbow Mode is activated by a hidden secret action on the home title. Each tap on that title gives the words a slight tactile shake. Activation fades in `Kikis, this is for you`, waits for that message to fade away, then shows an oversized `RAINBOW MODE ACTIVATED` message as the animated rainbow background starts; the same hidden secret action disables it and fades in `rainbow mode deactivated`. This mode is intentionally separate from palette selection and has no visible control.
 
 The settings modal includes app preferences, color customization, an iOS Home Screen install guide, and an app version history view. The home header displays only the current app version.
 

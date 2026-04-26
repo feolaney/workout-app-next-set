@@ -200,9 +200,17 @@ const RAINBOW_CONFETTI_PIECES = Array.from({ length: RAINBOW_CONFETTI_COUNT }, (
 });
 const RAINBOW_CONFETTI_REST_REPEL = RAINBOW_CONFETTI_PIECES.map(() => ({ x: 0, y: 0, rotation: 0 }));
 
-const APP_VERSION = '2.36';
+const APP_VERSION = '2.37';
 
 const APP_VERSION_HISTORY = [
+  {
+    version: '2.37',
+    date: '2026-04-26',
+    type: 'UI',
+    changes: [
+      'Added a subtle tactile shake to the home title tap target used for the hidden Rainbow Mode action.',
+    ],
+  },
   {
     version: '2.36',
     date: '2026-04-26',
@@ -1798,10 +1806,18 @@ function GlobalStyles() {
         60% { transform: translateX(-8px); opacity: 1; }
         100% { transform: translateX(0); opacity: 1; }
       }
+      @keyframes home-title-tap-shake {
+        0%, 100% { transform: translate3d(0, 0, 0) rotate(0deg); }
+        20% { transform: translate3d(-2px, 1px, 0) rotate(-0.4deg); }
+        40% { transform: translate3d(2px, -1px, 0) rotate(0.4deg); }
+        60% { transform: translate3d(-1px, 0, 0) rotate(-0.25deg); }
+        80% { transform: translate3d(1px, 0, 0) rotate(0.2deg); }
+      }
       .slide-in { animation: slide-up 0.4s ease-out both; }
       .fade-in { animation: fade-in 0.25s ease-out both; }
       .title-slide-top { animation: title-in-top 0.55s cubic-bezier(0.22, 1, 0.36, 1) both; }
       .title-slide-bottom { animation: title-in-bottom 0.55s cubic-bezier(0.22, 1, 0.36, 1) 0.08s both; }
+      .home-title-tap-shake { animation: home-title-tap-shake 180ms ease-in-out both; }
       @media (prefers-reduced-motion: reduce) {
         html.rainbow-mode-bg,
         body.rainbow-mode-bg,
@@ -1813,6 +1829,9 @@ function GlobalStyles() {
         .rainbow-confetti-piece {
           animation: none;
           opacity: 0.28;
+        }
+        .home-title-tap-shake {
+          animation: none;
         }
       }
       .active-workout-screen {
@@ -2576,6 +2595,7 @@ function HomeScreen({ onStart, onHistory, onFavorites, onColorSettings, onRerun,
   const rainbowTapCountRef = useRef(0);
   const rainbowTapResetRef = useRef(null);
   const rainbowActivationRef = useRef(null);
+  const rainbowTitleRef = useRef(null);
 
   const recent = history.filter(entry => !isPartialHistoryEntry(entry)).slice(0, 5);
   const favs = favorites.slice(0, 5);
@@ -2601,7 +2621,16 @@ function HomeScreen({ onStart, onHistory, onFavorites, onColorSettings, onRerun,
     };
   }, []);
 
+  const triggerRainbowTitleFeedback = () => {
+    if (!rainbowTitleRef.current) return;
+    rainbowTitleRef.current.classList.remove('home-title-tap-shake');
+    void rainbowTitleRef.current.offsetWidth;
+    rainbowTitleRef.current.classList.add('home-title-tap-shake');
+  };
+
   const handleRainbowTitleTap = () => {
+    triggerRainbowTitleFeedback();
+
     if (rainbowTapResetRef.current) {
       window.clearTimeout(rainbowTapResetRef.current);
       rainbowTapResetRef.current = null;
@@ -2703,8 +2732,13 @@ function HomeScreen({ onStart, onHistory, onFavorites, onColorSettings, onRerun,
 
       <div style={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
         <div
+          ref={rainbowTitleRef}
           onClick={handleRainbowTitleTap}
-          style={{ userSelect: 'none', WebkitUserSelect: 'none', touchAction: 'manipulation' }}
+          onAnimationEnd={(event) => {
+            if (event.target !== event.currentTarget) return;
+            rainbowTitleRef.current?.classList.remove('home-title-tap-shake');
+          }}
+          style={{ userSelect: 'none', WebkitUserSelect: 'none', touchAction: 'manipulation', willChange: 'transform' }}
         >
           <AnimatedTitle />
         </div>
