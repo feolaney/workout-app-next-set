@@ -161,10 +161,51 @@ const RAINBOW_MODE_UI_PALETTE = {
   accent2: '#FF38D8',
   warn: '#FF3D8F',
 };
+const RAINBOW_CONFETTI_COLORS = [
+  '#FF1744', '#FF6D00', '#FFD600', '#76FF03', '#00E676', '#00E5FF',
+  '#2979FF', '#651FFF', '#D500F9', '#FF2EA6', '#FFFFFF', '#FFE600',
+];
+const RAINBOW_CONFETTI_PIECES = Array.from({ length: 52 }, (_, index) => {
+  const driftDirection = index % 2 === 0 ? 1 : -1;
+  const driftX = driftDirection * (16 + (index % 7) * 7);
+  const driftY = 34 + (index % 8) * 9;
+  const rotation = (index * 47) % 360;
+  const width = 5 + (index % 4) * 2;
+  const shape = index % 5 === 0 ? 'dot' : index % 3 === 0 ? 'ribbon' : 'rect';
+  const height = shape === 'dot' ? width : shape === 'ribbon' ? width * 3.1 : width * 1.9;
+  const duration = 18 + (index % 9) * 2;
 
-const APP_VERSION = '2.32';
+  return {
+    color: RAINBOW_CONFETTI_COLORS[index % RAINBOW_CONFETTI_COLORS.length],
+    x: (index * 19 + (index % 6) * 11) % 104 - 2,
+    y: (index * 29 + (index % 5) * 13) % 116 - 8,
+    width,
+    height,
+    shape,
+    driftX,
+    driftY,
+    endX: driftX * -0.35,
+    endY: driftY + 30,
+    rotation,
+    midRotation: rotation + 160 + (index % 4) * 28,
+    endRotation: rotation + 340 + (index % 5) * 32,
+    duration,
+    delay: -((index * 1.65) % duration),
+    opacity: 0.34 + (index % 5) * 0.07,
+  };
+});
+
+const APP_VERSION = '2.33';
 
 const APP_VERSION_HISTORY = [
+  {
+    version: '2.33',
+    date: '2026-04-26',
+    type: 'UI',
+    changes: [
+      'Added slow floating multicolor confetti behind the app content while Rainbow Mode is active.',
+    ],
+  },
   {
     version: '2.32',
     date: '2026-04-26',
@@ -1499,6 +1540,7 @@ export default function WorkoutApp() {
       style={{ ...effectivePaletteVars, minHeight: '100dvh', background: rainbowModeActive ? undefined : 'var(--bg)', color: 'var(--fg)', fontFamily: '"JetBrains Mono", "Fira Code", monospace', position: 'relative', overflow: 'hidden' }}
     >
       <GlobalStyles />
+      {rainbowModeActive && <RainbowConfettiLayer />}
       {screen === 'colorSettings' && (
         <ColorSettingsScreen
           activePaletteId={activePaletteId}
@@ -1708,6 +1750,23 @@ function GlobalStyles() {
         76% { opacity: 1; transform: translateY(0) scale(1); }
         100% { opacity: 0; transform: translateY(-10px) scale(1); }
       }
+      @keyframes rainbow-confetti-float {
+        0% {
+          opacity: 0;
+          transform: translate3d(0, -24px, 0) rotate(var(--confetti-rotation));
+        }
+        14% {
+          opacity: var(--confetti-opacity);
+        }
+        52% {
+          opacity: var(--confetti-opacity);
+          transform: translate3d(var(--confetti-drift-x), var(--confetti-drift-y), 0) rotate(var(--confetti-mid-rotation));
+        }
+        100% {
+          opacity: 0.1;
+          transform: translate3d(var(--confetti-end-x), var(--confetti-end-y), 0) rotate(var(--confetti-end-rotation));
+        }
+      }
       html.rainbow-mode-bg,
       body.rainbow-mode-bg,
       #root.rainbow-mode-bg,
@@ -1723,6 +1782,34 @@ function GlobalStyles() {
       }
       .rainbow-mode-activated-message {
         animation: rainbow-mode-message 2.6s cubic-bezier(0.22, 1, 0.36, 1) both;
+      }
+      .rainbow-confetti-layer {
+        position: fixed;
+        inset: -12dvh -8vw;
+        pointer-events: none;
+        overflow: hidden;
+        z-index: 1;
+      }
+      .rainbow-confetti-piece {
+        position: absolute;
+        left: var(--confetti-x);
+        top: var(--confetti-y);
+        width: var(--confetti-width);
+        height: var(--confetti-height);
+        border-radius: 2px;
+        background: var(--confetti-color);
+        opacity: 0;
+        box-shadow: 0 0 14px color-mix(in srgb, var(--confetti-color) 46%, transparent);
+        transform-origin: center;
+        animation: rainbow-confetti-float var(--confetti-duration) ease-in-out infinite;
+        animation-delay: var(--confetti-delay);
+        will-change: transform, opacity;
+      }
+      .rainbow-confetti-piece[data-shape="dot"] {
+        border-radius: 999px;
+      }
+      .rainbow-confetti-piece[data-shape="ribbon"] {
+        border-radius: 999px;
       }
       @keyframes pulse-ring { 0% { transform: scale(1); opacity: 0.8; } 100% { transform: scale(1.4); opacity: 0; } }
       @keyframes slide-up { from { opacity: 0; } to { opacity: 1; } }
@@ -1757,6 +1844,10 @@ function GlobalStyles() {
         .rainbow-mode-bg {
           animation: none;
           background-position: 50% 50%;
+        }
+        .rainbow-confetti-piece {
+          animation: none;
+          opacity: 0.28;
         }
       }
       .active-workout-screen {
@@ -1838,6 +1929,37 @@ function GrainOverlay() {
       position: 'fixed', inset: 0, pointerEvents: 'none', zIndex: 1, opacity: 0.08,
       backgroundImage: "url(\"data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E\")",
     }} />
+  );
+}
+
+function RainbowConfettiLayer() {
+  return (
+    <div className="rainbow-confetti-layer" aria-hidden="true">
+      {RAINBOW_CONFETTI_PIECES.map((piece, index) => (
+        <span
+          key={`${piece.color}-${index}`}
+          className="rainbow-confetti-piece"
+          data-shape={piece.shape}
+          style={{
+            '--confetti-x': `${piece.x}%`,
+            '--confetti-y': `${piece.y}%`,
+            '--confetti-width': `${piece.width}px`,
+            '--confetti-height': `${piece.height}px`,
+            '--confetti-color': piece.color,
+            '--confetti-drift-x': `${piece.driftX}px`,
+            '--confetti-drift-y': `${piece.driftY}px`,
+            '--confetti-end-x': `${piece.endX}px`,
+            '--confetti-end-y': `${piece.endY}px`,
+            '--confetti-rotation': `${piece.rotation}deg`,
+            '--confetti-mid-rotation': `${piece.midRotation}deg`,
+            '--confetti-end-rotation': `${piece.endRotation}deg`,
+            '--confetti-duration': `${piece.duration}s`,
+            '--confetti-delay': `${piece.delay}s`,
+            '--confetti-opacity': `${piece.opacity}`,
+          }}
+        />
+      ))}
+    </div>
   );
 }
 
