@@ -143,10 +143,24 @@ const DEFAULT_SETTINGS = {
   rememberSectionState: true,
   homeScreenPromptSeen: false,
 };
+const RAINBOW_MODE_STORAGE_KEY = 'rainbowModeActive';
+const RAINBOW_TAP_THRESHOLD = 20;
+const RAINBOW_TAP_RESET_MS = 2500;
+const RAINBOW_ACTIVATION_DELAY_MS = 850;
+const RAINBOW_MODE_THEME_COLOR = '#7C5CFF';
 
-const APP_VERSION = '2.26';
+const APP_VERSION = '2.27';
 
 const APP_VERSION_HISTORY = [
+  {
+    version: '2.27',
+    date: '2026-04-26',
+    type: 'Feature / UI',
+    changes: [
+      'Added a hidden persisted Rainbow Mode that toggles from the home title after 20 taps.',
+      'Applied the animated rainbow background across the app shell, root, document, and mobile safe-area surfaces without changing the selected palette.',
+    ],
+  },
   {
     version: '2.26',
     date: '2026-04-26',
@@ -555,20 +569,26 @@ function buildPaletteVars(palette) {
   };
 }
 
-function applyDocumentPalette(paletteVars) {
+function applyDocumentPalette(paletteVars, rainbowModeActive = false) {
   if (typeof document === 'undefined') return;
   Object.entries(paletteVars).forEach(([key, value]) => {
     document.documentElement.style.setProperty(key, value);
   });
 
   const bg = paletteVars['--bg'];
-  document.documentElement.style.backgroundColor = bg;
-  document.body.style.backgroundColor = bg;
+  const documentBg = rainbowModeActive ? RAINBOW_MODE_THEME_COLOR : bg;
+  document.documentElement.style.backgroundColor = documentBg;
+  document.documentElement.classList.toggle('rainbow-mode-bg', rainbowModeActive);
+  document.body.style.backgroundColor = documentBg;
+  document.body.classList.toggle('rainbow-mode-bg', rainbowModeActive);
   const appRoot = document.getElementById('root');
-  if (appRoot) appRoot.style.backgroundColor = bg;
+  if (appRoot) {
+    appRoot.style.backgroundColor = documentBg;
+    appRoot.classList.toggle('rainbow-mode-bg', rainbowModeActive);
+  }
 
   const themeMeta = document.querySelector('meta[name="theme-color"]');
-  if (themeMeta) themeMeta.setAttribute('content', bg);
+  if (themeMeta) themeMeta.setAttribute('content', documentBg);
 }
 
 function getBrowserStorage() {
@@ -1124,6 +1144,9 @@ export default function WorkoutApp() {
   const [activePaletteId, setActivePaletteId] = useState(DEFAULT_PALETTE_ID);
   const [customPalettes, setCustomPalettes] = useState([]);
   const [paletteHydrated, setPaletteHydrated] = useState(false);
+  // Hidden visual mode state
+  const [rainbowModeActive, setRainbowModeActive] = useState(false);
+  const [rainbowModeHydrated, setRainbowModeHydrated] = useState(false);
 
   useEffect(() => {
     (async () => {
@@ -1153,6 +1176,9 @@ export default function WorkoutApp() {
       setActivePaletteId(storedPaletteId);
       setCustomPalettes(storedCustoms);
       setPaletteHydrated(true);
+      const storedRainbowModeActive = await storage.get(RAINBOW_MODE_STORAGE_KEY, false);
+      setRainbowModeActive(storedRainbowModeActive === true);
+      setRainbowModeHydrated(true);
       setStorageHydrated(true);
     })();
   }, []);
@@ -1185,6 +1211,10 @@ export default function WorkoutApp() {
     if (!paletteHydrated) return;
     storage.set('customPalettes', customPalettes);
   }, [customPalettes, paletteHydrated]);
+  useEffect(() => {
+    if (!rainbowModeHydrated) return;
+    storage.set(RAINBOW_MODE_STORAGE_KEY, rainbowModeActive);
+  }, [rainbowModeActive, rainbowModeHydrated]);
   // Only persist collapse state after hydration AND when the setting is on
   useEffect(() => {
     if (!collapseHydrated) return;
@@ -1204,12 +1234,15 @@ export default function WorkoutApp() {
   const paletteVars = buildPaletteVars(activePalette);
 
   useEffect(() => {
-    applyDocumentPalette(paletteVars);
-  }, [activePalette]);
+    applyDocumentPalette(paletteVars, rainbowModeActive);
+  }, [activePalette, rainbowModeActive]);
 
   if (!library) {
     return (
-      <div style={{ ...paletteVars, minHeight: '100dvh', background: 'var(--bg)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--accent)', fontFamily: 'monospace' }}>
+      <div
+        className={rainbowModeActive ? 'rainbow-mode-bg' : undefined}
+        style={{ ...paletteVars, minHeight: '100dvh', background: rainbowModeActive ? undefined : 'var(--bg)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--accent)', fontFamily: 'monospace' }}
+      >
         LOADING...
       </div>
     );
@@ -1389,7 +1422,10 @@ export default function WorkoutApp() {
   };
 
   return (
-    <div style={{ ...paletteVars, minHeight: '100dvh', background: 'var(--bg)', color: 'var(--fg)', fontFamily: '"JetBrains Mono", "Fira Code", monospace', position: 'relative', overflow: 'hidden' }}>
+    <div
+      className={rainbowModeActive ? 'rainbow-mode-bg' : undefined}
+      style={{ ...paletteVars, minHeight: '100dvh', background: rainbowModeActive ? undefined : 'var(--bg)', color: 'var(--fg)', fontFamily: '"JetBrains Mono", "Fira Code", monospace', position: 'relative', overflow: 'hidden' }}
+    >
       <GlobalStyles />
       {screen === 'colorSettings' && (
         <ColorSettingsScreen
@@ -1427,6 +1463,9 @@ export default function WorkoutApp() {
           settingsHydrated={settingsHydrated}
           setSettings={setSettings}
           library={library}
+          rainbowModeActive={rainbowModeActive}
+          onRainbowModeActivate={() => setRainbowModeActive(true)}
+          onRainbowModeDeactivate={() => setRainbowModeActive(false)}
         />
       )}
       {screen === 'history' && (
@@ -1583,6 +1622,32 @@ function GlobalStyles() {
       .display { font-family: 'Archivo Black', sans-serif; letter-spacing: -0.02em; }
       .stencil { font-family: 'Bebas Neue', sans-serif; letter-spacing: 0.05em; }
       .mono { font-family: 'JetBrains Mono', monospace; }
+      @keyframes rainbow-bg-flow {
+        0% { background-position: 0% 50%; }
+        50% { background-position: 100% 50%; }
+        100% { background-position: 0% 50%; }
+      }
+      @keyframes rainbow-mode-message {
+        0% { opacity: 0; transform: translateY(14px) scale(0.98); }
+        18% { opacity: 1; transform: translateY(0) scale(1); }
+        76% { opacity: 1; transform: translateY(0) scale(1); }
+        100% { opacity: 0; transform: translateY(-10px) scale(1); }
+      }
+      html.rainbow-mode-bg,
+      body.rainbow-mode-bg,
+      #root.rainbow-mode-bg,
+      .rainbow-mode-bg {
+        background:
+          linear-gradient(rgba(8,8,12,0.34), rgba(8,8,12,0.34)),
+          radial-gradient(circle at 18% 18%, rgba(255,255,255,0.22), transparent 24%),
+          radial-gradient(circle at 82% 76%, rgba(255,255,255,0.16), transparent 28%),
+          linear-gradient(120deg, #ff004c, #ff8a00, #fff200, #21d66b, #00c8ff, #6b5cff, #ff00cc, #ff004c);
+        background-size: 100% 100%, 220% 220%, 260% 260%, 360% 360%;
+        animation: rainbow-bg-flow 13s ease-in-out infinite;
+      }
+      .rainbow-mode-activated-message {
+        animation: rainbow-mode-message 2.6s cubic-bezier(0.22, 1, 0.36, 1) both;
+      }
       @keyframes pulse-ring { 0% { transform: scale(1); opacity: 0.8; } 100% { transform: scale(1.4); opacity: 0; } }
       @keyframes slide-up { from { opacity: 0; } to { opacity: 1; } }
       @keyframes fade-in { from { opacity: 0; } to { opacity: 1; } }
@@ -1609,6 +1674,15 @@ function GlobalStyles() {
       .fade-in { animation: fade-in 0.25s ease-out both; }
       .title-slide-top { animation: title-in-top 0.55s cubic-bezier(0.22, 1, 0.36, 1) both; }
       .title-slide-bottom { animation: title-in-bottom 0.55s cubic-bezier(0.22, 1, 0.36, 1) 0.08s both; }
+      @media (prefers-reduced-motion: reduce) {
+        html.rainbow-mode-bg,
+        body.rainbow-mode-bg,
+        #root.rainbow-mode-bg,
+        .rainbow-mode-bg {
+          animation: none;
+          background-position: 50% 50%;
+        }
+      }
       .active-workout-screen {
         --active-header-meta-size: 11px;
         --active-content-x: 24px;
@@ -2236,11 +2310,15 @@ function ColorPickerModal({ slot, value, palette, onChange, onClose }) {
   );
 }
 
-function HomeScreen({ onStart, onHistory, onFavorites, onColorSettings, onRerun, history, favorites, findMatchingFavorite, addFavorite, removeFavorite, favCollapsed, setFavCollapsed, recentCollapsed, setRecentCollapsed, settings, settingsHydrated, setSettings, library }) {
+function HomeScreen({ onStart, onHistory, onFavorites, onColorSettings, onRerun, history, favorites, findMatchingFavorite, addFavorite, removeFavorite, favCollapsed, setFavCollapsed, recentCollapsed, setRecentCollapsed, settings, settingsHydrated, setSettings, library, rainbowModeActive, onRainbowModeActivate, onRainbowModeDeactivate }) {
   const [infoFor, setInfoFor] = useState(null);
   const [namingEntry, setNamingEntry] = useState(null); // entry being named for favoriting
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [showHomeScreenPrompt, setShowHomeScreenPrompt] = useState(false);
+  const [rainbowMessageNonce, setRainbowMessageNonce] = useState(0);
+  const rainbowTapCountRef = useRef(0);
+  const rainbowTapResetRef = useRef(null);
+  const rainbowActivationRef = useRef(null);
 
   const recent = history.filter(entry => !isPartialHistoryEntry(entry)).slice(0, 5);
   const favs = favorites.slice(0, 5);
@@ -2258,6 +2336,47 @@ function HomeScreen({ onStart, onHistory, onFavorites, onColorSettings, onRerun,
     const timer = window.setTimeout(() => setShowHomeScreenPrompt(true), 500);
     return () => window.clearTimeout(timer);
   }, [settingsHydrated, settings.homeScreenPromptSeen, settingsOpen]);
+
+  useEffect(() => {
+    return () => {
+      if (rainbowTapResetRef.current) window.clearTimeout(rainbowTapResetRef.current);
+      if (rainbowActivationRef.current) window.clearTimeout(rainbowActivationRef.current);
+    };
+  }, []);
+
+  const handleRainbowTitleTap = () => {
+    if (rainbowTapResetRef.current) {
+      window.clearTimeout(rainbowTapResetRef.current);
+      rainbowTapResetRef.current = null;
+    }
+
+    rainbowTapCountRef.current += 1;
+
+    if (rainbowTapCountRef.current >= RAINBOW_TAP_THRESHOLD) {
+      rainbowTapCountRef.current = 0;
+      if (rainbowActivationRef.current) {
+        window.clearTimeout(rainbowActivationRef.current);
+        rainbowActivationRef.current = null;
+      }
+
+      if (rainbowModeActive) {
+        onRainbowModeDeactivate();
+        return;
+      }
+
+      setRainbowMessageNonce(n => n + 1);
+      rainbowActivationRef.current = window.setTimeout(() => {
+        rainbowActivationRef.current = null;
+        onRainbowModeActivate();
+      }, RAINBOW_ACTIVATION_DELAY_MS);
+      return;
+    }
+
+    rainbowTapResetRef.current = window.setTimeout(() => {
+      rainbowTapCountRef.current = 0;
+      rainbowTapResetRef.current = null;
+    }, RAINBOW_TAP_RESET_MS);
+  };
 
   const handleStarToggle = (entry) => {
     const existing = findMatchingFavorite(entry);
@@ -2324,7 +2443,36 @@ function HomeScreen({ onStart, onHistory, onFavorites, onColorSettings, onRerun,
       </div>
 
       <div style={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
-        <AnimatedTitle />
+        <div
+          onClick={handleRainbowTitleTap}
+          style={{ userSelect: 'none', WebkitUserSelect: 'none', touchAction: 'manipulation' }}
+        >
+          <AnimatedTitle />
+        </div>
+        {rainbowMessageNonce > 0 && (
+          <div
+            key={rainbowMessageNonce}
+            className="display rainbow-mode-activated-message"
+            aria-live="polite"
+            style={{
+              position: 'fixed',
+              inset: 0,
+              zIndex: 300,
+              pointerEvents: 'none',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              padding: '24px',
+              color: '#FFFFFF',
+              textAlign: 'center',
+              fontSize: 'clamp(32px, 10vw, 92px)',
+              lineHeight: 0.95,
+              textShadow: '0 5px 28px rgba(0,0,0,0.62), 0 0 28px rgba(255,255,255,0.38)',
+            }}
+          >
+            RAINBOW MODE ACTIVATED
+          </div>
+        )}
         <div className="mono" style={{ fontSize: '13px', color: 'var(--muted)', marginTop: '16px', maxWidth: '320px', lineHeight: 1.5 }}>
           Build your workout. Pick your format. Do the work.
         </div>

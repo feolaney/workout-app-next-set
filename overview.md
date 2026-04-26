@@ -67,6 +67,8 @@ Secondary screens:
 
 The home screen can start a new workout, rerun recent workouts, rerun favorites, open history, open favorites, and open settings/color controls. On first launch for iOS or ambiguous mobile devices, the home screen shows a one-time blurred welcome prompt that points users to Settings for Home Screen bookmark setup.
 
+The large animated home title also owns a hidden Rainbow Mode toggle. Twenty consecutive taps on the title fades in `RAINBOW MODE ACTIVATED` and then enables an animated rainbow background; another twenty title taps disables it. This mode is intentionally separate from palette selection and has no visible control.
+
 The settings modal includes app preferences, color customization, an iOS Home Screen install guide, and an app version history view. The home header displays only the current app version.
 
 The color customization screen shows preset and custom palette cards as full-card touch targets. Active palette cards use a separated static double-stroke highlight that is reserved inside each card slot so the active state does not overlap neighboring cards.
@@ -88,6 +90,7 @@ Top-level state in `WorkoutApp` is the app's source of truth during a session:
 - `favorites`: saved workout templates
 - `settings`: app settings, currently `rememberSectionState` and `homeScreenPromptSeen`
 - `activePaletteId` and `customPalettes`: palette selection and custom palette data
+- `rainbowModeActive`: hidden animated rainbow background mode, toggled from the home title
 
 Most child components receive state and callbacks through props rather than owning shared app state themselves.
 
@@ -110,10 +113,11 @@ Persisted keys:
 - `homeCollapse`
 - `activePaletteId`
 - `customPalettes`
+- `rainbowModeActive`
 
 Do not rename these keys without a deliberate migration plan. Existing user data depends on them.
 
-Hydration happens once on app load. The default library is built from `support files/workout_exercise_library.csv`, then merged with the saved `library` value so new default exercises and metadata are added without removing custom exercises. Default rows removed from the CSV are not restored from saved non-custom library entries, so the CSV remains the source of truth for bundled exercises. Follow-up `useEffect` calls persist changes back to localStorage. Persisted write-back is guarded until initial reads complete so default in-memory state cannot overwrite saved library, history, favorites, rest settings, app settings, palette, or home collapse data during startup.
+Hydration happens once on app load. The default library is built from `support files/workout_exercise_library.csv`, then merged with the saved `library` value so new default exercises and metadata are added without removing custom exercises. Default rows removed from the CSV are not restored from saved non-custom library entries, so the CSV remains the source of truth for bundled exercises. Follow-up `useEffect` calls persist changes back to localStorage. Persisted write-back is guarded until initial reads complete so default in-memory state cannot overwrite saved library, history, favorites, rest settings, app settings, palette, rainbow mode, or home collapse data during startup.
 
 ## Workout Logic
 
@@ -186,7 +190,7 @@ The app uses a palette-driven workout aesthetic with inline styles and lucide ic
 - JetBrains Mono
 - Bebas Neue
 
-Palette selection controls app CSS variables for background, surface, text, accent, secondary accent, warning, derived muted text, borders, and readable text-on-accent colors. These variables are applied both on the app wrapper and `document.documentElement` so fixed overlays, mobile safe areas, and overscroll regions use the active palette.
+Palette selection controls app CSS variables for background, surface, text, accent, secondary accent, warning, derived muted text, borders, and readable text-on-accent colors. These variables are applied both on the app wrapper and `document.documentElement` so fixed overlays, mobile safe areas, and overscroll regions use the active palette. Rainbow Mode overrides only the app, root, document, and body background layer with an animated rainbow while preserving the selected palette for text, surfaces, borders, and controls.
 
 Avoid visual redesigns unless explicitly requested. Preserve copy, spacing, colors, icons, and interaction flows for behavior-focused changes.
 
