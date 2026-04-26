@@ -206,9 +206,11 @@ const APP_VERSION_HISTORY = [
   {
     version: '2.37',
     date: '2026-04-26',
-    type: 'UI',
+    type: 'UI / Maintenance',
     changes: [
       'Added a subtle tactile shake to the home title tap target used for the hidden Rainbow Mode action.',
+      'Added a Rainbow Mode primary-accent pulse that cycles through vibrant readable party colors.',
+      'Updated the release workflow so local commits are summarized into one version-history entry when pushed.',
     ],
   },
   {
