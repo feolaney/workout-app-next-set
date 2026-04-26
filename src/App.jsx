@@ -144,9 +144,17 @@ const DEFAULT_SETTINGS = {
   homeScreenPromptSeen: false,
 };
 
-const APP_VERSION = '2.24';
+const APP_VERSION = '2.25';
 
 const APP_VERSION_HISTORY = [
+  {
+    version: '2.25',
+    date: '2026-04-26',
+    type: 'UI',
+    changes: [
+      'Made the active color palette card glow smoother and more visible.',
+    ],
+  },
   {
     version: '2.24',
     date: '2026-04-26',
@@ -1591,21 +1599,35 @@ function GlobalStyles() {
       }
       @keyframes palette-card-active-glow {
         0%, 100% {
-          box-shadow: 0 0 3px 0 color-mix(in srgb, currentColor 24%, transparent);
+          box-shadow:
+            inset 0 0 6px 0 color-mix(in srgb, currentColor 24%, transparent),
+            0 0 5px 0 color-mix(in srgb, currentColor 22%, transparent);
+        }
+        35%, 65% {
+          box-shadow:
+            inset 0 0 11px 1px color-mix(in srgb, currentColor 38%, transparent),
+            0 0 10px 1px color-mix(in srgb, currentColor 34%, transparent);
         }
         50% {
-          box-shadow: 0 0 8px 1px color-mix(in srgb, currentColor 42%, transparent);
+          box-shadow:
+            inset 0 0 15px 2px color-mix(in srgb, currentColor 52%, transparent),
+            0 0 13px 1px color-mix(in srgb, currentColor 44%, transparent);
         }
       }
       .slide-in { animation: slide-up 0.4s ease-out both; }
       .fade-in { animation: fade-in 0.25s ease-out both; }
       .title-slide-top { animation: title-in-top 0.55s cubic-bezier(0.22, 1, 0.36, 1) both; }
       .title-slide-bottom { animation: title-in-bottom 0.55s cubic-bezier(0.22, 1, 0.36, 1) 0.08s both; }
-      .palette-card-active-glow { animation: palette-card-active-glow 2.4s ease-in-out infinite; }
+      .palette-card-active-glow {
+        animation: palette-card-active-glow 3.6s cubic-bezier(0.4, 0, 0.2, 1) infinite;
+        will-change: box-shadow;
+      }
       @media (prefers-reduced-motion: reduce) {
         .palette-card-active-glow {
           animation: none;
-          box-shadow: 0 0 5px 0 color-mix(in srgb, currentColor 28%, transparent);
+          box-shadow:
+            inset 0 0 10px 1px color-mix(in srgb, currentColor 36%, transparent),
+            0 0 8px 1px color-mix(in srgb, currentColor 30%, transparent);
         }
       }
       .active-workout-screen {

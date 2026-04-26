@@ -69,7 +69,7 @@ The home screen can start a new workout, rerun recent workouts, rerun favorites,
 
 The settings modal includes app preferences, color customization, an iOS Home Screen install guide, and an app version history view. The home header displays only the current app version.
 
-The color customization screen shows preset and custom palette cards as full-card touch targets. Active palette cards use a separated double-stroke highlight with a subtle pulsing glow that is reserved inside each card slot so the active state does not overlap neighboring cards.
+The color customization screen shows preset and custom palette cards as full-card touch targets. Active palette cards use a separated double-stroke highlight with a smooth pulsing glow that is reserved inside each card slot so the active state does not overlap neighboring cards.
 
 ## Core State
 
