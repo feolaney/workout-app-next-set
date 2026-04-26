@@ -69,7 +69,7 @@ The home screen can start a new workout, rerun recent workouts, rerun favorites,
 
 Rainbow Mode is activated by a hidden secret action on the home title. Each tap on that title gives the words a slight tactile shake. Activation fades in `Kikis, this is for you`, waits for that message to fade away, then shows an oversized `RAINBOW MODE ACTIVATED` message as the animated rainbow background starts; the same hidden secret action disables it and fades in `rainbow mode deactivated`. This mode is intentionally separate from palette selection and has no visible control.
 
-The settings modal includes app preferences, color customization, an iOS Home Screen install guide, and an app version history view. It closes only from explicit in-modal controls so backdrop clicks or mobile viewport retargeting cannot accidentally dismiss it. The home header displays only the current app version.
+The settings modal includes app preferences, color customization, an iOS Home Screen install guide, a feedback/issues email panel, and an app version history view. The feedback panel uses `FEEDBACK_EMAIL_ADDRESS` in `src/App.jsx` as its single email source, offers a `mailto:` action that opens the user's email app, and provides a copy-email button. It closes only from explicit in-modal controls so backdrop clicks or mobile viewport retargeting cannot accidentally dismiss it. The home header displays only the current app version.
 
 The color customization screen shows preset and custom palette cards as full-card touch targets. Active palette cards use a separated static double-stroke highlight that is reserved inside each card slot so the active state does not overlap neighboring cards.
 

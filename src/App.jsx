@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { ChevronLeft, ChevronDown, ChevronRight, Play, SkipForward, SkipBack, Check, Plus, Minus, X, Dumbbell, Hexagon, GripVertical, History, Shuffle, Target, Layers, TrendingUp, Info, Weight, ArrowUpToLine, Star, Settings, Palette, Trash2, Pencil, Smartphone, ExternalLink, Image as ImageIcon } from 'lucide-react';
+import { ChevronLeft, ChevronDown, ChevronRight, Play, SkipForward, SkipBack, Check, Plus, Minus, X, Dumbbell, Hexagon, GripVertical, History, Shuffle, Target, Layers, TrendingUp, Info, Weight, ArrowUpToLine, Star, Settings, Palette, Trash2, Pencil, Smartphone, ExternalLink, Image as ImageIcon, Mail, Copy } from 'lucide-react';
 import WORKOUT_EXERCISE_LIBRARY_CSV from '../support files/workout_exercise_library.csv?raw';
 import IOS_HOME_SCREEN_GIF from '../support files/Images/ios_how_to_add_to_homescreen.gif';
 
@@ -139,6 +139,7 @@ const MODES = [
 
 const MODE_LABELS = MODES.reduce((acc, m) => ({ ...acc, [m.key]: m.label }), {});
 const IOS_CUSTOM_ICON_SHORTCUT_URL = 'https://www.icloud.com/shortcuts/bda50f91bc534d649c495f6999fb9cc2';
+const FEEDBACK_EMAIL_ADDRESS = 'seat_peppery.1v@icloud.com';
 const DEFAULT_SETTINGS = {
   rememberSectionState: true,
   homeScreenPromptSeen: false,
@@ -678,6 +679,44 @@ function applyDocumentPalette(paletteVars, rainbowModeActive = false) {
 
   const themeMeta = document.querySelector('meta[name="theme-color"]');
   if (themeMeta) themeMeta.setAttribute('content', documentBg);
+}
+
+function buildFeedbackMailtoUrl() {
+  const subject = encodeURIComponent('Next Set feedback / issue');
+  const body = encodeURIComponent([
+    'Feedback, feature request, or issue:',
+    '',
+    '',
+    'If this is an issue, please include screenshots if possible, the device/browser you are using, what happened, what you expected to happen, and any steps that help reproduce it.',
+  ].join('\n'));
+  return `mailto:${FEEDBACK_EMAIL_ADDRESS}?subject=${subject}&body=${body}`;
+}
+
+async function copyTextToClipboard(text) {
+  if (typeof navigator !== 'undefined' && navigator.clipboard?.writeText) {
+    try {
+      await navigator.clipboard.writeText(text);
+      return true;
+    } catch {
+      // Fall back to the selection-based copy path below.
+    }
+  }
+  if (typeof document === 'undefined') return false;
+
+  const textArea = document.createElement('textarea');
+  textArea.value = text;
+  textArea.setAttribute('readonly', '');
+  textArea.style.position = 'fixed';
+  textArea.style.top = '-1000px';
+  textArea.style.opacity = '0';
+  document.body.appendChild(textArea);
+  textArea.select();
+
+  try {
+    return document.execCommand('copy');
+  } finally {
+    document.body.removeChild(textArea);
+  }
 }
 
 function getBrowserStorage() {
@@ -3020,11 +3059,13 @@ function SettingsModal({ settings, setSettings, onOpenColorSettings, onClose }) 
   const guideOpen = settingsView === 'homescreen' || settingsView === 'iconSetup';
   const title = settingsView === 'version'
     ? 'APP VERSION HISTORY'
-    : settingsView === 'homescreen'
-      ? 'ADD TO HOME SCREEN'
-      : settingsView === 'iconSetup'
-        ? 'CUSTOM ICON SETUP'
-        : 'SETTINGS';
+    : settingsView === 'feedback'
+      ? 'FEEDBACK / ISSUES'
+      : settingsView === 'homescreen'
+        ? 'ADD TO HOME SCREEN'
+        : settingsView === 'iconSetup'
+          ? 'CUSTOM ICON SETUP'
+          : 'SETTINGS';
 
   const toggle = (key) => {
     setSettings(prev => ({ ...prev, [key]: !prev[key] }));
@@ -3073,6 +3114,8 @@ function SettingsModal({ settings, setSettings, onOpenColorSettings, onClose }) 
         <div style={{ flex: 1, overflowY: 'auto', minHeight: 0 }}>
           {settingsView === 'version' ? (
             <VersionHistoryList />
+          ) : settingsView === 'feedback' ? (
+            <FeedbackIssuesPanel />
           ) : settingsView === 'homescreen' ? (
             <IosHomeScreenGuide onAdvanced={() => setSettingsView('iconSetup')} />
           ) : settingsView === 'iconSetup' ? (
@@ -3098,6 +3141,13 @@ function SettingsModal({ settings, setSettings, onOpenColorSettings, onClose }) 
                 label="Add to iOS Home Screen"
                 description="Animated iOS setup guide for an app-like bookmark."
                 onClick={() => setSettingsView('homescreen')}
+              />
+
+              <SettingsAction
+                icon={<Mail size={18} color="var(--accent)" />}
+                label="Submit feedback / issues"
+                description="Send feedback, feature ideas, or issue details by email."
+                onClick={() => setSettingsView('feedback')}
               />
 
               <SettingsAction
@@ -3256,6 +3306,82 @@ function AdvancedHomeScreenIconGuide() {
           Pick your image, then use the Home Screen guide to add the bookmark.
         </GuideStep>
       </div>
+    </div>
+  );
+}
+
+function FeedbackIssuesPanel() {
+  const [copied, setCopied] = useState(false);
+  const resetTimerRef = useRef(null);
+
+  useEffect(() => {
+    return () => {
+      if (resetTimerRef.current) window.clearTimeout(resetTimerRef.current);
+    };
+  }, []);
+
+  const copyEmail = async () => {
+    const ok = await copyTextToClipboard(FEEDBACK_EMAIL_ADDRESS);
+    if (!ok) return;
+    setCopied(true);
+    if (resetTimerRef.current) window.clearTimeout(resetTimerRef.current);
+    resetTimerRef.current = window.setTimeout(() => setCopied(false), 1800);
+  };
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '14px', paddingBottom: '8px' }}>
+      <div>
+        <div className="display" style={{ fontSize: 'clamp(36px, 10vw, 58px)', lineHeight: 0.86, color: 'var(--fg)', marginBottom: '8px' }}>
+          SEND A NOTE
+        </div>
+        <div className="mono" style={{ fontSize: '12px', color: 'var(--muted)', lineHeight: 1.6, maxWidth: '560px' }}>
+          Use this email for feedback, enhancement ideas, feature requests, or issues you run into. If you are reporting a problem, include screenshots if possible, your device and browser, what happened, what you expected, and any steps that help reproduce it.
+        </div>
+      </div>
+
+      <div style={{
+        padding: '14px', background: 'var(--field-bg)', border: '1px solid var(--border)', borderRadius: '2px',
+      }}>
+        <div className="mono" style={{ fontSize: '10px', color: 'var(--subtle)', letterSpacing: '0.08em', marginBottom: '6px' }}>
+          // EMAIL
+        </div>
+        <div className="mono" style={{ fontSize: '14px', color: 'var(--fg)', wordBreak: 'break-all' }}>
+          {FEEDBACK_EMAIL_ADDRESS}
+        </div>
+      </div>
+
+      <a
+        href={buildFeedbackMailtoUrl()}
+        style={{
+          width: '100%', padding: '16px', background: 'var(--accent)', color: 'var(--on-accent)',
+          borderRadius: '2px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px',
+          textDecoration: 'none',
+        }}
+      >
+        <span style={{ display: 'flex', alignItems: 'center', gap: '10px', minWidth: 0 }}>
+          <Mail size={18} />
+          <span style={{ fontSize: '14px', fontWeight: 900, fontFamily: 'Archivo Black, sans-serif', letterSpacing: '0.02em' }}>
+            SEND EMAIL
+          </span>
+        </span>
+        <ExternalLink size={18} />
+      </a>
+
+      <button
+        onClick={copyEmail}
+        style={{
+          width: '100%', padding: '16px', background: 'var(--surface-muted)', color: copied ? 'var(--favorite)' : 'var(--muted-strong)',
+          border: `1px solid ${copied ? alphaColorToken('var(--favorite)', '66') : 'var(--border-strong)'}`,
+          borderRadius: '2px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px',
+        }}
+      >
+        <span style={{ display: 'flex', alignItems: 'center', gap: '10px', minWidth: 0 }}>
+          {copied ? <Check size={18} /> : <Copy size={18} />}
+          <span style={{ fontSize: '13px', fontWeight: 900, fontFamily: 'Archivo Black, sans-serif', letterSpacing: '0.02em' }}>
+            {copied ? 'EMAIL COPIED' : 'COPY EMAIL ADDRESS'}
+          </span>
+        </span>
+      </button>
     </div>
   );
 }
