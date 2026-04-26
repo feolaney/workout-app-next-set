@@ -146,14 +146,23 @@ const DEFAULT_SETTINGS = {
 const RAINBOW_MODE_STORAGE_KEY = 'rainbowModeActive';
 const RAINBOW_TAP_THRESHOLD = 20;
 const RAINBOW_TAP_RESET_MS = 2500;
-const RAINBOW_ACTIVATION_DELAY_MS = 850;
+const RAINBOW_MESSAGE_SEQUENCE_DELAY_MS = 2600;
 const RAINBOW_MODE_THEME_COLOR = '#7C5CFF';
 const RAINBOW_ACTIVATION_MESSAGE = 'Kikis, this is for you';
+const RAINBOW_ACTIVATED_MESSAGE = 'RAINBOW MODE ACTIVATED';
 const RAINBOW_DEACTIVATION_MESSAGE = 'rainbow mode deactivated';
 
-const APP_VERSION = '2.30';
+const APP_VERSION = '2.31';
 
 const APP_VERSION_HISTORY = [
+  {
+    version: '2.31',
+    date: '2026-04-26',
+    type: 'UI',
+    changes: [
+      'Changed Rainbow Mode activation into a two-message sequence with a larger final activation message.',
+    ],
+  },
   {
     version: '2.30',
     date: '2026-04-26',
@@ -2345,7 +2354,7 @@ function HomeScreen({ onStart, onHistory, onFavorites, onColorSettings, onRerun,
   const [namingEntry, setNamingEntry] = useState(null); // entry being named for favoriting
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [showHomeScreenPrompt, setShowHomeScreenPrompt] = useState(false);
-  const [rainbowMessage, setRainbowMessage] = useState({ nonce: 0, text: '' });
+  const [rainbowMessage, setRainbowMessage] = useState({ nonce: 0, text: '', emphasis: 'normal' });
   const rainbowTapCountRef = useRef(0);
   const rainbowTapResetRef = useRef(null);
   const rainbowActivationRef = useRef(null);
@@ -2390,16 +2399,17 @@ function HomeScreen({ onStart, onHistory, onFavorites, onColorSettings, onRerun,
       }
 
       if (rainbowModeActive) {
-        setRainbowMessage(prev => ({ nonce: prev.nonce + 1, text: RAINBOW_DEACTIVATION_MESSAGE }));
+        setRainbowMessage(prev => ({ nonce: prev.nonce + 1, text: RAINBOW_DEACTIVATION_MESSAGE, emphasis: 'normal' }));
         onRainbowModeDeactivate();
         return;
       }
 
-      setRainbowMessage(prev => ({ nonce: prev.nonce + 1, text: RAINBOW_ACTIVATION_MESSAGE }));
+      setRainbowMessage(prev => ({ nonce: prev.nonce + 1, text: RAINBOW_ACTIVATION_MESSAGE, emphasis: 'normal' }));
       rainbowActivationRef.current = window.setTimeout(() => {
         rainbowActivationRef.current = null;
+        setRainbowMessage(prev => ({ nonce: prev.nonce + 1, text: RAINBOW_ACTIVATED_MESSAGE, emphasis: 'strong' }));
         onRainbowModeActivate();
-      }, RAINBOW_ACTIVATION_DELAY_MS);
+      }, RAINBOW_MESSAGE_SEQUENCE_DELAY_MS);
       return;
     }
 
@@ -2496,8 +2506,8 @@ function HomeScreen({ onStart, onHistory, onFavorites, onColorSettings, onRerun,
               padding: '24px',
               color: '#FFFFFF',
               textAlign: 'center',
-              fontSize: 'clamp(32px, 10vw, 92px)',
-              lineHeight: 0.95,
+              fontSize: rainbowMessage.emphasis === 'strong' ? 'clamp(48px, 16vw, 190px)' : 'clamp(32px, 10vw, 92px)',
+              lineHeight: rainbowMessage.emphasis === 'strong' ? 0.82 : 0.95,
               overflowWrap: 'break-word',
               textShadow: '0 5px 28px rgba(0,0,0,0.62), 0 0 28px rgba(255,255,255,0.38)',
             }}
