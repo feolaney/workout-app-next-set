@@ -151,10 +151,28 @@ const RAINBOW_MODE_THEME_COLOR = '#7C5CFF';
 const RAINBOW_ACTIVATION_MESSAGE = 'Kikis, this is for you';
 const RAINBOW_ACTIVATED_MESSAGE = 'RAINBOW MODE ACTIVATED';
 const RAINBOW_DEACTIVATION_MESSAGE = 'rainbow mode deactivated';
+const RAINBOW_MODE_UI_PALETTE = {
+  id: 'rainbow-mode-ui',
+  name: 'Rainbow Mode UI',
+  bg: '#070716',
+  surface: '#111136',
+  fg: '#FFFFFF',
+  accent: '#00F5FF',
+  accent2: '#FF38D8',
+  warn: '#FF3D8F',
+};
 
-const APP_VERSION = '2.31';
+const APP_VERSION = '2.32';
 
 const APP_VERSION_HISTORY = [
+  {
+    version: '2.32',
+    date: '2026-04-26',
+    type: 'UI',
+    changes: [
+      'Added a dedicated vibrant Rainbow Mode UI palette that temporarily overrides text, surfaces, borders, and action colors while preserving the saved theme.',
+    ],
+  },
   {
     version: '2.31',
     date: '2026-04-26',
@@ -601,6 +619,24 @@ function buildPaletteVars(palette) {
     '--on-warn': readableOnColor(warn),
     '--on-favorite': readableOnColor(favorite),
     '--color-scheme': darkBackground ? 'dark' : 'light',
+  };
+}
+
+function buildRainbowModePaletteVars() {
+  const base = buildPaletteVars(RAINBOW_MODE_UI_PALETTE);
+  const favorite = '#FFE600';
+  return {
+    ...base,
+    '--surface-muted': '#191A4D',
+    '--surface-strong': '#292A78',
+    '--field-bg': '#080821',
+    '--muted': '#B7C8FF',
+    '--muted-strong': '#E6FBFF',
+    '--subtle': '#8FA3FF',
+    '--border': '#3444CC',
+    '--border-strong': '#00E5FF',
+    '--favorite': favorite,
+    '--on-favorite': readableOnColor(favorite),
   };
 }
 
@@ -1267,16 +1303,17 @@ export default function WorkoutApp() {
 
   const activePalette = resolvePalette(activePaletteId, customPalettes);
   const paletteVars = buildPaletteVars(activePalette);
+  const effectivePaletteVars = rainbowModeActive ? buildRainbowModePaletteVars() : paletteVars;
 
   useEffect(() => {
-    applyDocumentPalette(paletteVars, rainbowModeActive);
+    applyDocumentPalette(effectivePaletteVars, rainbowModeActive);
   }, [activePalette, rainbowModeActive]);
 
   if (!library) {
     return (
       <div
         className={rainbowModeActive ? 'rainbow-mode-bg' : undefined}
-        style={{ ...paletteVars, minHeight: '100dvh', background: rainbowModeActive ? undefined : 'var(--bg)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--accent)', fontFamily: 'monospace' }}
+        style={{ ...effectivePaletteVars, minHeight: '100dvh', background: rainbowModeActive ? undefined : 'var(--bg)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--accent)', fontFamily: 'monospace' }}
       >
         LOADING...
       </div>
@@ -1459,7 +1496,7 @@ export default function WorkoutApp() {
   return (
     <div
       className={rainbowModeActive ? 'rainbow-mode-bg' : undefined}
-      style={{ ...paletteVars, minHeight: '100dvh', background: rainbowModeActive ? undefined : 'var(--bg)', color: 'var(--fg)', fontFamily: '"JetBrains Mono", "Fira Code", monospace', position: 'relative', overflow: 'hidden' }}
+      style={{ ...effectivePaletteVars, minHeight: '100dvh', background: rainbowModeActive ? undefined : 'var(--bg)', color: 'var(--fg)', fontFamily: '"JetBrains Mono", "Fira Code", monospace', position: 'relative', overflow: 'hidden' }}
     >
       <GlobalStyles />
       {screen === 'colorSettings' && (
