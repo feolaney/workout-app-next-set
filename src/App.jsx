@@ -203,9 +203,18 @@ const RAINBOW_CONFETTI_PIECES = Array.from({ length: RAINBOW_CONFETTI_COUNT }, (
 });
 const RAINBOW_CONFETTI_REST_REPEL = RAINBOW_CONFETTI_PIECES.map(() => ({ x: 0, y: 0, rotation: 0 }));
 
-const APP_VERSION = '2.39';
+const APP_VERSION = '2.40';
 
 const APP_VERSION_HISTORY = [
+  {
+    version: '2.40',
+    date: '2026-04-26',
+    type: 'UI',
+    changes: [
+      'Made Favorites drag reordering show a full-row replacement target highlight instead of only a divider line.',
+      'Matched the Format step exercise-order drag target styling to the clearer full-row outline and glow.',
+    ],
+  },
   {
     version: '2.39',
     date: '2026-04-26',
