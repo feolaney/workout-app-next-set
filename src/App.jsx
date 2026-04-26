@@ -203,9 +203,18 @@ const RAINBOW_CONFETTI_PIECES = Array.from({ length: RAINBOW_CONFETTI_COUNT }, (
 });
 const RAINBOW_CONFETTI_REST_REPEL = RAINBOW_CONFETTI_PIECES.map(() => ({ x: 0, y: 0, rotation: 0 }));
 
-const APP_VERSION = '2.38';
+const APP_VERSION = '2.39';
 
 const APP_VERSION_HISTORY = [
+  {
+    version: '2.39',
+    date: '2026-04-26',
+    type: 'Feature / Bug fix',
+    changes: [
+      'Added a Settings feedback and issues panel with email launch and copy-email actions.',
+      'Stabilized Rainbow Mode rendering by keeping root backgrounds static and moving the animated rainbow to a single fixed background layer.',
+    ],
+  },
   {
     version: '2.38',
     date: '2026-04-26',
