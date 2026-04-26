@@ -148,10 +148,20 @@ const RAINBOW_TAP_THRESHOLD = 20;
 const RAINBOW_TAP_RESET_MS = 2500;
 const RAINBOW_ACTIVATION_DELAY_MS = 850;
 const RAINBOW_MODE_THEME_COLOR = '#7C5CFF';
+const RAINBOW_ACTIVATION_MESSAGE = 'Kikis, this is for you';
+const RAINBOW_DEACTIVATION_MESSAGE = 'rainbow mode deactivated';
 
-const APP_VERSION = '2.29';
+const APP_VERSION = '2.30';
 
 const APP_VERSION_HISTORY = [
+  {
+    version: '2.30',
+    date: '2026-04-26',
+    type: 'UI',
+    changes: [
+      'Updated Rainbow Mode activation and deactivation messages while keeping the same fade animation.',
+    ],
+  },
   {
     version: '2.29',
     date: '2026-04-26',
@@ -2335,7 +2345,7 @@ function HomeScreen({ onStart, onHistory, onFavorites, onColorSettings, onRerun,
   const [namingEntry, setNamingEntry] = useState(null); // entry being named for favoriting
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [showHomeScreenPrompt, setShowHomeScreenPrompt] = useState(false);
-  const [rainbowMessageNonce, setRainbowMessageNonce] = useState(0);
+  const [rainbowMessage, setRainbowMessage] = useState({ nonce: 0, text: '' });
   const rainbowTapCountRef = useRef(0);
   const rainbowTapResetRef = useRef(null);
   const rainbowActivationRef = useRef(null);
@@ -2380,11 +2390,12 @@ function HomeScreen({ onStart, onHistory, onFavorites, onColorSettings, onRerun,
       }
 
       if (rainbowModeActive) {
+        setRainbowMessage(prev => ({ nonce: prev.nonce + 1, text: RAINBOW_DEACTIVATION_MESSAGE }));
         onRainbowModeDeactivate();
         return;
       }
 
-      setRainbowMessageNonce(n => n + 1);
+      setRainbowMessage(prev => ({ nonce: prev.nonce + 1, text: RAINBOW_ACTIVATION_MESSAGE }));
       rainbowActivationRef.current = window.setTimeout(() => {
         rainbowActivationRef.current = null;
         onRainbowModeActivate();
@@ -2469,9 +2480,9 @@ function HomeScreen({ onStart, onHistory, onFavorites, onColorSettings, onRerun,
         >
           <AnimatedTitle />
         </div>
-        {rainbowMessageNonce > 0 && (
+        {rainbowMessage.nonce > 0 && (
           <div
-            key={rainbowMessageNonce}
+            key={rainbowMessage.nonce}
             className="display rainbow-mode-activated-message"
             aria-live="polite"
             style={{
@@ -2487,10 +2498,11 @@ function HomeScreen({ onStart, onHistory, onFavorites, onColorSettings, onRerun,
               textAlign: 'center',
               fontSize: 'clamp(32px, 10vw, 92px)',
               lineHeight: 0.95,
+              overflowWrap: 'break-word',
               textShadow: '0 5px 28px rgba(0,0,0,0.62), 0 0 28px rgba(255,255,255,0.38)',
             }}
           >
-            RAINBOW MODE ACTIVATED
+            {rainbowMessage.text}
           </div>
         )}
         <div className="mono" style={{ fontSize: '13px', color: 'var(--muted)', marginTop: '16px', maxWidth: '320px', lineHeight: 1.5 }}>
