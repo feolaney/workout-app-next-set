@@ -165,6 +165,9 @@ const RAINBOW_CONFETTI_COLORS = [
   '#FF1744', '#FF6D00', '#FFD600', '#76FF03', '#00E676', '#00E5FF',
   '#2979FF', '#651FFF', '#D500F9', '#FF2EA6', '#FFFFFF', '#FFE600',
 ];
+const RAINBOW_CONFETTI_REPEL_RADIUS_PX = 255;
+const RAINBOW_CONFETTI_REPEL_FORCE_PX = 82;
+const RAINBOW_CONFETTI_REPEL_IDLE_MS = 650;
 const RAINBOW_CONFETTI_PIECES = Array.from({ length: 52 }, (_, index) => {
   const driftDirection = index % 2 === 0 ? 1 : -1;
   const driftX = driftDirection * (16 + (index % 7) * 7);
@@ -194,10 +197,19 @@ const RAINBOW_CONFETTI_PIECES = Array.from({ length: 52 }, (_, index) => {
     opacity: 0.34 + (index % 5) * 0.07,
   };
 });
+const RAINBOW_CONFETTI_REST_REPEL = RAINBOW_CONFETTI_PIECES.map(() => ({ x: 0, y: 0, rotation: 0 }));
 
-const APP_VERSION = '2.33';
+const APP_VERSION = '2.34';
 
 const APP_VERSION_HISTORY = [
+  {
+    version: '2.34',
+    date: '2026-04-26',
+    type: 'UI',
+    changes: [
+      'Added pointer and touch repulsion so Rainbow Mode confetti drifts away from the cursor or a dragged finger.',
+    ],
+  },
   {
     version: '2.33',
     date: '2026-04-26',
@@ -1797,13 +1809,21 @@ function GlobalStyles() {
         width: var(--confetti-width);
         height: var(--confetti-height);
         border-radius: 2px;
-        background: var(--confetti-color);
         opacity: 0;
-        box-shadow: 0 0 14px color-mix(in srgb, var(--confetti-color) 46%, transparent);
         transform-origin: center;
         animation: rainbow-confetti-float var(--confetti-duration) ease-in-out infinite;
         animation-delay: var(--confetti-delay);
         will-change: transform, opacity;
+      }
+      .rainbow-confetti-face {
+        position: absolute;
+        inset: 0;
+        border-radius: inherit;
+        background: var(--confetti-color);
+        box-shadow: 0 0 14px color-mix(in srgb, var(--confetti-color) 46%, transparent);
+        transform: translate3d(var(--confetti-repel-x, 0px), var(--confetti-repel-y, 0px), 0) rotate(var(--confetti-repel-rotation, 0deg));
+        transition: transform 180ms ease-out;
+        will-change: transform;
       }
       .rainbow-confetti-piece[data-shape="dot"] {
         border-radius: 999px;
@@ -1933,32 +1953,126 @@ function GrainOverlay() {
 }
 
 function RainbowConfettiLayer() {
+  const [repelOffsets, setRepelOffsets] = useState(RAINBOW_CONFETTI_REST_REPEL);
+  const pointerRef = useRef(null);
+  const frameRef = useRef(null);
+  const clearRef = useRef(null);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return undefined;
+
+    const resetRepel = () => {
+      pointerRef.current = null;
+      if (frameRef.current) {
+        window.cancelAnimationFrame(frameRef.current);
+        frameRef.current = null;
+      }
+      setRepelOffsets(RAINBOW_CONFETTI_REST_REPEL);
+    };
+
+    const scheduleRepel = (x, y) => {
+      pointerRef.current = { x, y };
+      if (clearRef.current) window.clearTimeout(clearRef.current);
+      clearRef.current = window.setTimeout(() => {
+        clearRef.current = null;
+        resetRepel();
+      }, RAINBOW_CONFETTI_REPEL_IDLE_MS);
+
+      if (frameRef.current) return;
+      frameRef.current = window.requestAnimationFrame(() => {
+        frameRef.current = null;
+        const pointer = pointerRef.current;
+        if (!pointer) return;
+
+        const width = window.innerWidth || 1;
+        const height = window.innerHeight || 1;
+        const radius = Math.min(RAINBOW_CONFETTI_REPEL_RADIUS_PX, Math.max(width, height) * 0.34);
+
+        setRepelOffsets(RAINBOW_CONFETTI_PIECES.map((piece, index) => {
+          const pieceX = (piece.x / 100) * width;
+          const pieceY = (piece.y / 100) * height;
+          const dx = pieceX - pointer.x;
+          const dy = pieceY - pointer.y;
+          const distance = Math.hypot(dx, dy);
+          if (distance > radius) return RAINBOW_CONFETTI_REST_REPEL[index];
+
+          const fallbackAngle = ((index * 137) % 360) * (Math.PI / 180);
+          const unitX = distance > 0 ? dx / distance : Math.cos(fallbackAngle);
+          const unitY = distance > 0 ? dy / distance : Math.sin(fallbackAngle);
+          const force = Math.pow(1 - distance / radius, 2) * RAINBOW_CONFETTI_REPEL_FORCE_PX;
+          const rotationDirection = index % 2 === 0 ? 1 : -1;
+
+          return {
+            x: unitX * force,
+            y: unitY * force,
+            rotation: rotationDirection * force * 0.72,
+          };
+        }));
+      });
+    };
+
+    const handlePointerMove = (event) => {
+      scheduleRepel(event.clientX, event.clientY);
+    };
+
+    const handleTouchMove = (event) => {
+      const touch = event.touches && event.touches[0];
+      if (touch) scheduleRepel(touch.clientX, touch.clientY);
+    };
+
+    window.addEventListener('pointermove', handlePointerMove, { passive: true });
+    window.addEventListener('touchmove', handleTouchMove, { passive: true });
+    window.addEventListener('pointerleave', resetRepel);
+    window.addEventListener('pointercancel', resetRepel);
+    window.addEventListener('touchend', resetRepel);
+    window.addEventListener('touchcancel', resetRepel);
+
+    return () => {
+      window.removeEventListener('pointermove', handlePointerMove);
+      window.removeEventListener('touchmove', handleTouchMove);
+      window.removeEventListener('pointerleave', resetRepel);
+      window.removeEventListener('pointercancel', resetRepel);
+      window.removeEventListener('touchend', resetRepel);
+      window.removeEventListener('touchcancel', resetRepel);
+      if (clearRef.current) window.clearTimeout(clearRef.current);
+      if (frameRef.current) window.cancelAnimationFrame(frameRef.current);
+    };
+  }, []);
+
   return (
     <div className="rainbow-confetti-layer" aria-hidden="true">
-      {RAINBOW_CONFETTI_PIECES.map((piece, index) => (
-        <span
-          key={`${piece.color}-${index}`}
-          className="rainbow-confetti-piece"
-          data-shape={piece.shape}
-          style={{
-            '--confetti-x': `${piece.x}%`,
-            '--confetti-y': `${piece.y}%`,
-            '--confetti-width': `${piece.width}px`,
-            '--confetti-height': `${piece.height}px`,
-            '--confetti-color': piece.color,
-            '--confetti-drift-x': `${piece.driftX}px`,
-            '--confetti-drift-y': `${piece.driftY}px`,
-            '--confetti-end-x': `${piece.endX}px`,
-            '--confetti-end-y': `${piece.endY}px`,
-            '--confetti-rotation': `${piece.rotation}deg`,
-            '--confetti-mid-rotation': `${piece.midRotation}deg`,
-            '--confetti-end-rotation': `${piece.endRotation}deg`,
-            '--confetti-duration': `${piece.duration}s`,
-            '--confetti-delay': `${piece.delay}s`,
-            '--confetti-opacity': `${piece.opacity}`,
-          }}
-        />
-      ))}
+      {RAINBOW_CONFETTI_PIECES.map((piece, index) => {
+        const repel = repelOffsets[index] || RAINBOW_CONFETTI_REST_REPEL[index];
+        return (
+          <span
+            key={`${piece.color}-${index}`}
+            className="rainbow-confetti-piece"
+            data-shape={piece.shape}
+            style={{
+              '--confetti-x': `${piece.x}%`,
+              '--confetti-y': `${piece.y}%`,
+              '--confetti-width': `${piece.width}px`,
+              '--confetti-height': `${piece.height}px`,
+              '--confetti-color': piece.color,
+              '--confetti-drift-x': `${piece.driftX}px`,
+              '--confetti-drift-y': `${piece.driftY}px`,
+              '--confetti-end-x': `${piece.endX}px`,
+              '--confetti-end-y': `${piece.endY}px`,
+              '--confetti-rotation': `${piece.rotation}deg`,
+              '--confetti-mid-rotation': `${piece.midRotation}deg`,
+              '--confetti-end-rotation': `${piece.endRotation}deg`,
+              '--confetti-duration': `${piece.duration}s`,
+              '--confetti-delay': `${piece.delay}s`,
+              '--confetti-opacity': `${piece.opacity}`,
+              '--confetti-repel-x': `${repel.x}px`,
+              '--confetti-repel-y': `${repel.y}px`,
+              '--confetti-repel-rotation': `${repel.rotation}deg`,
+            }}
+          >
+            <span className="rainbow-confetti-face" />
+          </span>
+        );
+      })}
     </div>
   );
 }
