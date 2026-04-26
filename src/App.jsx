@@ -149,9 +149,17 @@ const RAINBOW_TAP_RESET_MS = 2500;
 const RAINBOW_ACTIVATION_DELAY_MS = 850;
 const RAINBOW_MODE_THEME_COLOR = '#7C5CFF';
 
-const APP_VERSION = '2.28';
+const APP_VERSION = '2.29';
 
 const APP_VERSION_HISTORY = [
+  {
+    version: '2.29',
+    date: '2026-04-26',
+    type: 'UI',
+    changes: [
+      'Made Rainbow Mode more vibrant with a denser full-spectrum color mix while preserving the faster movement.',
+    ],
+  },
   {
     version: '2.28',
     date: '2026-04-26',
@@ -1649,11 +1657,11 @@ function GlobalStyles() {
       #root.rainbow-mode-bg,
       .rainbow-mode-bg {
         background:
-          linear-gradient(rgba(8,8,12,0.3), rgba(8,8,12,0.3)),
-          radial-gradient(circle at 18% 18%, rgba(255,255,255,0.24), transparent 24%),
-          radial-gradient(circle at 82% 76%, rgba(255,255,255,0.18), transparent 28%),
-          linear-gradient(45deg, rgba(255,0,76,0.55), rgba(255,214,0,0.48), rgba(0,255,133,0.5), rgba(0,200,255,0.5), rgba(208,0,255,0.52), rgba(255,0,153,0.55)),
-          linear-gradient(120deg, #ff003d, #ff3d00, #ff9500, #ffd400, #bfff00, #36ff00, #00ff85, #00f5ff, #0088ff, #244dff, #7a3cff, #d000ff, #ff0099, #ff003d);
+          linear-gradient(rgba(4,4,10,0.2), rgba(4,4,10,0.2)),
+          radial-gradient(circle at 18% 18%, rgba(255,255,255,0.28), transparent 24%),
+          radial-gradient(circle at 82% 76%, rgba(255,255,255,0.2), transparent 28%),
+          conic-gradient(from 0.08turn at 50% 50%, #ff0000, #ff2b00, #ff5c00, #ff8c00, #ffbf00, #ffff00, #b7ff00, #73ff00, #2bff00, #00ff22, #00ff66, #00ffaa, #00ffff, #00b7ff, #0073ff, #002bff, #3300ff, #7300ff, #b700ff, #ff00ff, #ff00b7, #ff0073, #ff002b, #ff0000),
+          linear-gradient(120deg, #ff0000 0%, #ff1c00 3%, #ff4000 6%, #ff6600 9%, #ff8c00 12%, #ffb300 15%, #ffde00 18%, #ffff00 21%, #caff00 24%, #99ff00 27%, #66ff00 30%, #33ff00 33%, #00ff00 36%, #00ff38 39%, #00ff73 42%, #00ffaa 45%, #00ffe1 48%, #00ffff 51%, #00caff 54%, #0099ff 57%, #0066ff 60%, #0033ff 63%, #0000ff 66%, #3300ff 69%, #6600ff 72%, #9900ff 75%, #cc00ff 78%, #ff00ff 81%, #ff00cc 84%, #ff0099 87%, #ff0066 90%, #ff0038 94%, #ff0000 100%);
         background-size: 100% 100%, 180% 180%, 220% 220%, 340% 340%, 460% 460%;
         animation: rainbow-bg-flow 8s ease-in-out infinite;
       }
