@@ -633,6 +633,7 @@ function buildRainbowModePaletteVars() {
   const favorite = '#FFE600';
   return {
     ...base,
+    '--on-accent': DEFAULT_DARK_TEXT,
     '--surface-muted': '#191A4D',
     '--surface-strong': '#292A78',
     '--field-bg': '#080821',
@@ -1701,6 +1702,11 @@ function GlobalStyles() {
       .display { font-family: 'Archivo Black', sans-serif; letter-spacing: -0.02em; }
       .stencil { font-family: 'Bebas Neue', sans-serif; letter-spacing: 0.05em; }
       .mono { font-family: 'JetBrains Mono', monospace; }
+      @property --accent {
+        syntax: '<color>';
+        inherits: true;
+        initial-value: #00F5FF;
+      }
       @keyframes rainbow-bg-flow {
         0% { background-position: 50% 50%, 0% 18%, 100% 84%, 0% 50%, 12% 50%; }
         20% { background-position: 50% 50%, 82% 8%, 18% 62%, 46% 14%, 38% 24%; }
@@ -1708,6 +1714,14 @@ function GlobalStyles() {
         60% { background-position: 50% 50%, 30% 100%, 88% 10%, 58% 100%, 100% 36%; }
         80% { background-position: 50% 50%, 6% 42%, 38% 100%, 18% 72%, 54% 90%; }
         100% { background-position: 50% 50%, 0% 18%, 100% 84%, 0% 50%, 12% 50%; }
+      }
+      @keyframes rainbow-accent-party-pulse {
+        0%, 100% { --accent: #00F5FF; }
+        18% { --accent: #B6FF00; }
+        36% { --accent: #FFE600; }
+        54% { --accent: #FF6FD8; }
+        72% { --accent: #FF9F1C; }
+        88% { --accent: #73FFF2; }
       }
       @keyframes rainbow-mode-message {
         0% { opacity: 0; transform: translateY(14px) scale(0.98); }
@@ -1743,7 +1757,9 @@ function GlobalStyles() {
           conic-gradient(from 0.08turn at 50% 50%, #ff0000, #ff2b00, #ff5c00, #ff8c00, #ffbf00, #ffff00, #b7ff00, #73ff00, #2bff00, #00ff22, #00ff66, #00ffaa, #00ffff, #00b7ff, #0073ff, #002bff, #3300ff, #7300ff, #b700ff, #ff00ff, #ff00b7, #ff0073, #ff002b, #ff0000),
           linear-gradient(120deg, #ff0000 0%, #ff1c00 3%, #ff4000 6%, #ff6600 9%, #ff8c00 12%, #ffb300 15%, #ffde00 18%, #ffff00 21%, #caff00 24%, #99ff00 27%, #66ff00 30%, #33ff00 33%, #00ff00 36%, #00ff38 39%, #00ff73 42%, #00ffaa 45%, #00ffe1 48%, #00ffff 51%, #00caff 54%, #0099ff 57%, #0066ff 60%, #0033ff 63%, #0000ff 66%, #3300ff 69%, #6600ff 72%, #9900ff 75%, #cc00ff 78%, #ff00ff 81%, #ff00cc 84%, #ff0099 87%, #ff0066 90%, #ff0038 94%, #ff0000 100%);
         background-size: 100% 100%, 180% 180%, 220% 220%, 340% 340%, 460% 460%;
-        animation: rainbow-bg-flow 8s ease-in-out infinite;
+        animation:
+          rainbow-bg-flow 8s ease-in-out infinite,
+          rainbow-accent-party-pulse 4.4s cubic-bezier(0.45, 0, 0.25, 1) infinite;
       }
       .rainbow-mode-activated-message {
         animation: rainbow-mode-message 2.6s cubic-bezier(0.22, 1, 0.36, 1) both;
