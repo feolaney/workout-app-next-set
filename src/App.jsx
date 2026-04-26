@@ -144,6 +144,8 @@ const DEFAULT_SETTINGS = {
   rememberSectionState: true,
   homeScreenPromptSeen: false,
 };
+const HOME_RECENT_LIMIT = 5;
+const HOME_RECENT_LOOKBACK_MS = 3 * 24 * 60 * 60 * 1000;
 const RAINBOW_MODE_STORAGE_KEY = 'rainbowModeActive';
 const RAINBOW_TAP_THRESHOLD = 20;
 const RAINBOW_TAP_RESET_MS = 2500;
@@ -1151,6 +1153,14 @@ function partialProgressLabel(entry) {
   return `${getPartialCompletedCount(entry)}/${total} sets complete`;
 }
 
+function isHomeRecentWorkout(entry, now = Date.now()) {
+  if (!entry || isPartialHistoryEntry(entry)) return false;
+  const date = Number(entry.date);
+  if (!Number.isFinite(date)) return false;
+  const age = now - date;
+  return age >= 0 && age <= HOME_RECENT_LOOKBACK_MS;
+}
+
 function upsertPartialHistoryEntry(history, partialEntry) {
   const key = partialEntry.partialKey || makeHistoryWorkoutKey(partialEntry);
   return [
@@ -1500,6 +1510,28 @@ export default function WorkoutApp() {
     setFavorites(nextFavorites);
   };
 
+  const removeHistoryEntry = (targetEntry, targetIndex) => {
+    setHistory(prev => {
+      if (prev[targetIndex] === targetEntry) {
+        return prev.filter((_, i) => i !== targetIndex);
+      }
+
+      const refIndex = prev.findIndex(entry => entry === targetEntry);
+      if (refIndex >= 0) {
+        return prev.filter((_, i) => i !== refIndex);
+      }
+
+      const fallbackIndex = prev.findIndex(entry => (
+        entry.date === targetEntry?.date
+        && entry.mode === targetEntry?.mode
+        && (entry.partialKey || '') === (targetEntry?.partialKey || '')
+        && (entry.status || '') === (targetEntry?.status || '')
+      ));
+
+      return fallbackIndex >= 0 ? prev.filter((_, i) => i !== fallbackIndex) : prev;
+    });
+  };
+
   // Build a workout entry from current active state (for starring mid-workout)
   const currentWorkoutAsEntry = () => ({
     date: Date.now(),
@@ -1642,6 +1674,7 @@ export default function WorkoutApp() {
           onRerun={rerunFromHistory}
           onContinuePartial={continueFromHistory}
           onClear={() => setHistory([])}
+          onDeleteEntry={removeHistoryEntry}
           findMatchingFavorite={findMatchingFavorite}
           addFavorite={addFavorite}
           removeFavorite={removeFavorite}
@@ -2686,7 +2719,8 @@ function HomeScreen({ onStart, onHistory, onFavorites, onColorSettings, onRerun,
   const rainbowActivationRef = useRef(null);
   const rainbowTitleRef = useRef(null);
 
-  const recent = history.filter(entry => !isPartialHistoryEntry(entry)).slice(0, 5);
+  const recentNow = Date.now();
+  const recent = history.filter(entry => isHomeRecentWorkout(entry, recentNow)).slice(0, HOME_RECENT_LIMIT);
   const favs = favorites.slice(0, 5);
   const hasFavorites = favorites.length > 0;
 
@@ -3795,6 +3829,67 @@ function DraggableFavoriteList({ favorites, onReorder, onRun, onInfo, onEdit, on
   );
 }
 
+function HistoryWorkoutList({ history, onRun, onInfo, onStarToggle, onDelete, findMatchingFavorite }) {
+  const [confirmDeleteId, setConfirmDeleteId] = useState(null);
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+      {history.map((entry, i) => {
+        const rowId = `${entry.date || 'history'}-${entry.partialKey || entry.status || entry.mode || 'complete'}-${i}`;
+        const confirmingDelete = confirmDeleteId === rowId;
+
+        return (
+          <div
+            key={rowId}
+            style={{ display: 'flex', alignItems: 'stretch', gap: '4px' }}
+          >
+            <div style={{
+              flex: 1, minWidth: 0,
+              transform: confirmingDelete ? 'translateX(-6px)' : 'translateX(0)',
+              transition: 'transform 0.18s ease',
+            }}>
+              <RecentWorkoutCard
+                entry={entry}
+                opacity={1}
+                onRun={() => onRun(entry)}
+                onInfo={() => onInfo(entry)}
+                onStarToggle={() => onStarToggle(entry)}
+                findMatchingFavorite={findMatchingFavorite}
+              />
+            </div>
+            <button
+              type="button"
+              onClick={() => {
+                if (confirmingDelete) {
+                  setConfirmDeleteId(null);
+                  onDelete(entry, i);
+                } else {
+                  setConfirmDeleteId(rowId);
+                }
+              }}
+              onBlur={() => setTimeout(() => setConfirmDeleteId(current => current === rowId ? null : current), 120)}
+              aria-label={confirmingDelete ? 'Confirm delete history workout' : 'Delete history workout'}
+              className="mono"
+              style={{
+                width: confirmingDelete ? '74px' : '34px',
+                background: confirmingDelete ? 'var(--warn)' : 'var(--surface)',
+                border: `1px solid ${confirmingDelete ? 'var(--warn)' : 'var(--border)'}`,
+                borderRadius: '2px', color: confirmingDelete ? 'var(--on-warn)' : 'var(--muted)',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                fontSize: '10px', fontWeight: 900, letterSpacing: '0.04em',
+                transition: 'width 0.18s ease, background 0.18s ease, color 0.18s ease',
+                flexShrink: 0,
+              }}
+            >
+              {confirmingDelete ? 'DELETE?' : <Trash2 size={15} />}
+            </button>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
 function WorkoutInfoModal({ entry, library, onClose, onRun, onContinue, onStartOver }) {
   const cats = entry.categories || [];
   const mods = entry.modifiers || [];
@@ -3950,7 +4045,7 @@ function PartialWorkoutActionModal({ entry, onCancel, onContinue, onStartOver })
   );
 }
 
-function HistoryScreen({ history, library, onBack, onRerun, onContinuePartial, onClear, findMatchingFavorite, addFavorite, removeFavorite }) {
+function HistoryScreen({ history, library, onBack, onRerun, onContinuePartial, onClear, onDeleteEntry, findMatchingFavorite, addFavorite, removeFavorite }) {
   const [infoFor, setInfoFor] = useState(null);
   const [partialActionFor, setPartialActionFor] = useState(null);
   const [confirmClear, setConfirmClear] = useState(false);
@@ -4018,19 +4113,14 @@ function HistoryScreen({ history, library, onBack, onRerun, onContinuePartial, o
             <div style={{ fontSize: '13px', marginTop: '8px' }}>Finish or quit a workout and it'll show up.</div>
           </div>
         ) : (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-            {history.map(entry => (
-              <RecentWorkoutCard
-                key={entry.date}
-                entry={entry}
-                opacity={1}
-                onRun={() => handleRunEntry(entry)}
-                onInfo={() => setInfoFor(entry)}
-                onStarToggle={() => handleStarToggle(entry)}
-                findMatchingFavorite={findMatchingFavorite}
-              />
-            ))}
-          </div>
+          <HistoryWorkoutList
+            history={history}
+            onRun={handleRunEntry}
+            onInfo={setInfoFor}
+            onStarToggle={handleStarToggle}
+            onDelete={onDeleteEntry}
+            findMatchingFavorite={findMatchingFavorite}
+          />
         )}
       </div>
 
