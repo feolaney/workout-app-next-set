@@ -168,7 +168,8 @@ const RAINBOW_CONFETTI_COLORS = [
 const RAINBOW_CONFETTI_REPEL_RADIUS_PX = 255;
 const RAINBOW_CONFETTI_REPEL_FORCE_PX = 82;
 const RAINBOW_CONFETTI_REPEL_IDLE_MS = 650;
-const RAINBOW_CONFETTI_PIECES = Array.from({ length: 52 }, (_, index) => {
+const RAINBOW_CONFETTI_COUNT = 68;
+const RAINBOW_CONFETTI_PIECES = Array.from({ length: RAINBOW_CONFETTI_COUNT }, (_, index) => {
   const driftDirection = index % 2 === 0 ? 1 : -1;
   const driftX = driftDirection * (16 + (index % 7) * 7);
   const driftY = 34 + (index % 8) * 9;
@@ -199,9 +200,17 @@ const RAINBOW_CONFETTI_PIECES = Array.from({ length: 52 }, (_, index) => {
 });
 const RAINBOW_CONFETTI_REST_REPEL = RAINBOW_CONFETTI_PIECES.map(() => ({ x: 0, y: 0, rotation: 0 }));
 
-const APP_VERSION = '2.34';
+const APP_VERSION = '2.35';
 
 const APP_VERSION_HISTORY = [
+  {
+    version: '2.35',
+    date: '2026-04-26',
+    type: 'UI',
+    changes: [
+      'Increased Rainbow Mode confetti density by 30%.',
+    ],
+  },
   {
     version: '2.34',
     date: '2026-04-26',
