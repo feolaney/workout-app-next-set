@@ -172,7 +172,7 @@ Exercise, short-rest, and long-rest views all show the primary next exercise plu
 
 History stores completed and partial workouts, capped to the latest 100 entries. Home's recent-completed section filters out partial entries, so partial workouts appear only in History until they are completed.
 
-Favorites are saved workout entries with a user-facing name and `favId`. New favorites are appended to the bottom of the saved list by default. The favorite naming modal closes only through its Save and Cancel controls so mobile keyboard or viewport shifts cannot accidentally dismiss an in-progress name. The Home favorites dropdown shows the top five favorites in persisted order and links to the full Favorites screen. The Favorites screen renders the full persisted order with drag handles, rename controls, and a two-step delete confirmation.
+Favorites are saved workout entries with a user-facing name and `favId`. New favorites are appended to the bottom of the saved list by default. The favorite naming modal closes only through its Save and Cancel controls so mobile keyboard or viewport shifts cannot accidentally dismiss an in-progress name. The Home favorites dropdown shows the top five favorites in persisted order and links to the full Favorites screen. The Favorites screen renders the full persisted order with drag handles, a full-row replacement target highlight while dragging, rename controls, and a two-step delete confirmation.
 
 Favorite matching is based on a generated workout signature:
 

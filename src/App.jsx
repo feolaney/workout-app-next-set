@@ -3695,12 +3695,24 @@ function DraggableFavoriteList({ favorites, onReorder, onRun, onInfo, onEdit, on
             key={rowId}
             data-favorite-row
             style={{
-              display: 'flex', alignItems: 'stretch', gap: '6px',
+              display: 'flex', alignItems: 'stretch', gap: '6px', position: 'relative',
               opacity: isDragging ? 0.55 : 1,
-              boxShadow: isDropTarget ? 'inset 0 -2px 0 0 var(--favorite)' : 'none',
-              transition: dragState ? 'none' : 'opacity 0.15s',
+              transform: isDropTarget ? 'translateY(-1px)' : 'translateY(0)',
+              transition: dragState ? 'none' : 'opacity 0.15s, transform 0.15s ease',
+              zIndex: isDropTarget ? 2 : 1,
             }}
           >
+            {isDropTarget && (
+              <div
+                aria-hidden="true"
+                style={{
+                  position: 'absolute', inset: '-4px', border: '2px solid var(--favorite)',
+                  borderRadius: '4px', background: alphaColorToken('var(--favorite)', '12'),
+                  boxShadow: `0 0 0 3px ${alphaColorToken('var(--favorite)', '24')}, 0 0 18px ${alphaColorToken('var(--favorite)', '33')}`,
+                  pointerEvents: 'none', zIndex: 3,
+                }}
+              />
+            )}
             <button
               type="button"
               onMouseDown={e => startDrag(e, i)}
