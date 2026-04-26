@@ -200,9 +200,17 @@ const RAINBOW_CONFETTI_PIECES = Array.from({ length: RAINBOW_CONFETTI_COUNT }, (
 });
 const RAINBOW_CONFETTI_REST_REPEL = RAINBOW_CONFETTI_PIECES.map(() => ({ x: 0, y: 0, rotation: 0 }));
 
-const APP_VERSION = '2.37';
+const APP_VERSION = '2.38';
 
 const APP_VERSION_HISTORY = [
+  {
+    version: '2.38',
+    date: '2026-04-26',
+    type: 'Bug fix',
+    changes: [
+      'Prevented Settings and favorite naming modals from closing due to backdrop taps or mobile viewport retargeting.',
+    ],
+  },
   {
     version: '2.37',
     date: '2026-04-26',
