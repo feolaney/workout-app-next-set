@@ -144,9 +144,17 @@ const DEFAULT_SETTINGS = {
   homeScreenPromptSeen: false,
 };
 
-const APP_VERSION = '2.23';
+const APP_VERSION = '2.24';
 
 const APP_VERSION_HISTORY = [
+  {
+    version: '2.24',
+    date: '2026-04-26',
+    type: 'UI',
+    changes: [
+      'Added a subtle pulsing glow to the active color palette card highlight.',
+    ],
+  },
   {
     version: '2.23',
     date: '2026-04-26',
@@ -1581,10 +1589,25 @@ function GlobalStyles() {
         60% { transform: translateX(-8px); opacity: 1; }
         100% { transform: translateX(0); opacity: 1; }
       }
+      @keyframes palette-card-active-glow {
+        0%, 100% {
+          box-shadow: 0 0 3px 0 color-mix(in srgb, currentColor 24%, transparent);
+        }
+        50% {
+          box-shadow: 0 0 8px 1px color-mix(in srgb, currentColor 42%, transparent);
+        }
+      }
       .slide-in { animation: slide-up 0.4s ease-out both; }
       .fade-in { animation: fade-in 0.25s ease-out both; }
       .title-slide-top { animation: title-in-top 0.55s cubic-bezier(0.22, 1, 0.36, 1) both; }
       .title-slide-bottom { animation: title-in-bottom 0.55s cubic-bezier(0.22, 1, 0.36, 1) 0.08s both; }
+      .palette-card-active-glow { animation: palette-card-active-glow 2.4s ease-in-out infinite; }
+      @media (prefers-reduced-motion: reduce) {
+        .palette-card-active-glow {
+          animation: none;
+          box-shadow: 0 0 5px 0 color-mix(in srgb, currentColor 28%, transparent);
+        }
+      }
       .active-workout-screen {
         --active-header-meta-size: 11px;
         --active-content-x: 24px;
@@ -1895,6 +1918,7 @@ function PaletteCard({ palette, active, onTap, onEdit }) {
 
   return (
     <div
+      className={active ? 'palette-card-active-glow' : undefined}
       role="button"
       tabIndex={0}
       onClick={selectPalette}
@@ -1906,6 +1930,7 @@ function PaletteCard({ palette, active, onTap, onEdit }) {
         position: 'relative',
         cursor: 'pointer',
         touchAction: 'manipulation',
+        color: palette.accent,
       }}
     >
       <div
