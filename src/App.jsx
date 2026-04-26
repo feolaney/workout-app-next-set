@@ -200,80 +200,16 @@ const RAINBOW_CONFETTI_PIECES = Array.from({ length: RAINBOW_CONFETTI_COUNT }, (
 });
 const RAINBOW_CONFETTI_REST_REPEL = RAINBOW_CONFETTI_PIECES.map(() => ({ x: 0, y: 0, rotation: 0 }));
 
-const APP_VERSION = '2.35';
+const APP_VERSION = '2.36';
 
 const APP_VERSION_HISTORY = [
   {
-    version: '2.35',
-    date: '2026-04-26',
-    type: 'UI',
-    changes: [
-      'Increased Rainbow Mode confetti density by 30%.',
-    ],
-  },
-  {
-    version: '2.34',
-    date: '2026-04-26',
-    type: 'UI',
-    changes: [
-      'Added pointer and touch repulsion so Rainbow Mode confetti drifts away from the cursor or a dragged finger.',
-    ],
-  },
-  {
-    version: '2.33',
-    date: '2026-04-26',
-    type: 'UI',
-    changes: [
-      'Added slow floating multicolor confetti behind the app content while Rainbow Mode is active.',
-    ],
-  },
-  {
-    version: '2.32',
-    date: '2026-04-26',
-    type: 'UI',
-    changes: [
-      'Added a dedicated vibrant Rainbow Mode UI palette that temporarily overrides text, surfaces, borders, and action colors while preserving the saved theme.',
-    ],
-  },
-  {
-    version: '2.31',
-    date: '2026-04-26',
-    type: 'UI',
-    changes: [
-      'Changed Rainbow Mode activation into a two-message sequence with a larger final activation message.',
-    ],
-  },
-  {
-    version: '2.30',
-    date: '2026-04-26',
-    type: 'UI',
-    changes: [
-      'Updated Rainbow Mode activation and deactivation messages while keeping the same fade animation.',
-    ],
-  },
-  {
-    version: '2.29',
-    date: '2026-04-26',
-    type: 'UI',
-    changes: [
-      'Made Rainbow Mode more vibrant with a denser full-spectrum color mix while preserving the faster movement.',
-    ],
-  },
-  {
-    version: '2.28',
-    date: '2026-04-26',
-    type: 'UI',
-    changes: [
-      'Expanded Rainbow Mode with a broader color spectrum and faster, more active background movement.',
-    ],
-  },
-  {
-    version: '2.27',
+    version: '2.36',
     date: '2026-04-26',
     type: 'Feature / UI',
     changes: [
-      'Added a hidden persisted Rainbow Mode that toggles from the home title after 20 taps.',
-      'Applied the animated rainbow background across the app shell, root, document, and mobile safe-area surfaces without changing the selected palette.',
+      'Added Rainbow Mode, activated by a hidden secret action and kept separate from the selected color palette.',
+      'Added a full-spectrum animated background, vibrant readable Rainbow Mode UI colors, activation and deactivation messages, and floating confetti with pointer and touch repulsion.',
     ],
   },
   {
