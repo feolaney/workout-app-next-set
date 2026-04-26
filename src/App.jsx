@@ -205,9 +205,19 @@ const RAINBOW_CONFETTI_PIECES = Array.from({ length: RAINBOW_CONFETTI_COUNT }, (
 });
 const RAINBOW_CONFETTI_REST_REPEL = RAINBOW_CONFETTI_PIECES.map(() => ({ x: 0, y: 0, rotation: 0 }));
 
-const APP_VERSION = '2.40';
+const APP_VERSION = '2.41';
 
 const APP_VERSION_HISTORY = [
+  {
+    version: '2.41',
+    date: '2026-04-26',
+    type: 'Feature / UI',
+    changes: [
+      'Limited Home Recent to up to five completed workouts from the last three days.',
+      'Kept the History screen showing the full persisted workout list.',
+      'Added two-step trash deletion for individual History entries.',
+    ],
+  },
   {
     version: '2.40',
     date: '2026-04-26',
