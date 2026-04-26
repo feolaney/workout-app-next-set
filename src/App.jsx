@@ -5064,16 +5064,28 @@ function OrderList({ exercises, setExercises, mode, supersetSize = 2 }) {
               <div
                 data-row
                 style={{
-                  padding: '10px 0', display: 'flex', alignItems: 'center', gap: '8px',
+                  padding: '10px 0', display: 'flex', alignItems: 'center', gap: '8px', position: 'relative',
                   borderBottom: isGroupEnd ? 'none' : '1px solid var(--border)',
                   background: isDragging ? 'var(--surface-muted)' : 'transparent',
                   opacity: isDragging ? 0.55 : 1,
-                  boxShadow: isDropTarget ? `inset 0 -2px 0 0 var(--accent)` : 'none',
-                  transition: dragState ? 'none' : 'background 0.15s',
+                  transform: isDropTarget ? 'translateY(-1px)' : 'translateY(0)',
+                  transition: dragState ? 'none' : 'background 0.15s, transform 0.15s ease',
+                  zIndex: isDropTarget ? 2 : 1,
                   userSelect: 'none',
                   WebkitUserSelect: 'none',
                 }}
               >
+                {isDropTarget && (
+                  <div
+                    aria-hidden="true"
+                    style={{
+                      position: 'absolute', inset: '-4px', border: '2px solid var(--accent)',
+                      borderRadius: '4px', background: alphaColorToken('var(--accent)', '12'),
+                      boxShadow: `0 0 0 3px ${alphaColorToken('var(--accent)', '24')}, 0 0 18px ${alphaColorToken('var(--accent)', '33')}`,
+                      pointerEvents: 'none', zIndex: 3,
+                    }}
+                  />
+                )}
                 <div className="mono" style={{
                   fontSize: '10px', color: 'var(--subtle)', width: '22px', flexShrink: 0,
                 }}>{String(displayIdx + 1).padStart(2, '0')}</div>
