@@ -149,9 +149,17 @@ const RAINBOW_TAP_RESET_MS = 2500;
 const RAINBOW_ACTIVATION_DELAY_MS = 850;
 const RAINBOW_MODE_THEME_COLOR = '#7C5CFF';
 
-const APP_VERSION = '2.27';
+const APP_VERSION = '2.28';
 
 const APP_VERSION_HISTORY = [
+  {
+    version: '2.28',
+    date: '2026-04-26',
+    type: 'UI',
+    changes: [
+      'Expanded Rainbow Mode with a broader color spectrum and faster, more active background movement.',
+    ],
+  },
   {
     version: '2.27',
     date: '2026-04-26',
@@ -1623,9 +1631,12 @@ function GlobalStyles() {
       .stencil { font-family: 'Bebas Neue', sans-serif; letter-spacing: 0.05em; }
       .mono { font-family: 'JetBrains Mono', monospace; }
       @keyframes rainbow-bg-flow {
-        0% { background-position: 0% 50%; }
-        50% { background-position: 100% 50%; }
-        100% { background-position: 0% 50%; }
+        0% { background-position: 50% 50%, 0% 18%, 100% 84%, 0% 50%, 12% 50%; }
+        20% { background-position: 50% 50%, 82% 8%, 18% 62%, 46% 14%, 38% 24%; }
+        40% { background-position: 50% 50%, 100% 76%, 8% 22%, 100% 46%, 76% 68%; }
+        60% { background-position: 50% 50%, 30% 100%, 88% 10%, 58% 100%, 100% 36%; }
+        80% { background-position: 50% 50%, 6% 42%, 38% 100%, 18% 72%, 54% 90%; }
+        100% { background-position: 50% 50%, 0% 18%, 100% 84%, 0% 50%, 12% 50%; }
       }
       @keyframes rainbow-mode-message {
         0% { opacity: 0; transform: translateY(14px) scale(0.98); }
@@ -1638,12 +1649,13 @@ function GlobalStyles() {
       #root.rainbow-mode-bg,
       .rainbow-mode-bg {
         background:
-          linear-gradient(rgba(8,8,12,0.34), rgba(8,8,12,0.34)),
-          radial-gradient(circle at 18% 18%, rgba(255,255,255,0.22), transparent 24%),
-          radial-gradient(circle at 82% 76%, rgba(255,255,255,0.16), transparent 28%),
-          linear-gradient(120deg, #ff004c, #ff8a00, #fff200, #21d66b, #00c8ff, #6b5cff, #ff00cc, #ff004c);
-        background-size: 100% 100%, 220% 220%, 260% 260%, 360% 360%;
-        animation: rainbow-bg-flow 13s ease-in-out infinite;
+          linear-gradient(rgba(8,8,12,0.3), rgba(8,8,12,0.3)),
+          radial-gradient(circle at 18% 18%, rgba(255,255,255,0.24), transparent 24%),
+          radial-gradient(circle at 82% 76%, rgba(255,255,255,0.18), transparent 28%),
+          linear-gradient(45deg, rgba(255,0,76,0.55), rgba(255,214,0,0.48), rgba(0,255,133,0.5), rgba(0,200,255,0.5), rgba(208,0,255,0.52), rgba(255,0,153,0.55)),
+          linear-gradient(120deg, #ff003d, #ff3d00, #ff9500, #ffd400, #bfff00, #36ff00, #00ff85, #00f5ff, #0088ff, #244dff, #7a3cff, #d000ff, #ff0099, #ff003d);
+        background-size: 100% 100%, 180% 180%, 220% 220%, 340% 340%, 460% 460%;
+        animation: rainbow-bg-flow 8s ease-in-out infinite;
       }
       .rainbow-mode-activated-message {
         animation: rainbow-mode-message 2.6s cubic-bezier(0.22, 1, 0.36, 1) both;
