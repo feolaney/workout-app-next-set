@@ -144,9 +144,18 @@ const DEFAULT_SETTINGS = {
   homeScreenPromptSeen: false,
 };
 
-const APP_VERSION = '2.22';
+const APP_VERSION = '2.23';
 
 const APP_VERSION_HISTORY = [
+  {
+    version: '2.23',
+    date: '2026-04-26',
+    type: 'Bug fix / UI',
+    changes: [
+      'Made each color preset and custom palette card a single full-card touch target.',
+      'Added a separated double-stroke active palette highlight that stays inside each card slot.',
+    ],
+  },
   {
     version: '2.22',
     date: '2026-04-26',
@@ -1874,80 +1883,101 @@ function ColorSettingsScreen({ activePaletteId, setActivePaletteId, customPalett
 }
 
 function PaletteCard({ palette, active, onTap, onEdit }) {
+  const selectPalette = () => {
+    if (onTap) onTap();
+  };
+
+  const handleKeyDown = (event) => {
+    if (event.key !== 'Enter' && event.key !== ' ') return;
+    event.preventDefault();
+    selectPalette();
+  };
+
   return (
     <div
+      role="button"
+      tabIndex={0}
+      onClick={selectPalette}
+      onKeyDown={handleKeyDown}
       style={{
-        background: palette.bg,
-        border: active ? `2px solid ${palette.accent}` : '1px solid var(--border)',
-        borderRadius: '2px', padding: '14px',
-        display: 'flex', flexDirection: 'column', gap: '10px',
+        padding: '4px',
+        border: active ? `1px solid ${palette.accent}` : '1px solid transparent',
+        borderRadius: '4px',
         position: 'relative',
+        cursor: 'pointer',
+        touchAction: 'manipulation',
       }}
     >
-      <button
-        onClick={onTap}
+      <div
         style={{
-          display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-          width: '100%', textAlign: 'left', padding: 0,
+          background: palette.bg,
+          border: active ? `2px solid ${palette.accent}` : '1px solid var(--border)',
+          borderRadius: '2px', padding: active ? '13px' : '14px',
+          display: 'flex', flexDirection: 'column', gap: '10px',
         }}
       >
-        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', minWidth: 0 }}>
-          <div className="stencil" style={{
-            fontSize: '20px', color: palette.fg, lineHeight: 1,
-            overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
-          }}>
-            {palette.name || 'UNTITLED'}
+        <div
+          style={{
+            display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+            width: '100%', textAlign: 'left', padding: 0,
+          }}
+        >
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', minWidth: 0 }}>
+            <div className="stencil" style={{
+              fontSize: '20px', color: palette.fg, lineHeight: 1,
+              overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+            }}>
+              {palette.name || 'UNTITLED'}
+            </div>
+            {active && (
+              <span className="mono" style={{
+                fontSize: '9px', padding: '2px 6px',
+                background: palette.accent, color: readableOnColor(palette.accent),
+                borderRadius: '2px', fontWeight: 700,
+              }}>ACTIVE</span>
+            )}
           </div>
-          {active && (
-            <span className="mono" style={{
-              fontSize: '9px', padding: '2px 6px',
-              background: palette.accent, color: palette.bg,
-              borderRadius: '2px', fontWeight: 700,
-            }}>ACTIVE</span>
+          {onEdit && (
+            <button
+              type="button"
+              onClick={(e) => { e.stopPropagation(); onEdit(); }}
+              style={{
+                fontSize: '10px', color: palette.fg, opacity: 0.6,
+                padding: '4px 8px', border: `1px solid ${alphaColorToken(palette.fg, '33')}`, borderRadius: '2px',
+              }}
+            >
+              EDIT
+            </button>
           )}
         </div>
-        {onEdit && (
-          <div
-            onClick={(e) => { e.stopPropagation(); onEdit(); }}
-            style={{
-              fontSize: '10px', color: palette.fg, opacity: 0.6,
-              padding: '4px 8px', border: `1px solid ${alphaColorToken(palette.fg, '33')}`, borderRadius: '2px',
-            }}
-          >
-            EDIT
-          </div>
-        )}
-      </button>
 
-      {/* Swatches - preview showing all 6 colors plus sample UI */}
-      <button
-        onClick={onTap}
-        style={{
-          display: 'flex', gap: '4px', width: '100%', height: '32px', padding: 0,
-        }}
-      >
-        <div style={{ flex: 2, background: palette.surface, borderRadius: '2px' }} />
-        <div style={{ flex: 1, background: palette.fg, borderRadius: '2px' }} />
-        <div style={{ flex: 1, background: palette.accent, borderRadius: '2px' }} />
-        <div style={{ flex: 1, background: palette.accent2, borderRadius: '2px' }} />
-        <div style={{ flex: 1, background: palette.warn, borderRadius: '2px' }} />
-      </button>
-
-      {/* Mini sample UI preview using this palette's colors */}
-      <div style={{
-        background: palette.surface, borderRadius: '2px', padding: '8px 10px',
-        display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px',
-      }}>
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '3px', minWidth: 0 }}>
-          <div className="stencil" style={{ fontSize: '11px', color: palette.accent, lineHeight: 1 }}>SAMPLE</div>
-          <div className="mono" style={{ fontSize: '9px', color: palette.fg, opacity: 0.7 }}>Aa Text 123</div>
-        </div>
+        {/* Swatches - preview showing all 6 colors plus sample UI */}
         <div style={{
-          padding: '4px 8px', background: palette.accent, color: palette.bg,
-          borderRadius: '2px', fontSize: '9px', fontWeight: 900,
-          fontFamily: 'Archivo Black, sans-serif',
+          display: 'flex', gap: '4px', width: '100%', height: '32px', padding: 0,
         }}>
-          GO
+          <div style={{ flex: 2, background: palette.surface, borderRadius: '2px' }} />
+          <div style={{ flex: 1, background: palette.fg, borderRadius: '2px' }} />
+          <div style={{ flex: 1, background: palette.accent, borderRadius: '2px' }} />
+          <div style={{ flex: 1, background: palette.accent2, borderRadius: '2px' }} />
+          <div style={{ flex: 1, background: palette.warn, borderRadius: '2px' }} />
+        </div>
+
+        {/* Mini sample UI preview using this palette's colors */}
+        <div style={{
+          background: palette.surface, borderRadius: '2px', padding: '8px 10px',
+          display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px',
+        }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '3px', minWidth: 0 }}>
+            <div className="stencil" style={{ fontSize: '11px', color: palette.accent, lineHeight: 1 }}>SAMPLE</div>
+            <div className="mono" style={{ fontSize: '9px', color: palette.fg, opacity: 0.7 }}>Aa Text 123</div>
+          </div>
+          <div style={{
+            padding: '4px 8px', background: palette.accent, color: readableOnColor(palette.accent),
+            borderRadius: '2px', fontSize: '9px', fontWeight: 900,
+            fontFamily: 'Archivo Black, sans-serif',
+          }}>
+            GO
+          </div>
         </div>
       </div>
     </div>
