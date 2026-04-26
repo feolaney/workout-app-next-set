@@ -120,7 +120,7 @@ const DEFAULT_EXERCISES = buildDefaultExerciseLibrary(WORKOUT_EXERCISE_LIBRARY_C
 
 const CATEGORIES = [
   { key: 'upper', label: 'UPPER', icon: Dumbbell, color: 'var(--accent)' },
-  { key: 'lower', label: 'LOWER', icon: TrendingUp, color: '#FFB800' },
+  { key: 'lower', label: 'LOWER', icon: TrendingUp, color: 'var(--favorite)' },
   { key: 'core', label: 'CORE', icon: Hexagon, color: 'var(--accent2)' },
 ];
 
@@ -144,9 +144,19 @@ const DEFAULT_SETTINGS = {
   homeScreenPromptSeen: false,
 };
 
-const APP_VERSION = '2.21';
+const APP_VERSION = '2.22';
 
 const APP_VERSION_HISTORY = [
+  {
+    version: '2.22',
+    date: '2026-04-26',
+    type: 'Bug fix / UI',
+    changes: [
+      'Restored palette background colors across the app, document, root, mobile theme color, and safe-area overscroll areas.',
+      'Added palette-derived surfaces, borders, muted text, and readable action text so preset and custom schemes stay legible.',
+      'Fixed translucent chip and border colors that were invalid when their source color came from a CSS variable.',
+    ],
+  },
   {
     version: '2.21',
     date: '2026-04-25',
@@ -368,6 +378,9 @@ const PALETTES = [
 
 // Default is GRIND to keep current look
 const DEFAULT_PALETTE_ID = 'grind';
+const DEFAULT_DARK_TEXT = '#0A0A0A';
+const DEFAULT_LIGHT_TEXT = '#F5F1E8';
+const DEFAULT_FAVORITE_COLOR = '#FFB800';
 
 // Palette slot definitions used in the custom editor
 const PALETTE_SLOTS = [
@@ -386,6 +399,143 @@ function resolvePalette(activeId, customPalettes) {
   const custom = (customPalettes || []).find(p => p.id === activeId);
   if (custom) return custom;
   return PALETTES[0]; // fallback to GRIND
+}
+
+function normalizeHexColor(value, fallback) {
+  if (typeof value !== 'string') return fallback;
+  const trimmed = value.trim();
+  const shortHex = /^#([0-9a-f]{3})$/i.exec(trimmed);
+  if (shortHex) {
+    return '#' + shortHex[1].split('').map(ch => ch + ch).join('').toUpperCase();
+  }
+  if (/^#[0-9a-f]{6}$/i.test(trimmed)) return trimmed.toUpperCase();
+  return fallback;
+}
+
+function hexToRgb(hex) {
+  const normalized = normalizeHexColor(hex, null);
+  if (!normalized) return null;
+  const value = parseInt(normalized.slice(1), 16);
+  return {
+    r: (value >> 16) & 255,
+    g: (value >> 8) & 255,
+    b: value & 255,
+  };
+}
+
+function rgbToHex({ r, g, b }) {
+  const toHex = (n) => Math.max(0, Math.min(255, Math.round(n))).toString(16).padStart(2, '0');
+  return `#${toHex(r)}${toHex(g)}${toHex(b)}`.toUpperCase();
+}
+
+function relativeLuminance(hex) {
+  const rgb = hexToRgb(hex);
+  if (!rgb) return 0;
+  const channel = (value) => {
+    const normalized = value / 255;
+    return normalized <= 0.03928
+      ? normalized / 12.92
+      : Math.pow((normalized + 0.055) / 1.055, 2.4);
+  };
+  return 0.2126 * channel(rgb.r) + 0.7152 * channel(rgb.g) + 0.0722 * channel(rgb.b);
+}
+
+function contrastRatio(colorA, colorB) {
+  const lighter = Math.max(relativeLuminance(colorA), relativeLuminance(colorB));
+  const darker = Math.min(relativeLuminance(colorA), relativeLuminance(colorB));
+  return (lighter + 0.05) / (darker + 0.05);
+}
+
+function readableOnColor(backgroundColor) {
+  const background = normalizeHexColor(backgroundColor, PALETTES[0].bg);
+  return contrastRatio(background, DEFAULT_DARK_TEXT) >= contrastRatio(background, DEFAULT_LIGHT_TEXT)
+    ? DEFAULT_DARK_TEXT
+    : DEFAULT_LIGHT_TEXT;
+}
+
+function readableOnToken(colorToken) {
+  if (colorToken === 'var(--accent)') return 'var(--on-accent)';
+  if (colorToken === 'var(--accent2)') return 'var(--on-accent2)';
+  if (colorToken === 'var(--warn)') return 'var(--on-warn)';
+  if (colorToken === 'var(--favorite)') return 'var(--on-favorite)';
+  return readableOnColor(colorToken);
+}
+
+function alphaColorToken(colorToken, alphaHex = '22') {
+  const normalized = normalizeHexColor(colorToken, null);
+  const cleanAlpha = /^[0-9a-f]{2}$/i.test(alphaHex) ? alphaHex.toUpperCase() : '22';
+  if (normalized) return `${normalized}${cleanAlpha}`;
+  const opacityPercent = Math.round((parseInt(cleanAlpha, 16) / 255) * 100);
+  return `color-mix(in srgb, ${colorToken} ${opacityPercent}%, transparent)`;
+}
+
+function mixHex(baseColor, targetColor, amount) {
+  const base = hexToRgb(baseColor);
+  const target = hexToRgb(targetColor);
+  if (!base || !target) return baseColor;
+  const weight = Math.max(0, Math.min(1, amount));
+  return rgbToHex({
+    r: base.r + (target.r - base.r) * weight,
+    g: base.g + (target.g - base.g) * weight,
+    b: base.b + (target.b - base.b) * weight,
+  });
+}
+
+function buildPaletteVars(palette) {
+  const bg = normalizeHexColor(palette.bg, PALETTES[0].bg);
+  const surface = normalizeHexColor(palette.surface, PALETTES[0].surface);
+  const fg = normalizeHexColor(palette.fg, PALETTES[0].fg);
+  const accent = normalizeHexColor(palette.accent, PALETTES[0].accent);
+  const accent2 = normalizeHexColor(palette.accent2, PALETTES[0].accent2);
+  const warn = normalizeHexColor(palette.warn, PALETTES[0].warn);
+  const favorite = (
+    contrastRatio(DEFAULT_FAVORITE_COLOR, bg) >= 3 &&
+    contrastRatio(DEFAULT_FAVORITE_COLOR, surface) >= 3
+  ) ? DEFAULT_FAVORITE_COLOR : accent;
+  const darkBackground = relativeLuminance(bg) < 0.5;
+  const surfaceLift = darkBackground ? 0.08 : 0.05;
+  const surfaceStrongLift = darkBackground ? 0.15 : 0.1;
+
+  return {
+    '--bg': bg,
+    '--surface': surface,
+    '--surface-muted': mixHex(surface, fg, surfaceLift),
+    '--surface-strong': mixHex(surface, fg, surfaceStrongLift),
+    '--field-bg': darkBackground ? mixHex(bg, '#000000', 0.35) : mixHex(surface, fg, 0.04),
+    '--fg': fg,
+    '--muted': mixHex(bg, fg, darkBackground ? 0.42 : 0.5),
+    '--muted-strong': mixHex(bg, fg, darkBackground ? 0.62 : 0.68),
+    '--subtle': mixHex(bg, fg, darkBackground ? 0.28 : 0.34),
+    '--border': mixHex(bg, fg, darkBackground ? 0.14 : 0.18),
+    '--border-strong': mixHex(bg, fg, darkBackground ? 0.26 : 0.3),
+    '--accent': accent,
+    '--accent2': accent2,
+    '--warn': warn,
+    '--favorite': favorite,
+    '--on-bg': readableOnColor(bg),
+    '--on-surface': readableOnColor(surface),
+    '--on-accent': readableOnColor(accent),
+    '--on-accent2': readableOnColor(accent2),
+    '--on-warn': readableOnColor(warn),
+    '--on-favorite': readableOnColor(favorite),
+    '--color-scheme': darkBackground ? 'dark' : 'light',
+  };
+}
+
+function applyDocumentPalette(paletteVars) {
+  if (typeof document === 'undefined') return;
+  Object.entries(paletteVars).forEach(([key, value]) => {
+    document.documentElement.style.setProperty(key, value);
+  });
+
+  const bg = paletteVars['--bg'];
+  document.documentElement.style.backgroundColor = bg;
+  document.body.style.backgroundColor = bg;
+  const appRoot = document.getElementById('root');
+  if (appRoot) appRoot.style.backgroundColor = bg;
+
+  const themeMeta = document.querySelector('meta[name="theme-color"]');
+  if (themeMeta) themeMeta.setAttribute('content', bg);
 }
 
 function getBrowserStorage() {
@@ -1017,9 +1167,16 @@ export default function WorkoutApp() {
     }
   }, [screen, settings.rememberSectionState]);
 
+  const activePalette = resolvePalette(activePaletteId, customPalettes);
+  const paletteVars = buildPaletteVars(activePalette);
+
+  useEffect(() => {
+    applyDocumentPalette(paletteVars);
+  }, [activePalette]);
+
   if (!library) {
     return (
-      <div style={{ minHeight: '100dvh', background: 'var(--bg)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--accent)', fontFamily: 'monospace' }}>
+      <div style={{ ...paletteVars, minHeight: '100dvh', background: 'var(--bg)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--accent)', fontFamily: 'monospace' }}>
         LOADING...
       </div>
     );
@@ -1175,17 +1332,6 @@ export default function WorkoutApp() {
     setActiveInitialRestRemaining(0);
     setEditResume(null);
     setScreen('active');
-  };
-
-  // Resolve active palette and build CSS variables for it
-  const activePalette = resolvePalette(activePaletteId, customPalettes);
-  const paletteVars = {
-    '--bg': '#0E0E0E',
-    '--surface': activePalette.surface,
-    '--fg': activePalette.fg,
-    '--accent': activePalette.accent,
-    '--accent2': activePalette.accent2,
-    '--warn': activePalette.warn,
   };
 
   // Add/replace custom palette (by id); returns the saved palette
@@ -1358,21 +1504,47 @@ function GlobalStyles() {
   return (
     <style>{`
       @import url('https://fonts.googleapis.com/css2?family=Archivo+Black&family=JetBrains+Mono:wght@400;500;700&family=Bebas+Neue&display=swap');
+      :root {
+        --bg: #0E0E0E;
+        --surface: #121212;
+        --surface-muted: #202020;
+        --surface-strong: #333333;
+        --field-bg: #050505;
+        --fg: #F5F1E8;
+        --muted: #888888;
+        --muted-strong: #AAAAAA;
+        --subtle: #666666;
+        --border: #222222;
+        --border-strong: #333333;
+        --accent: #FF4D2E;
+        --accent2: #00D9B2;
+        --warn: #FF4D8F;
+        --favorite: #FFB800;
+        --on-bg: #F5F1E8;
+        --on-surface: #F5F1E8;
+        --on-accent: #0A0A0A;
+        --on-accent2: #0A0A0A;
+        --on-warn: #0A0A0A;
+        --on-favorite: #0A0A0A;
+        --color-scheme: dark;
+      }
       * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
       html {
         margin: 0;
         min-height: 100%;
-        background: #0E0E0E;
+        background: var(--bg);
+        color-scheme: var(--color-scheme);
       }
       body {
         margin: 0;
         min-height: 100dvh;
-        background: #0E0E0E;
+        background: var(--bg);
+        color: var(--fg);
         overscroll-behavior: none;
       }
       #root {
         min-height: 100dvh;
-        background: #0E0E0E;
+        background: var(--bg);
       }
       button { font-family: inherit; cursor: pointer; border: none; background: none; color: inherit; }
       .display { font-family: 'Archivo Black', sans-serif; letter-spacing: -0.02em; }
@@ -1463,15 +1635,15 @@ function GlobalStyles() {
         }
       }
       input[type="range"] {
-        -webkit-appearance: none; appearance: none; width: 100%; height: 6px; background: #1A1A1A;
+        -webkit-appearance: none; appearance: none; width: 100%; height: 6px; background: var(--surface-strong);
         border-radius: 2px; outline: none;
       }
       input[type="range"]::-webkit-slider-thumb {
         -webkit-appearance: none; appearance: none; width: 24px; height: 24px; background: var(--accent);
-        border-radius: 2px; cursor: pointer; border: 2px solid #0A0A0A;
+        border-radius: 2px; cursor: pointer; border: 2px solid var(--bg);
       }
       input[type="range"]::-moz-range-thumb {
-        width: 24px; height: 24px; background: var(--accent); border-radius: 2px; cursor: pointer; border: 2px solid #0A0A0A;
+        width: 24px; height: 24px; background: var(--accent); border-radius: 2px; cursor: pointer; border: 2px solid var(--bg);
       }
     `}</style>
   );
@@ -1631,7 +1803,7 @@ function ColorSettingsScreen({ activePaletteId, setActivePaletteId, customPalett
     <div className="slide-in" style={{ minHeight: '100dvh', display: 'flex', flexDirection: 'column', position: 'relative', zIndex: 2 }}>
       <div style={{ padding: `${SAFE_TOP_20} 24px 12px` }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px' }}>
-          <button onClick={onBack} style={{ display: 'flex', alignItems: 'center', gap: '6px', color: '#888', padding: '4px 0' }}>
+          <button onClick={onBack} style={{ display: 'flex', alignItems: 'center', gap: '6px', color: 'var(--muted)', padding: '4px 0' }}>
             <ChevronLeft size={18} />
             <span className="mono" style={{ fontSize: '11px' }}>BACK</span>
           </button>
@@ -1642,14 +1814,14 @@ function ColorSettingsScreen({ activePaletteId, setActivePaletteId, customPalett
             COLORS
           </div>
         </div>
-        <div className="mono" style={{ fontSize: '11px', color: '#666', marginTop: '8px' }}>
+        <div className="mono" style={{ fontSize: '11px', color: 'var(--subtle)', marginTop: '8px' }}>
           Tap to apply. Hold or tap edit on customs.
         </div>
       </div>
 
       <div style={{ flex: 1, padding: '12px 24px 24px', overflowY: 'auto' }}>
         {/* Presets */}
-        <div className="mono" style={{ fontSize: '10px', color: '#666', marginBottom: '10px', letterSpacing: '0.1em' }}>
+        <div className="mono" style={{ fontSize: '10px', color: 'var(--subtle)', marginBottom: '10px', letterSpacing: '0.1em' }}>
           // PRESETS
         </div>
         <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: '8px', marginBottom: '24px' }}>
@@ -1664,7 +1836,7 @@ function ColorSettingsScreen({ activePaletteId, setActivePaletteId, customPalett
         </div>
 
         {/* Customs */}
-        <div className="mono" style={{ fontSize: '10px', color: '#666', marginBottom: '10px', letterSpacing: '0.1em', display: 'flex', justifyContent: 'space-between' }}>
+        <div className="mono" style={{ fontSize: '10px', color: 'var(--subtle)', marginBottom: '10px', letterSpacing: '0.1em', display: 'flex', justifyContent: 'space-between' }}>
           <span>// CUSTOM ({customPalettes.length}/3)</span>
         </div>
         <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: '8px', marginBottom: '12px' }}>
@@ -1681,7 +1853,7 @@ function ColorSettingsScreen({ activePaletteId, setActivePaletteId, customPalett
             <button
               onClick={startNewCustom}
               style={{
-                padding: '18px', background: '#0F0F0F',
+                padding: '18px', background: 'var(--surface)',
                 border: '1px dashed #FF4D2E66', borderRadius: '2px',
                 display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px',
                 color: 'var(--accent)', fontSize: '13px', fontWeight: 700,
@@ -1691,7 +1863,7 @@ function ColorSettingsScreen({ activePaletteId, setActivePaletteId, customPalett
             </button>
           )}
           {!canAddMoreCustoms && (
-            <div className="mono" style={{ padding: '12px', fontSize: '10px', color: '#555', textAlign: 'center', lineHeight: 1.5 }}>
+            <div className="mono" style={{ padding: '12px', fontSize: '10px', color: 'var(--subtle)', textAlign: 'center', lineHeight: 1.5 }}>
               Max of 3 custom palettes.<br/>Delete one to add another.
             </div>
           )}
@@ -1706,7 +1878,7 @@ function PaletteCard({ palette, active, onTap, onEdit }) {
     <div
       style={{
         background: palette.bg,
-        border: active ? `2px solid ${palette.accent}` : '1px solid #222',
+        border: active ? `2px solid ${palette.accent}` : '1px solid var(--border)',
         borderRadius: '2px', padding: '14px',
         display: 'flex', flexDirection: 'column', gap: '10px',
         position: 'relative',
@@ -1739,7 +1911,7 @@ function PaletteCard({ palette, active, onTap, onEdit }) {
             onClick={(e) => { e.stopPropagation(); onEdit(); }}
             style={{
               fontSize: '10px', color: palette.fg, opacity: 0.6,
-              padding: '4px 8px', border: `1px solid ${palette.fg}33`, borderRadius: '2px',
+              padding: '4px 8px', border: `1px solid ${alphaColorToken(palette.fg, '33')}`, borderRadius: '2px',
             }}
           >
             EDIT
@@ -1836,7 +2008,7 @@ function CustomPaletteEditor({ palette, onChange, onSave, onDelete, onCancel }) 
           maxLength={20}
           style={{
             width: '100%', padding: '12px', background: palette.surface, color: palette.fg,
-            border: `1px solid ${nameError ? palette.warn : palette.fg + '33'}`,
+            border: `1px solid ${nameError ? palette.warn : alphaColorToken(palette.fg, '33')}`,
             fontFamily: 'inherit', fontSize: '16px', fontWeight: 700,
             borderRadius: '2px', marginBottom: nameError ? '4px' : '20px',
             textTransform: 'uppercase',
@@ -1866,7 +2038,7 @@ function CustomPaletteEditor({ palette, onChange, onSave, onDelete, onCancel }) 
               <div style={{
                 width: '40px', height: '40px', borderRadius: '2px',
                 background: palette[slot.key],
-                border: `1px solid ${palette.fg}33`, flexShrink: 0,
+                border: `1px solid ${alphaColorToken(palette.fg, '33')}`, flexShrink: 0,
               }} />
               <div style={{ flex: 1, minWidth: 0 }}>
                 <div style={{ fontSize: '13px', fontWeight: 700, color: palette.fg }}>{slot.label}</div>
@@ -2069,28 +2241,28 @@ function HomeScreen({ onStart, onHistory, onFavorites, onColorSettings, onRerun,
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '32px' }}>
         <div>
           <div className="mono" style={{ fontSize: '11px', color: 'var(--accent)', marginBottom: '4px' }}>// NO EXCUSES</div>
-          <div className="mono" style={{ fontSize: '11px', color: '#666' }}>v{APP_VERSION}</div>
+          <div className="mono" style={{ fontSize: '11px', color: 'var(--subtle)' }}>v{APP_VERSION}</div>
         </div>
         <div style={{ display: 'flex', gap: '6px' }}>
           {favorites.length > 0 && (
             <button onClick={onFavorites} style={{
-              padding: '10px 12px', background: 'var(--surface)', border: '1px solid #FFB80033',
-              borderRadius: '2px', display: 'flex', alignItems: 'center', gap: '5px', color: '#FFB800',
+              padding: '10px 12px', background: 'var(--surface)', border: `1px solid ${alphaColorToken('var(--favorite)', '33')}`,
+              borderRadius: '2px', display: 'flex', alignItems: 'center', gap: '5px', color: 'var(--favorite)',
             }}>
-              <Star size={14} fill="#FFB800" />
+              <Star size={14} fill="var(--favorite)" />
               <span className="mono" style={{ fontSize: '11px' }}>{favorites.length}</span>
             </button>
           )}
           <button onClick={onHistory} style={{
-            padding: '10px 14px', background: 'var(--surface)', border: '1px solid #222',
-            borderRadius: '2px', display: 'flex', alignItems: 'center', gap: '6px', color: '#AAA',
+            padding: '10px 14px', background: 'var(--surface)', border: '1px solid var(--border)',
+            borderRadius: '2px', display: 'flex', alignItems: 'center', gap: '6px', color: 'var(--muted-strong)',
           }}>
             <History size={14} />
             <span className="mono" style={{ fontSize: '11px' }}>HISTORY</span>
           </button>
           <button onClick={openSettings} style={{
-            padding: '10px 12px', background: 'var(--surface)', border: '1px solid #222',
-            borderRadius: '2px', display: 'flex', alignItems: 'center', color: '#AAA',
+            padding: '10px 12px', background: 'var(--surface)', border: '1px solid var(--border)',
+            borderRadius: '2px', display: 'flex', alignItems: 'center', color: 'var(--muted-strong)',
           }}>
             <Settings size={14} />
           </button>
@@ -2099,7 +2271,7 @@ function HomeScreen({ onStart, onHistory, onFavorites, onColorSettings, onRerun,
 
       <div style={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
         <AnimatedTitle />
-        <div className="mono" style={{ fontSize: '13px', color: '#888', marginTop: '16px', maxWidth: '320px', lineHeight: 1.5 }}>
+        <div className="mono" style={{ fontSize: '13px', color: 'var(--muted)', marginTop: '16px', maxWidth: '320px', lineHeight: 1.5 }}>
           Build your workout. Pick your format. Do the work.
         </div>
       </div>
@@ -2112,11 +2284,11 @@ function HomeScreen({ onStart, onHistory, onFavorites, onColorSettings, onRerun,
           }}>
             <button
               onClick={() => setFavCollapsed(v => !v)}
-              style={{ flex: 1, minWidth: 0, display: 'flex', alignItems: 'center', justifyContent: 'space-between', color: '#FFB800' }}
+              style={{ flex: 1, minWidth: 0, display: 'flex', alignItems: 'center', justifyContent: 'space-between', color: 'var(--favorite)' }}
             >
               <div className="mono" style={{ fontSize: '10px', letterSpacing: '0.1em', display: 'flex', alignItems: 'center', gap: '5px' }}>
-                <Star size={10} fill="#FFB800" /> FAVORITES
-                <span style={{ color: '#666', marginLeft: '4px' }}>({favorites.length})</span>
+                <Star size={10} fill="var(--favorite)" /> FAVORITES
+                <span style={{ color: 'var(--subtle)', marginLeft: '4px' }}>({favorites.length})</span>
               </div>
               <ChevronDown
                 size={14}
@@ -2127,8 +2299,8 @@ function HomeScreen({ onStart, onHistory, onFavorites, onColorSettings, onRerun,
               onClick={onFavorites}
               className="mono"
               style={{
-                padding: '5px 7px', background: '#151515', border: '1px solid #FFB80044',
-                borderRadius: '2px', color: '#FFB800', fontSize: '9px', fontWeight: 900,
+                padding: '5px 7px', background: 'var(--surface-muted)', border: `1px solid ${alphaColorToken('var(--favorite)', '44')}`,
+                borderRadius: '2px', color: 'var(--favorite)', fontSize: '9px', fontWeight: 900,
                 letterSpacing: '0.05em', flexShrink: 0,
               }}
             >
@@ -2161,11 +2333,11 @@ function HomeScreen({ onStart, onHistory, onFavorites, onColorSettings, onRerun,
           }}>
             <button
               onClick={() => setRecentCollapsed(v => !v)}
-              style={{ flex: 1, minWidth: 0, display: 'flex', alignItems: 'center', justifyContent: 'space-between', color: '#666' }}
+              style={{ flex: 1, minWidth: 0, display: 'flex', alignItems: 'center', justifyContent: 'space-between', color: 'var(--subtle)' }}
             >
               <div className="mono" style={{ fontSize: '10px', letterSpacing: '0.1em' }}>
                 // RECENT
-                <span style={{ marginLeft: '6px', color: '#555' }}>({recent.length})</span>
+                <span style={{ marginLeft: '6px', color: 'var(--subtle)' }}>({recent.length})</span>
               </div>
               <ChevronDown
                 size={14}
@@ -2176,8 +2348,8 @@ function HomeScreen({ onStart, onHistory, onFavorites, onColorSettings, onRerun,
               onClick={onHistory}
               className="mono"
               style={{
-                padding: '5px 7px', background: '#151515', border: '1px solid #333',
-                borderRadius: '2px', color: '#888', fontSize: '9px', fontWeight: 900,
+                padding: '5px 7px', background: 'var(--surface-muted)', border: '1px solid var(--border-strong)',
+                borderRadius: '2px', color: 'var(--muted)', fontSize: '9px', fontWeight: 900,
                 letterSpacing: '0.05em', flexShrink: 0,
               }}
             >
@@ -2203,12 +2375,12 @@ function HomeScreen({ onStart, onHistory, onFavorites, onColorSettings, onRerun,
       )}
 
       <button onClick={onStart} style={{
-        padding: '24px', background: 'var(--accent)', color: '#0A0A0A', fontSize: '20px', fontWeight: 900,
+        padding: '24px', background: 'var(--accent)', color: 'var(--on-accent)', fontSize: '20px', fontWeight: 900,
         letterSpacing: '0.02em', display: 'flex', alignItems: 'center', justifyContent: 'space-between',
         borderRadius: '2px', fontFamily: 'Archivo Black, sans-serif',
       }}>
         <span>BUILD NEW WORKOUT</span>
-        <Play size={24} fill="#0A0A0A" />
+        <Play size={24} fill="var(--on-accent)" />
       </button>
 
       {infoFor && <WorkoutInfoModal entry={infoFor} library={library} onClose={() => setInfoFor(null)} onRun={() => { onRerun(infoFor); setInfoFor(null); }} />}
@@ -2285,14 +2457,14 @@ function HomeScreenInstallPrompt({ onDismiss, onOpenSettings }) {
         <div className="display" style={{ fontSize: 'clamp(46px, 13vw, 68px)', lineHeight: 0.85, color: 'var(--fg)', marginBottom: '12px' }}>
           WELCOME
         </div>
-        <div className="mono" style={{ fontSize: '12px', color: '#AAA', lineHeight: 1.55, marginBottom: '18px' }}>
+        <div className="mono" style={{ fontSize: '12px', color: 'var(--muted-strong)', lineHeight: 1.55, marginBottom: '18px' }}>
           Go to Settings to learn how to add this to your phone's Home Screen.
         </div>
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 0.75fr', gap: '8px' }}>
           <button
             onClick={onOpenSettings}
             style={{
-              padding: '13px 12px', background: 'var(--accent)', color: '#0A0A0A',
+              padding: '13px 12px', background: 'var(--accent)', color: 'var(--on-accent)',
               borderRadius: '2px', fontFamily: 'Archivo Black, sans-serif',
               fontSize: '12px',
             }}
@@ -2302,8 +2474,8 @@ function HomeScreenInstallPrompt({ onDismiss, onOpenSettings }) {
           <button
             onClick={onDismiss}
             style={{
-              padding: '13px 12px', background: '#181818', color: '#999',
-              border: '1px solid #333', borderRadius: '2px',
+              padding: '13px 12px', background: 'var(--surface-muted)', color: 'var(--muted)',
+              border: '1px solid var(--border-strong)', borderRadius: '2px',
               fontSize: '11px', fontWeight: 900,
             }}
           >
@@ -2356,7 +2528,7 @@ function SettingsModal({ settings, setSettings, onOpenColorSettings, onClose }) 
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px', flexShrink: 0 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
             {settingsView !== 'main' ? (
-              <button onClick={goBack} style={{ color: '#888', padding: '2px' }}>
+              <button onClick={goBack} style={{ color: 'var(--muted)', padding: '2px' }}>
                 <ChevronLeft size={18} />
               </button>
             ) : (
@@ -2366,7 +2538,7 @@ function SettingsModal({ settings, setSettings, onOpenColorSettings, onClose }) 
               {title}
             </div>
           </div>
-          <button onClick={onClose} style={{ color: '#666' }}><X size={18} /></button>
+          <button onClick={onClose} style={{ color: 'var(--subtle)' }}><X size={18} /></button>
         </div>
 
         <div style={{ flex: 1, overflowY: 'auto', minHeight: 0 }}>
@@ -2417,10 +2589,10 @@ function GuideStep({ number, title, children }) {
   return (
     <div style={{
       display: 'grid', gridTemplateColumns: '34px minmax(0, 1fr)', gap: '12px',
-      padding: '14px', background: '#0F0F0F', border: '1px solid #222', borderRadius: '2px',
+      padding: '14px', background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '2px',
     }}>
       <div className="display" style={{
-        width: '34px', height: '34px', background: 'var(--accent)', color: '#0A0A0A',
+        width: '34px', height: '34px', background: 'var(--accent)', color: 'var(--on-accent)',
         borderRadius: '2px', display: 'flex', alignItems: 'center', justifyContent: 'center',
         fontSize: '18px', lineHeight: 1,
       }}>
@@ -2430,7 +2602,7 @@ function GuideStep({ number, title, children }) {
         <div style={{ fontSize: '14px', fontWeight: 700, color: 'var(--fg)', marginBottom: '4px' }}>
           {title}
         </div>
-        <div className="mono" style={{ fontSize: '11px', color: '#888', lineHeight: 1.5 }}>
+        <div className="mono" style={{ fontSize: '11px', color: 'var(--muted)', lineHeight: 1.5 }}>
           {children}
         </div>
       </div>
@@ -2443,14 +2615,14 @@ function IosHomeScreenGuide({ onAdvanced }) {
     <div style={{ display: 'flex', flexDirection: 'column', gap: '14px', paddingBottom: '8px' }}>
       <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
         <span className="mono" style={{
-          fontSize: '10px', padding: '4px 8px', background: 'var(--accent)22',
+          fontSize: '10px', padding: '4px 8px', background: alphaColorToken('var(--accent)', '22'),
           color: 'var(--accent)', borderRadius: '2px', fontWeight: 900, letterSpacing: '0.08em',
         }}>
           iOS SAFARI
         </span>
         <span className="mono" style={{
-          fontSize: '10px', padding: '4px 8px', background: '#222',
-          color: '#888', borderRadius: '2px', fontWeight: 700, letterSpacing: '0.06em',
+          fontSize: '10px', padding: '4px 8px', background: 'var(--surface-strong)',
+          color: 'var(--muted)', borderRadius: '2px', fontWeight: 700, letterSpacing: '0.06em',
         }}>
           ANDROID: USE YOUR DEVICE INSTRUCTIONS
         </span>
@@ -2460,13 +2632,13 @@ function IosHomeScreenGuide({ onAdvanced }) {
         <div className="display" style={{ fontSize: 'clamp(38px, 11vw, 64px)', lineHeight: 0.86, color: 'var(--fg)', marginBottom: '8px' }}>
           MAKE IT FEEL LIKE AN APP
         </div>
-        <div className="mono" style={{ fontSize: '12px', color: '#888', lineHeight: 1.5, maxWidth: '520px' }}>
+        <div className="mono" style={{ fontSize: '12px', color: 'var(--muted)', lineHeight: 1.5, maxWidth: '520px' }}>
           On iPhone, add this site to your Home Screen from Safari. The bookmark opens like a lightweight app.
         </div>
       </div>
 
       <div style={{
-        background: '#050505', border: '1px solid #222', borderRadius: '2px',
+        background: 'var(--field-bg)', border: '1px solid var(--border)', borderRadius: '2px',
         padding: '10px', display: 'flex', justifyContent: 'center',
       }}>
         <img
@@ -2492,8 +2664,8 @@ function IosHomeScreenGuide({ onAdvanced }) {
       </div>
 
       <button onClick={onAdvanced} style={{
-        width: '100%', padding: '16px', background: '#1A1A1A', color: 'var(--accent)',
-        border: '1px solid var(--accent)55', borderRadius: '2px',
+        width: '100%', padding: '16px', background: 'var(--surface-muted)', color: 'var(--accent)',
+        border: `1px solid ${alphaColorToken('var(--accent)', '55')}`, borderRadius: '2px',
         display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px',
       }}>
         <span style={{ display: 'flex', alignItems: 'center', gap: '10px', minWidth: 0 }}>
@@ -2515,7 +2687,7 @@ function AdvancedHomeScreenIconGuide() {
         <div className="display" style={{ fontSize: 'clamp(36px, 10vw, 58px)', lineHeight: 0.86, color: 'var(--fg)', marginBottom: '8px' }}>
           CUSTOM ICON
         </div>
-        <div className="mono" style={{ fontSize: '12px', color: '#888', lineHeight: 1.5, maxWidth: '560px' }}>
+        <div className="mono" style={{ fontSize: '12px', color: 'var(--muted)', lineHeight: 1.5, maxWidth: '560px' }}>
           Optional iOS Shortcut workflow for choosing a bookmark image from Photos.
         </div>
       </div>
@@ -2525,7 +2697,7 @@ function AdvancedHomeScreenIconGuide() {
         target="_blank"
         rel="noopener noreferrer"
         style={{
-          width: '100%', padding: '16px', background: 'var(--accent)', color: '#0A0A0A',
+          width: '100%', padding: '16px', background: 'var(--accent)', color: 'var(--on-accent)',
           borderRadius: '2px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px',
           textDecoration: 'none',
         }}
@@ -2564,8 +2736,8 @@ function SettingsAction({ icon, label, description, onClick }) {
     <button
       onClick={onClick}
       style={{
-        width: '100%', padding: '14px', background: '#0F0F0F',
-        border: '1px solid #222', borderRadius: '2px',
+        width: '100%', padding: '14px', background: 'var(--surface)',
+        border: '1px solid var(--border)', borderRadius: '2px',
         display: 'flex', alignItems: 'center', gap: '14px',
         textAlign: 'left', marginBottom: '8px',
       }}
@@ -2575,11 +2747,11 @@ function SettingsAction({ icon, label, description, onClick }) {
         <div style={{ fontSize: '14px', fontWeight: 600, color: 'var(--fg)', marginBottom: '2px' }}>
           {label}
         </div>
-        <div className="mono" style={{ fontSize: '10px', color: '#666', lineHeight: 1.4 }}>
+        <div className="mono" style={{ fontSize: '10px', color: 'var(--subtle)', lineHeight: 1.4 }}>
           {description}
         </div>
       </div>
-      <ChevronRight size={18} color="#666" />
+      <ChevronRight size={18} color="var(--subtle)" />
     </button>
   );
 }
@@ -2591,20 +2763,20 @@ function VersionHistoryList() {
         <div
           key={entry.version}
           style={{
-            padding: '14px', background: '#0F0F0F',
-            border: '1px solid #222', borderRadius: '2px',
+            padding: '14px', background: 'var(--surface)',
+            border: '1px solid var(--border)', borderRadius: '2px',
           }}
         >
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: '10px', marginBottom: '6px' }}>
             <div className="stencil" style={{ fontSize: '18px', color: 'var(--accent)' }}>v{entry.version}</div>
-            <div className="mono" style={{ fontSize: '10px', color: '#666', flexShrink: 0 }}>{entry.date}</div>
+            <div className="mono" style={{ fontSize: '10px', color: 'var(--subtle)', flexShrink: 0 }}>{entry.date}</div>
           </div>
-          <div className="mono" style={{ fontSize: '10px', color: '#888', marginBottom: '10px' }}>
+          <div className="mono" style={{ fontSize: '10px', color: 'var(--muted)', marginBottom: '10px' }}>
             {entry.type}
           </div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
             {entry.changes.map(change => (
-              <div key={change} style={{ display: 'flex', gap: '8px', color: '#AAA', fontSize: '12px', lineHeight: 1.4 }}>
+              <div key={change} style={{ display: 'flex', gap: '8px', color: 'var(--muted-strong)', fontSize: '12px', lineHeight: 1.4 }}>
                 <span className="mono" style={{ color: 'var(--accent)', flexShrink: 0 }}>//</span>
                 <span>{change}</span>
               </div>
@@ -2621,8 +2793,8 @@ function SettingsToggle({ label, description, checked, onToggle }) {
     <button
       onClick={onToggle}
       style={{
-        width: '100%', padding: '14px', background: '#0F0F0F',
-        border: '1px solid #222', borderRadius: '2px',
+        width: '100%', padding: '14px', background: 'var(--surface)',
+        border: '1px solid var(--border)', borderRadius: '2px',
         display: 'flex', alignItems: 'center', gap: '14px',
         textAlign: 'left', marginBottom: '8px',
       }}
@@ -2631,19 +2803,19 @@ function SettingsToggle({ label, description, checked, onToggle }) {
         <div style={{ fontSize: '14px', fontWeight: 600, color: 'var(--fg)', marginBottom: '2px' }}>
           {label}
         </div>
-        <div className="mono" style={{ fontSize: '10px', color: '#666', lineHeight: 1.4 }}>
+        <div className="mono" style={{ fontSize: '10px', color: 'var(--subtle)', lineHeight: 1.4 }}>
           {description}
         </div>
       </div>
       <div style={{
         width: '40px', height: '22px', borderRadius: '20px',
-        background: checked ? 'var(--accent)' : '#2A2A2A',
+        background: checked ? 'var(--accent)' : 'var(--surface-strong)',
         position: 'relative', transition: 'all 0.2s', flexShrink: 0,
       }}>
         <div style={{
           position: 'absolute', top: '2px', left: checked ? '20px' : '2px',
           width: '18px', height: '18px', borderRadius: '18px',
-          background: checked ? '#0A0A0A' : '#666', transition: 'all 0.2s',
+          background: checked ? 'var(--on-accent)' : 'var(--subtle)', transition: 'all 0.2s',
         }} />
       </div>
     </button>
@@ -2664,15 +2836,15 @@ function NameFavoriteModal({ entry, onCancel, onSave, initialName = '', title = 
       <div
         onClick={e => e.stopPropagation()}
         style={{
-          width: '100%', background: 'var(--surface)', border: '2px solid #FFB800', borderRadius: '2px',
+          width: '100%', background: 'var(--surface)', border: '2px solid var(--favorite)', borderRadius: '2px',
           padding: '20px',
         }}
       >
         <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '16px' }}>
-          <Star size={18} fill="#FFB800" color="#FFB800" />
-          <div className="stencil" style={{ fontSize: '22px', color: '#FFB800' }}>{title}</div>
+          <Star size={18} fill="var(--favorite)" color="var(--favorite)" />
+          <div className="stencil" style={{ fontSize: '22px', color: 'var(--favorite)' }}>{title}</div>
         </div>
-        <div className="mono" style={{ fontSize: '11px', color: '#888', marginBottom: '12px', lineHeight: 1.5 }}>
+        <div className="mono" style={{ fontSize: '11px', color: 'var(--muted)', marginBottom: '12px', lineHeight: 1.5 }}>
           Give it a name so you can find it later.
         </div>
         <input
@@ -2683,22 +2855,22 @@ function NameFavoriteModal({ entry, onCancel, onSave, initialName = '', title = 
           placeholder={defaultPlaceholder}
           maxLength={50}
           style={{
-            width: '100%', padding: '14px', background: '#000', color: 'var(--fg)',
-            border: '1px solid #333', fontFamily: 'inherit', fontSize: '15px',
+            width: '100%', padding: '14px', background: 'var(--field-bg)', color: 'var(--fg)',
+            border: '1px solid var(--border-strong)', fontFamily: 'inherit', fontSize: '15px',
             borderRadius: '2px', marginBottom: '16px',
           }}
         />
         <div style={{ display: 'flex', gap: '8px' }}>
           <button onClick={onCancel} style={{
-            flex: 1, padding: '14px', background: '#1A1A1A', color: '#888',
+            flex: 1, padding: '14px', background: 'var(--surface-muted)', color: 'var(--muted)',
             fontFamily: 'Archivo Black, sans-serif', fontSize: '13px', borderRadius: '2px',
           }}>CANCEL</button>
           <button onClick={() => onSave(name)} style={{
-            flex: 2, padding: '14px', background: '#FFB800', color: '#0A0A0A',
+            flex: 2, padding: '14px', background: 'var(--favorite)', color: 'var(--on-favorite)',
             fontFamily: 'Archivo Black, sans-serif', fontSize: '13px', borderRadius: '2px',
             display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px',
           }}>
-            <Star size={14} fill="#0A0A0A" /> {saveLabel}
+            <Star size={14} fill="var(--on-favorite)" /> {saveLabel}
           </button>
         </div>
       </div>
@@ -2717,7 +2889,7 @@ function RecentWorkoutCard({ entry, opacity, onRun, onInfo, onStarToggle, findMa
   // Show name on top if favorite (either the direct name or matched fav name)
   const matchedFav = findMatchingFavorite ? findMatchingFavorite(entry) : null;
   const displayName = entry.name || (matchedFav && matchedFav.name);
-  const borderColor = partial ? 'var(--accent2)' : (starred ? '#FFB80055' : '#222');
+  const borderColor = partial ? 'var(--accent2)' : (starred ? alphaColorToken('var(--favorite)', '55') : 'var(--border)');
 
   return (
     <div style={{
@@ -2729,7 +2901,7 @@ function RecentWorkoutCard({ entry, opacity, onRun, onInfo, onStarToggle, findMa
         style={{ flex: 1, padding: '12px 14px', textAlign: 'left', display: 'flex', flexDirection: 'column', gap: '4px', minWidth: 0 }}
       >
         {displayName && (
-          <div style={{ fontSize: '14px', fontWeight: 700, color: '#FFB800', marginBottom: '2px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+          <div style={{ fontSize: '14px', fontWeight: 700, color: 'var(--favorite)', marginBottom: '2px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
             {displayName}
           </div>
         )}
@@ -2738,7 +2910,7 @@ function RecentWorkoutCard({ entry, opacity, onRun, onInfo, onStarToggle, findMa
           {partial && (
             <div className="mono" style={{ fontSize: '9px', color: 'var(--accent2)', fontWeight: 900, letterSpacing: '0.08em' }}>* PARTIAL</div>
           )}
-          <div className="mono" style={{ fontSize: '10px', color: '#666' }}>· {when}</div>
+          <div className="mono" style={{ fontSize: '10px', color: 'var(--subtle)' }}>· {when}</div>
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap', marginTop: '4px' }}>
           {cats.map(c => {
@@ -2746,7 +2918,7 @@ function RecentWorkoutCard({ entry, opacity, onRun, onInfo, onStarToggle, findMa
             if (!cat) return null;
             return (
               <span key={c} className="mono" style={{
-                fontSize: '9px', padding: '2px 6px', background: cat.color + '22',
+                fontSize: '9px', padding: '2px 6px', background: alphaColorToken(cat.color, '22'),
                 color: cat.color, borderRadius: '2px', fontWeight: 700, letterSpacing: '0.05em',
               }}>{cat.label}</span>
             );
@@ -2756,12 +2928,12 @@ function RecentWorkoutCard({ entry, opacity, onRun, onInfo, onStarToggle, findMa
             if (!mod) return null;
             return (
               <span key={m} className="mono" style={{
-                fontSize: '9px', padding: '2px 6px', background: mod.color + '22',
+                fontSize: '9px', padding: '2px 6px', background: alphaColorToken(mod.color, '22'),
                 color: mod.color, borderRadius: '2px', fontWeight: 700, letterSpacing: '0.05em',
               }}>+ {mod.label}</span>
             );
           })}
-          <span className="mono" style={{ fontSize: '9px', color: '#555' }}>{entry.totalItems} sets</span>
+          <span className="mono" style={{ fontSize: '9px', color: 'var(--subtle)' }}>{entry.totalItems} sets</span>
           {partial && (
             <span className="mono" style={{ fontSize: '9px', color: 'var(--accent2)' }}>{partialProgressLabel(entry)}</span>
           )}
@@ -2770,14 +2942,14 @@ function RecentWorkoutCard({ entry, opacity, onRun, onInfo, onStarToggle, findMa
       {onStarToggle && (
         <button
           onClick={onStarToggle}
-          style={{ padding: '12px 12px', borderLeft: '1px solid #222', color: starred ? '#FFB800' : '#444', display: 'flex', alignItems: 'center' }}
+          style={{ padding: '12px 12px', borderLeft: '1px solid var(--border)', color: starred ? 'var(--favorite)' : 'var(--subtle)', display: 'flex', alignItems: 'center' }}
         >
-          <Star size={16} fill={starred ? '#FFB800' : 'transparent'} />
+          <Star size={16} fill={starred ? 'var(--favorite)' : 'transparent'} />
         </button>
       )}
       <button
         onClick={onInfo}
-        style={{ padding: '12px 14px', borderLeft: '1px solid #222', color: '#666', display: 'flex', alignItems: 'center' }}
+        style={{ padding: '12px 14px', borderLeft: '1px solid var(--border)', color: 'var(--subtle)', display: 'flex', alignItems: 'center' }}
       >
         <Info size={16} />
       </button>
@@ -2860,7 +3032,7 @@ function DraggableFavoriteList({ favorites, onReorder, onRun, onInfo, onEdit, on
             style={{
               display: 'flex', alignItems: 'stretch', gap: '6px',
               opacity: isDragging ? 0.55 : 1,
-              boxShadow: isDropTarget ? 'inset 0 -2px 0 0 #FFB800' : 'none',
+              boxShadow: isDropTarget ? 'inset 0 -2px 0 0 var(--favorite)' : 'none',
               transition: dragState ? 'none' : 'opacity 0.15s',
             }}
           >
@@ -2870,8 +3042,8 @@ function DraggableFavoriteList({ favorites, onReorder, onRun, onInfo, onEdit, on
               onTouchStart={e => startDrag(e, i)}
               aria-label="Drag favorite"
               style={{
-                width: '34px', flexShrink: 0, background: '#0F0F0F', border: '1px solid #222',
-                borderRadius: '2px', color: isDragging ? '#FFB800' : '#666',
+                width: '34px', flexShrink: 0, background: 'var(--surface)', border: '1px solid var(--border)',
+                borderRadius: '2px', color: isDragging ? 'var(--favorite)' : 'var(--subtle)',
                 display: 'flex', alignItems: 'center', justifyContent: 'center',
                 touchAction: 'none', cursor: 'grab',
               }}
@@ -2898,8 +3070,8 @@ function DraggableFavoriteList({ favorites, onReorder, onRun, onInfo, onEdit, on
                 onClick={() => onEdit(entry)}
                 aria-label="Edit favorite name"
                 style={{
-                  width: '34px', background: '#0F0F0F', border: '1px solid #222', borderRadius: '2px',
-                  color: '#888', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  width: '34px', background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '2px',
+                  color: 'var(--muted)', display: 'flex', alignItems: 'center', justifyContent: 'center',
                 }}
               >
                 <Pencil size={15} />
@@ -2919,9 +3091,9 @@ function DraggableFavoriteList({ favorites, onReorder, onRun, onInfo, onEdit, on
                 className="mono"
                 style={{
                   width: confirmingDelete ? '74px' : '34px',
-                  background: confirmingDelete ? 'var(--warn)' : '#0F0F0F',
-                  border: `1px solid ${confirmingDelete ? 'var(--warn)' : '#222'}`,
-                  borderRadius: '2px', color: confirmingDelete ? '#0A0A0A' : '#888',
+                  background: confirmingDelete ? 'var(--warn)' : 'var(--surface)',
+                  border: `1px solid ${confirmingDelete ? 'var(--warn)' : 'var(--border)'}`,
+                  borderRadius: '2px', color: confirmingDelete ? 'var(--on-warn)' : 'var(--muted)',
                   display: 'flex', alignItems: 'center', justifyContent: 'center',
                   fontSize: '10px', fontWeight: 900, letterSpacing: '0.04em',
                   transition: 'width 0.18s ease, background 0.18s ease, color 0.18s ease',
@@ -2958,16 +3130,16 @@ function WorkoutInfoModal({ entry, library, onClose, onRun, onContinue, onStartO
         }}
       >
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
-          <div className="mono" style={{ fontSize: '10px', color: '#666' }}>
+          <div className="mono" style={{ fontSize: '10px', color: 'var(--subtle)' }}>
             // {new Date(entry.date).toLocaleString()}{partial ? ' · * PARTIAL' : ''}
           </div>
-          <button onClick={onClose} style={{ color: '#666' }}><X size={18} /></button>
+          <button onClick={onClose} style={{ color: 'var(--subtle)' }}><X size={18} /></button>
         </div>
 
         <div className="display" style={{ fontSize: '32px', lineHeight: 0.9, color: 'var(--accent)', marginBottom: '4px' }}>
           {modeLabel}
         </div>
-        <div className="mono" style={{ fontSize: '12px', color: '#888', marginBottom: '16px' }}>
+        <div className="mono" style={{ fontSize: '12px', color: 'var(--muted)', marginBottom: '16px' }}>
           {entry.totalItems} total sets · {exercises.length} exercises{partial ? ` · ${partialProgressLabel(entry)}` : ''}
         </div>
 
@@ -2977,7 +3149,7 @@ function WorkoutInfoModal({ entry, library, onClose, onRun, onContinue, onStartO
             if (!cat) return null;
             return (
               <span key={c} className="stencil" style={{
-                fontSize: '14px', padding: '4px 10px', background: cat.color + '22',
+                fontSize: '14px', padding: '4px 10px', background: alphaColorToken(cat.color, '22'),
                 color: cat.color, borderRadius: '2px',
               }}>{cat.label}</span>
             );
@@ -2987,7 +3159,7 @@ function WorkoutInfoModal({ entry, library, onClose, onRun, onContinue, onStartO
             if (!mod) return null;
             return (
               <span key={m} className="stencil" style={{
-                fontSize: '14px', padding: '4px 10px', background: mod.color + '22',
+                fontSize: '14px', padding: '4px 10px', background: alphaColorToken(mod.color, '22'),
                 color: mod.color, borderRadius: '2px',
               }}>+ {mod.label}</span>
             );
@@ -3000,14 +3172,14 @@ function WorkoutInfoModal({ entry, library, onClose, onRun, onContinue, onStartO
             const reps = (entry.modeConfig && entry.modeConfig.exerciseSets && entry.modeConfig.exerciseSets[ex.id]) || ex.default || ex.defaultReps;
             const equip = EQUIP[ex.equipment] || EQUIP.bodyweight;
             return (
-              <div key={ex.id} style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '8px 0', borderBottom: '1px solid #1A1A1A' }}>
+              <div key={ex.id} style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '8px 0', borderBottom: '1px solid var(--border)' }}>
                 <span className="mono" style={{
-                  fontSize: '9px', padding: '2px 5px', background: equip.color + '22',
+                  fontSize: '9px', padding: '2px 5px', background: alphaColorToken(equip.color, '22'),
                   color: equip.color, borderRadius: '2px', fontWeight: 700, minWidth: '30px', textAlign: 'center',
                 }}>{equip.label}</span>
                 <div style={{ flex: 1, fontSize: '13px' }}>{ex.name}</div>
-                <SourceInfoButton exercise={ex} size={13} color="#555" activeColor={equip.color} />
-                <div className="mono" style={{ fontSize: '11px', color: '#888' }}>{reps} {ex.unit}</div>
+              <SourceInfoButton exercise={ex} size={13} color="var(--subtle)" activeColor={equip.color} />
+                <div className="mono" style={{ fontSize: '11px', color: 'var(--muted)' }}>{reps} {ex.unit}</div>
               </div>
             );
           })}
@@ -3016,27 +3188,27 @@ function WorkoutInfoModal({ entry, library, onClose, onRun, onContinue, onStartO
         {partial ? (
           <div style={{ display: 'flex', gap: '8px' }}>
             <button onClick={onStartOver || onRun} style={{
-              flex: 1, padding: '18px 12px', background: '#1A1A1A', color: '#888',
+              flex: 1, padding: '18px 12px', background: 'var(--surface-muted)', color: 'var(--muted)',
               fontSize: '13px', fontWeight: 900, fontFamily: 'Archivo Black, sans-serif',
               borderRadius: '2px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px',
             }}>
               <SkipBack size={16} /> START OVER
             </button>
             <button onClick={onContinue || onRun} style={{
-              flex: 1, padding: '18px 12px', background: 'var(--accent)', color: '#0A0A0A',
+              flex: 1, padding: '18px 12px', background: 'var(--accent)', color: 'var(--on-accent)',
               fontSize: '13px', fontWeight: 900, fontFamily: 'Archivo Black, sans-serif',
               borderRadius: '2px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px',
             }}>
-              <Play size={16} fill="#0A0A0A" /> CONTINUE
+              <Play size={16} fill="var(--on-accent)" /> CONTINUE
             </button>
           </div>
         ) : (
           <button onClick={onRun} style={{
-            width: '100%', padding: '20px', background: 'var(--accent)', color: '#0A0A0A',
+            width: '100%', padding: '20px', background: 'var(--accent)', color: 'var(--on-accent)',
             fontSize: '16px', fontWeight: 900, fontFamily: 'Archivo Black, sans-serif',
             borderRadius: '2px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '10px',
           }}>
-            <Play size={18} fill="#0A0A0A" /> RUN AGAIN
+            <Play size={18} fill="var(--on-accent)" /> RUN AGAIN
           </button>
         )}
       </div>
@@ -3066,25 +3238,25 @@ function PartialWorkoutActionModal({ entry, onCancel, onContinue, onStartOver })
             <div className="display" style={{ fontSize: '32px', lineHeight: 0.9, color: 'var(--accent)', marginBottom: '6px' }}>
               {modeLabel}
             </div>
-            <div className="mono" style={{ fontSize: '11px', color: '#888' }}>{partialProgressLabel(entry)}</div>
+            <div className="mono" style={{ fontSize: '11px', color: 'var(--muted)' }}>{partialProgressLabel(entry)}</div>
           </div>
-          <button onClick={onCancel} style={{ color: '#666' }}><X size={18} /></button>
+          <button onClick={onCancel} style={{ color: 'var(--subtle)' }}><X size={18} /></button>
         </div>
 
         <div style={{ display: 'flex', gap: '8px' }}>
           <button onClick={onStartOver} style={{
-            flex: 1, padding: '18px 12px', background: '#1A1A1A', color: '#888',
+            flex: 1, padding: '18px 12px', background: 'var(--surface-muted)', color: 'var(--muted)',
             fontSize: '13px', fontWeight: 900, fontFamily: 'Archivo Black, sans-serif',
             borderRadius: '2px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px',
           }}>
             <SkipBack size={16} /> START OVER
           </button>
           <button onClick={onContinue} style={{
-            flex: 1, padding: '18px 12px', background: 'var(--accent)', color: '#0A0A0A',
+            flex: 1, padding: '18px 12px', background: 'var(--accent)', color: 'var(--on-accent)',
             fontSize: '13px', fontWeight: 900, fontFamily: 'Archivo Black, sans-serif',
             borderRadius: '2px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px',
           }}>
-            <Play size={16} fill="#0A0A0A" /> CONTINUE
+            <Play size={16} fill="var(--on-accent)" /> CONTINUE
           </button>
         </div>
       </div>
@@ -3131,14 +3303,14 @@ function HistoryScreen({ history, library, onBack, onRerun, onContinuePartial, o
     <div className="slide-in" style={{ minHeight: '100dvh', display: 'flex', flexDirection: 'column', position: 'relative', zIndex: 2 }}>
       <div style={{ padding: `${SAFE_TOP_20} 24px 12px` }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px' }}>
-          <button onClick={onBack} style={{ display: 'flex', alignItems: 'center', gap: '6px', color: '#888', padding: '4px 0' }}>
+          <button onClick={onBack} style={{ display: 'flex', alignItems: 'center', gap: '6px', color: 'var(--muted)', padding: '4px 0' }}>
             <ChevronLeft size={18} />
             <span className="mono" style={{ fontSize: '11px' }}>HOME</span>
           </button>
           {history.length > 0 && (
             <button
               onClick={() => confirmClear ? (onClear(), setConfirmClear(false)) : setConfirmClear(true)}
-              style={{ color: confirmClear ? 'var(--accent)' : '#666', fontSize: '11px' }}
+              style={{ color: confirmClear ? 'var(--accent)' : 'var(--subtle)', fontSize: '11px' }}
               className="mono"
             >
               {confirmClear ? 'TAP AGAIN TO CONFIRM' : 'CLEAR'}
@@ -3148,14 +3320,14 @@ function HistoryScreen({ history, library, onBack, onRerun, onContinuePartial, o
         <div className="display" style={{ fontSize: 'clamp(36px, 10vw, 56px)', lineHeight: 0.9, color: 'var(--fg)' }}>
           HISTORY
         </div>
-        <div className="mono" style={{ fontSize: '11px', color: '#666', marginTop: '8px' }}>
+        <div className="mono" style={{ fontSize: '11px', color: 'var(--subtle)', marginTop: '8px' }}>
           {history.length} {history.length === 1 ? 'session' : 'sessions'} logged
         </div>
       </div>
 
       <div style={{ flex: 1, padding: '12px 24px 24px', overflowY: 'auto' }}>
         {history.length === 0 ? (
-          <div style={{ padding: '40px 20px', textAlign: 'center', color: '#444' }}>
+          <div style={{ padding: '40px 20px', textAlign: 'center', color: 'var(--subtle)' }}>
             <div className="mono" style={{ fontSize: '12px' }}>// NOTHING HERE YET</div>
             <div style={{ fontSize: '13px', marginTop: '8px' }}>Finish or quit a workout and it'll show up.</div>
           </div>
@@ -3213,25 +3385,25 @@ function FavoritesScreen({ favorites, library, onBack, onRerun, removeFavorite, 
     <div className="slide-in" style={{ minHeight: '100dvh', display: 'flex', flexDirection: 'column', position: 'relative', zIndex: 2 }}>
       <div style={{ padding: `${SAFE_TOP_20} 24px 12px` }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px' }}>
-          <button onClick={onBack} style={{ display: 'flex', alignItems: 'center', gap: '6px', color: '#888', padding: '4px 0' }}>
+          <button onClick={onBack} style={{ display: 'flex', alignItems: 'center', gap: '6px', color: 'var(--muted)', padding: '4px 0' }}>
             <ChevronLeft size={18} />
             <span className="mono" style={{ fontSize: '11px' }}>HOME</span>
           </button>
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-          <Star size={28} fill="#FFB800" color="#FFB800" />
-          <div className="display" style={{ fontSize: 'clamp(36px, 10vw, 56px)', lineHeight: 0.9, color: '#FFB800' }}>
+          <Star size={28} fill="var(--favorite)" color="var(--favorite)" />
+          <div className="display" style={{ fontSize: 'clamp(36px, 10vw, 56px)', lineHeight: 0.9, color: 'var(--favorite)' }}>
             FAVORITES
           </div>
         </div>
-        <div className="mono" style={{ fontSize: '11px', color: '#666', marginTop: '8px' }}>
+        <div className="mono" style={{ fontSize: '11px', color: 'var(--subtle)', marginTop: '8px' }}>
           {favorites.length} saved {favorites.length === 1 ? 'workout' : 'workouts'}
         </div>
       </div>
 
       <div style={{ flex: 1, padding: '12px 24px 24px', overflowY: 'auto' }}>
         {favorites.length === 0 ? (
-          <div style={{ padding: '40px 20px', textAlign: 'center', color: '#444' }}>
+          <div style={{ padding: '40px 20px', textAlign: 'center', color: 'var(--subtle)' }}>
             <div className="mono" style={{ fontSize: '12px' }}>// NOTHING HERE YET</div>
             <div style={{ fontSize: '13px', marginTop: '8px' }}>Tap the star on any workout to favorite it.</div>
           </div>
@@ -3277,13 +3449,14 @@ function CategoryScreen({ selectedCategories, setSelectedCategories, selectedMod
     <div className="slide-in" style={{ minHeight: '100dvh', display: 'flex', flexDirection: 'column', position: 'relative', zIndex: 2 }}>
       <Header step={1} total={4} title="TARGETS" onBack={onBack} />
       <div style={{ padding: '0 24px 24px', flex: 1, overflowY: 'auto' }}>
-        <div className="mono" style={{ fontSize: '12px', color: '#666', marginBottom: '16px' }}>
+        <div className="mono" style={{ fontSize: '12px', color: 'var(--subtle)', marginBottom: '16px' }}>
           // MUSCLE GROUPS
         </div>
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '8px', marginBottom: '32px' }}>
           {CATEGORIES.map(cat => {
             const Icon = cat.icon;
             const on = selectedCategories.includes(cat.key);
+            const activeTextColor = readableOnToken(cat.color);
             return (
               <button
                 key={cat.key}
@@ -3291,8 +3464,8 @@ function CategoryScreen({ selectedCategories, setSelectedCategories, selectedMod
                 style={{
                   padding: '18px 10px', aspectRatio: '1', display: 'flex', flexDirection: 'column',
                   alignItems: 'flex-start', justifyContent: 'space-between', textAlign: 'left',
-                  background: on ? cat.color : '#121212', color: on ? '#0A0A0A' : '#F5F1E8',
-                  border: on ? `2px solid ${cat.color}` : '2px solid #222',
+                  background: on ? cat.color : 'var(--surface)', color: on ? activeTextColor : 'var(--fg)',
+                  border: on ? `2px solid ${cat.color}` : '2px solid var(--border)',
                   borderRadius: '2px', transition: 'all 0.15s',
                 }}
               >
@@ -3308,24 +3481,25 @@ function CategoryScreen({ selectedCategories, setSelectedCategories, selectedMod
           })}
         </div>
 
-        <div className="mono" style={{ fontSize: '12px', color: '#666', marginBottom: '8px' }}>
+        <div className="mono" style={{ fontSize: '12px', color: 'var(--subtle)', marginBottom: '8px' }}>
           // EQUIPMENT AVAILABLE
         </div>
-        <div className="mono" style={{ fontSize: '11px', color: '#555', marginBottom: '12px', lineHeight: 1.5 }}>
+        <div className="mono" style={{ fontSize: '11px', color: 'var(--subtle)', marginBottom: '12px', lineHeight: 1.5 }}>
           Toggle these to unlock more exercise variants in each group.
         </div>
         <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
           {MODIFIERS.map(mod => {
             const Icon = mod.icon;
             const on = selectedModifiers.includes(mod.key);
+            const activeTextColor = readableOnToken(mod.color);
             return (
               <button
                 key={mod.key}
                 onClick={() => toggleMod(mod.key)}
                 style={{
                   padding: '14px 16px', display: 'flex', alignItems: 'center', gap: '14px', textAlign: 'left',
-                  background: on ? mod.color : '#121212', color: on ? '#0A0A0A' : '#F5F1E8',
-                  border: on ? `2px solid ${mod.color}` : '2px solid #222',
+                  background: on ? mod.color : 'var(--surface)', color: on ? activeTextColor : 'var(--fg)',
+                  border: on ? `2px solid ${mod.color}` : '2px solid var(--border)',
                   borderRadius: '2px', transition: 'all 0.15s',
                 }}
               >
@@ -3336,12 +3510,12 @@ function CategoryScreen({ selectedCategories, setSelectedCategories, selectedMod
                 </div>
                 <div style={{
                   width: '36px', height: '20px', borderRadius: '20px',
-                  background: on ? '#0A0A0A' : '#222', position: 'relative', transition: 'all 0.2s',
+                  background: on ? activeTextColor : 'var(--surface-strong)', position: 'relative', transition: 'all 0.2s',
                 }}>
                   <div style={{
                     position: 'absolute', top: '2px', left: on ? '18px' : '2px',
                     width: '16px', height: '16px', borderRadius: '16px',
-                    background: on ? mod.color : '#666', transition: 'all 0.2s',
+                    background: on ? mod.color : 'var(--subtle)', transition: 'all 0.2s',
                   }} />
                 </div>
               </button>
@@ -3361,20 +3535,21 @@ function CategoryRandomPicker({ catKey, catColor, maxCount, value, onValueChange
   const safeValue = Math.max(1, Math.min(maxCount, value));
   const min = 1;
   const max = maxCount;
+  const activeTextColor = readableOnToken(catColor);
 
   return (
     <div style={{
       padding: '10px 12px', marginBottom: '10px',
-      background: '#0F0F0F', border: `1px solid ${catColor}33`, borderRadius: '2px',
+      background: 'var(--surface)', border: `1px solid ${alphaColorToken(catColor, '33')}`, borderRadius: '2px',
     }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px', flexWrap: 'wrap' }}>
-        <div className="mono" style={{ fontSize: '10px', color: '#888', flex: 1 }}>
+        <div className="mono" style={{ fontSize: '10px', color: 'var(--muted)', flex: 1 }}>
           PICK <span style={{ color: catColor, fontWeight: 700 }}>{safeValue}</span> AT RANDOM
         </div>
         {hasAdvancedControls && (
           <button onClick={onToggleAdvanced} style={{
-            padding: '6px 10px', background: advancedOpen ? '#1A1A1A' : '#0A0A0A',
-            color: catColor, border: `1px solid ${catColor}66`,
+            padding: '6px 10px', background: advancedOpen ? 'var(--surface-muted)' : 'var(--bg)',
+            color: catColor, border: `1px solid ${alphaColorToken(catColor, '66')}`,
             fontSize: '10px', fontWeight: 900, fontFamily: 'Archivo Black, sans-serif',
             letterSpacing: '0.03em', borderRadius: '2px', display: 'flex',
             alignItems: 'center', gap: '5px',
@@ -3387,7 +3562,7 @@ function CategoryRandomPicker({ catKey, catColor, maxCount, value, onValueChange
           </button>
         )}
         <button onClick={onRandom} style={{
-          padding: '6px 12px', background: catColor, color: '#0A0A0A',
+          padding: '6px 12px', background: catColor, color: activeTextColor,
           fontSize: '11px', fontWeight: 900, fontFamily: 'Archivo Black, sans-serif',
           letterSpacing: '0.05em', borderRadius: '2px', display: 'flex',
           alignItems: 'center', gap: '5px',
@@ -3404,8 +3579,8 @@ function CategoryRandomPicker({ catKey, catColor, maxCount, value, onValueChange
         style={{ width: '100%', accentColor: catColor }}
       />
       <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '2px' }}>
-        <div className="mono" style={{ fontSize: '9px', color: '#555' }}>{min}</div>
-        <div className="mono" style={{ fontSize: '9px', color: '#555' }}>{max}</div>
+        <div className="mono" style={{ fontSize: '9px', color: 'var(--subtle)' }}>{min}</div>
+        <div className="mono" style={{ fontSize: '9px', color: 'var(--subtle)' }}>{max}</div>
       </div>
     </div>
   );
@@ -3529,14 +3704,14 @@ function ExerciseScreen({ library, setLibrary, categories, modifiers, selected, 
     <div className="slide-in" style={{ minHeight: '100dvh', display: 'flex', flexDirection: 'column', position: 'relative', zIndex: 2 }}>
       <Header step={2} total={4} title="EXERCISES" onBack={onBack} />
       <div style={{ padding: '0 24px 24px', flex: 1, overflowY: 'auto' }}>
-        <div className="mono" style={{ fontSize: '12px', color: '#666', marginBottom: '16px' }}>
+        <div className="mono" style={{ fontSize: '12px', color: 'var(--subtle)', marginBottom: '16px' }}>
           // {selected.length} SELECTED
         </div>
 
         <div style={{ display: 'flex', gap: '8px', marginBottom: '20px', flexWrap: 'wrap' }}>
           {Object.values(EQUIP).filter(e => allowedEquip.has(e.key)).map(e => (
             <div key={e.key} className="mono" style={{
-              fontSize: '9px', padding: '3px 8px', background: e.color + '22',
+              fontSize: '9px', padding: '3px 8px', background: alphaColorToken(e.color, '22'),
               color: e.color, borderRadius: '2px', fontWeight: 700, letterSpacing: '0.05em',
             }}>{e.label} {e.name}</div>
           ))}
@@ -3553,7 +3728,7 @@ function ExerciseScreen({ library, setLibrary, categories, modifiers, selected, 
               <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '12px', borderBottom: `2px solid ${cat.color}`, paddingBottom: '8px' }}>
                 <Icon size={18} color={cat.color} />
                 <div className="stencil" style={{ fontSize: '20px', color: cat.color }}>{cat.label}</div>
-                <div className="mono" style={{ fontSize: '10px', color: '#555', marginLeft: 'auto' }}>{visibleExs.length} available</div>
+                <div className="mono" style={{ fontSize: '10px', color: 'var(--subtle)', marginLeft: 'auto' }}>{visibleExs.length} available</div>
               </div>
 
               {/* Random picker for this category */}
@@ -3601,9 +3776,9 @@ function ExerciseScreen({ library, setLibrary, categories, modifiers, selected, 
                           onClick={() => toggleAdvancedBucket(bucketKey)}
                           style={{
                             padding: '10px 12px', display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-                            background: advancedExpanded ? equip.color : '#0F0F0F',
-                            color: advancedExpanded ? '#0A0A0A' : equip.color,
-                            border: `1px dashed ${equip.color}66`, borderRadius: '2px',
+                            background: advancedExpanded ? equip.color : 'var(--surface)',
+                            color: advancedExpanded ? readableOnToken(equip.color) : equip.color,
+                            border: `1px dashed ${alphaColorToken(equip.color, '66')}`, borderRadius: '2px',
                             fontFamily: 'Archivo Black, sans-serif', fontSize: '11px', letterSpacing: '0.03em',
                           }}
                         >
@@ -3630,46 +3805,46 @@ function ExerciseScreen({ library, setLibrary, categories, modifiers, selected, 
                   );
                 })}
                 {addingTo === catKey ? (
-                  <div style={{ padding: '12px', background: '#0F0F0F', border: `1px dashed ${cat.color}`, borderRadius: '2px' }}>
+                  <div style={{ padding: '12px', background: 'var(--surface)', border: `1px dashed ${cat.color}`, borderRadius: '2px' }}>
                     <input
                       autoFocus value={newName} onChange={e => setNewName(e.target.value)}
                       placeholder="Exercise name"
-                      style={{ width: '100%', padding: '8px', background: '#000', color: 'var(--fg)', border: '1px solid #333', marginBottom: '8px', fontFamily: 'inherit', borderRadius: '2px' }}
+                      style={{ width: '100%', padding: '8px', background: 'var(--field-bg)', color: 'var(--fg)', border: '1px solid var(--border-strong)', marginBottom: '8px', fontFamily: 'inherit', borderRadius: '2px' }}
                     />
                     <div style={{ display: 'flex', gap: '6px', marginBottom: '8px' }}>
-                      <select value={newEquip} onChange={e => setNewEquip(e.target.value)} style={{ flex: 1, padding: '8px', background: '#000', color: 'var(--fg)', border: '1px solid #333', fontFamily: 'inherit', borderRadius: '2px', fontSize: '11px' }}>
+                      <select value={newEquip} onChange={e => setNewEquip(e.target.value)} style={{ flex: 1, padding: '8px', background: 'var(--field-bg)', color: 'var(--fg)', border: '1px solid var(--border-strong)', fontFamily: 'inherit', borderRadius: '2px', fontSize: '11px' }}>
                         <option value="bodyweight">Bodyweight</option>
                         {allowedEquip.has('weights') && <option value="weights">Dumbbell</option>}
                         {allowedEquip.has('pullup') && <option value="pullup">Bar</option>}
                       </select>
-                      <select value={newUnit} onChange={e => setNewUnit(e.target.value)} style={{ padding: '8px', background: '#000', color: 'var(--fg)', border: '1px solid #333', fontFamily: 'inherit', borderRadius: '2px', fontSize: '11px' }}>
+                      <select value={newUnit} onChange={e => setNewUnit(e.target.value)} style={{ padding: '8px', background: 'var(--field-bg)', color: 'var(--fg)', border: '1px solid var(--border-strong)', fontFamily: 'inherit', borderRadius: '2px', fontSize: '11px' }}>
                         <option value="reps">reps</option>
                         <option value="sec">sec</option>
                       </select>
                     </div>
                     <div style={{ display: 'flex', gap: '6px', marginBottom: '8px', fontSize: '11px' }}>
-                      <label style={{ flex: 1, color: '#888' }}>
+                      <label style={{ flex: 1, color: 'var(--muted)' }}>
                         MIN
-                        <input type="number" value={newMin} onChange={e => setNewMin(e.target.value)} style={{ width: '100%', padding: '6px', background: '#000', color: 'var(--fg)', border: '1px solid #333', fontFamily: 'inherit', borderRadius: '2px', marginTop: '2px' }} />
+                        <input type="number" value={newMin} onChange={e => setNewMin(e.target.value)} style={{ width: '100%', padding: '6px', background: 'var(--field-bg)', color: 'var(--fg)', border: '1px solid var(--border-strong)', fontFamily: 'inherit', borderRadius: '2px', marginTop: '2px' }} />
                       </label>
-                      <label style={{ flex: 1, color: '#888' }}>
+                      <label style={{ flex: 1, color: 'var(--muted)' }}>
                         DEFAULT
-                        <input type="number" value={newDefault} onChange={e => setNewDefault(e.target.value)} style={{ width: '100%', padding: '6px', background: '#000', color: 'var(--fg)', border: '1px solid #333', fontFamily: 'inherit', borderRadius: '2px', marginTop: '2px' }} />
+                        <input type="number" value={newDefault} onChange={e => setNewDefault(e.target.value)} style={{ width: '100%', padding: '6px', background: 'var(--field-bg)', color: 'var(--fg)', border: '1px solid var(--border-strong)', fontFamily: 'inherit', borderRadius: '2px', marginTop: '2px' }} />
                       </label>
-                      <label style={{ flex: 1, color: '#888' }}>
+                      <label style={{ flex: 1, color: 'var(--muted)' }}>
                         MAX
-                        <input type="number" value={newMax} onChange={e => setNewMax(e.target.value)} style={{ width: '100%', padding: '6px', background: '#000', color: 'var(--fg)', border: '1px solid #333', fontFamily: 'inherit', borderRadius: '2px', marginTop: '2px' }} />
+                        <input type="number" value={newMax} onChange={e => setNewMax(e.target.value)} style={{ width: '100%', padding: '6px', background: 'var(--field-bg)', color: 'var(--fg)', border: '1px solid var(--border-strong)', fontFamily: 'inherit', borderRadius: '2px', marginTop: '2px' }} />
                       </label>
                     </div>
                     <div style={{ display: 'flex', gap: '6px' }}>
-                      <button onClick={() => addCustom(catKey)} style={{ flex: 1, padding: '8px', background: cat.color, color: '#0A0A0A', fontWeight: 700, borderRadius: '2px' }}>ADD</button>
-                      <button onClick={() => setAddingTo(null)} style={{ padding: '8px 12px', color: '#666' }}><X size={16} /></button>
+                      <button onClick={() => addCustom(catKey)} style={{ flex: 1, padding: '8px', background: cat.color, color: readableOnToken(cat.color), fontWeight: 700, borderRadius: '2px' }}>ADD</button>
+                      <button onClick={() => setAddingTo(null)} style={{ padding: '8px 12px', color: 'var(--subtle)' }}><X size={16} /></button>
                     </div>
                   </div>
                 ) : (
                   <button
                     onClick={() => setAddingTo(catKey)}
-                    style={{ padding: '10px', color: cat.color, border: `1px dashed ${cat.color}44`, borderRadius: '2px', fontSize: '12px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}
+                    style={{ padding: '10px', color: cat.color, border: `1px dashed ${alphaColorToken(cat.color, '44')}`, borderRadius: '2px', fontSize: '12px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}
                   >
                     <Plus size={14} /> ADD CUSTOM
                   </button>
@@ -3684,7 +3859,7 @@ function ExerciseScreen({ library, setLibrary, categories, modifiers, selected, 
   );
 }
 
-function SourceInfoButton({ exercise, size = 14, color = '#666', activeColor = 'var(--accent)', style = {} }) {
+function SourceInfoButton({ exercise, size = 14, color = 'var(--subtle)', activeColor = 'var(--accent)', style = {} }) {
   const [detailsOpen, setDetailsOpen] = useState(false);
   const hasDetails = !!(exercise?.description || exercise?.sourceUrl || exercise?.directUrl);
   if (!hasDetails) return null;
@@ -3729,6 +3904,7 @@ function SourceInfoButton({ exercise, size = 14, color = '#666', activeColor = '
 function ExerciseDescriptionModal({ exercise, accentColor = 'var(--accent)', onClose }) {
   const sourceUrl = exercise?.sourceUrl || exercise?.directUrl;
   const description = exercise?.description || 'No description is available for this exercise yet.';
+  const accentTextColor = readableOnToken(accentColor);
 
   return (
     <div
@@ -3752,7 +3928,7 @@ function ExerciseDescriptionModal({ exercise, accentColor = 'var(--accent)', onC
           display: 'flex', flexDirection: 'column', overflow: 'hidden',
         }}
       >
-        <div style={{ padding: '20px 20px 12px', borderBottom: '1px solid #222' }}>
+        <div style={{ padding: '20px 20px 12px', borderBottom: '1px solid var(--border)' }}>
           <div className="mono" style={{ fontSize: '10px', color: accentColor, marginBottom: '8px', letterSpacing: '0.1em' }}>
             // EXERCISE DETAILS
           </div>
@@ -3763,18 +3939,18 @@ function ExerciseDescriptionModal({ exercise, accentColor = 'var(--accent)', onC
 
         <div style={{ flex: 1, overflowY: 'auto', padding: '20px' }}>
           <div style={{
-            fontSize: '15px', lineHeight: 1.65, color: '#DDD',
+            fontSize: '15px', lineHeight: 1.65, color: 'var(--fg)',
             whiteSpace: 'pre-wrap',
           }}>
             {description}
           </div>
         </div>
 
-        <div style={{ padding: '16px 20px 20px', borderTop: '1px solid #222', display: 'grid', gridTemplateColumns: '1fr 1.35fr', gap: '8px' }}>
+        <div style={{ padding: '16px 20px 20px', borderTop: '1px solid var(--border)', display: 'grid', gridTemplateColumns: '1fr 1.35fr', gap: '8px' }}>
           <button
             onClick={onClose}
             style={{
-              padding: '16px 12px', background: '#1A1A1A', color: '#AAA',
+              padding: '16px 12px', background: 'var(--surface-muted)', color: 'var(--muted-strong)',
               fontSize: '13px', fontWeight: 900, fontFamily: 'Archivo Black, sans-serif',
               letterSpacing: '0.02em', borderRadius: '2px',
             }}
@@ -3785,8 +3961,8 @@ function ExerciseDescriptionModal({ exercise, accentColor = 'var(--accent)', onC
             onClick={() => openExerciseSource(exercise)}
             disabled={!sourceUrl}
             style={{
-              padding: '16px 12px', background: sourceUrl ? accentColor : '#1A1A1A',
-              color: sourceUrl ? '#0A0A0A' : '#444',
+              padding: '16px 12px', background: sourceUrl ? accentColor : 'var(--surface-muted)',
+              color: sourceUrl ? accentTextColor : 'var(--subtle)',
               fontSize: '13px', fontWeight: 900, fontFamily: 'Archivo Black, sans-serif',
               letterSpacing: '0.02em', borderRadius: '2px', opacity: sourceUrl ? 1 : 0.6,
             }}
@@ -3802,15 +3978,17 @@ function ExerciseDescriptionModal({ exercise, accentColor = 'var(--accent)', onC
 function ExercisePickerRow({ exercise, selected, revealed = false, groupExpanded, onToggle, onToggleGroup, onRemoveCustom }) {
   const equip = EQUIP[exercise.equipment] || EQUIP.bodyweight;
   const canExpandGroup = exercise.hasGroupVariants && exercise.groupPrimary;
-  const background = selected ? '#F5F1E8' : (revealed ? '#1A1A1A' : '#121212');
-  const borderColor = selected ? '#F5F1E8' : (revealed ? '#333' : '#222');
+  const background = selected ? 'var(--fg)' : (revealed ? 'var(--surface-muted)' : 'var(--surface)');
+  const borderColor = selected ? 'var(--fg)' : (revealed ? 'var(--border-strong)' : 'var(--border)');
+  const selectedText = 'var(--bg)';
+  const activeEquipText = readableOnToken(equip.color);
 
   return (
     <div
       style={{
         display: 'flex', alignItems: 'stretch', overflow: 'hidden',
         background,
-        color: selected ? '#0A0A0A' : '#F5F1E8',
+        color: selected ? selectedText : 'var(--fg)',
         border: `1px solid ${borderColor}`,
         borderRadius: '2px',
       }}
@@ -3823,7 +4001,7 @@ function ExercisePickerRow({ exercise, selected, revealed = false, groupExpanded
         }}
       >
         <div style={{
-          width: '18px', height: '18px', border: `2px solid ${selected ? '#0A0A0A' : '#444'}`,
+          width: '18px', height: '18px', border: `2px solid ${selected ? selectedText : 'var(--subtle)'}`,
           display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: '2px',
           flexShrink: 0,
         }}>
@@ -3837,7 +4015,7 @@ function ExercisePickerRow({ exercise, selected, revealed = false, groupExpanded
       <div style={{ display: 'flex', alignItems: 'center', gap: '4px', paddingRight: '8px', flexShrink: 0 }}>
         <span className="mono" style={{
           fontSize: '9px', padding: '2px 6px',
-          background: selected ? '#0A0A0A' : '#1F1F1F',
+          background: selected ? selectedText : 'var(--surface-strong)',
           color: equip.color,
           borderRadius: '2px', fontWeight: 700, letterSpacing: '0.05em',
         }}>{equip.label}</span>
@@ -3847,8 +4025,8 @@ function ExercisePickerRow({ exercise, selected, revealed = false, groupExpanded
             onClick={onToggleGroup}
             className="mono"
             style={{
-              padding: '5px 7px', background: groupExpanded ? equip.color : '#1F1F1F',
-              color: groupExpanded ? '#0A0A0A' : equip.color,
+              padding: '5px 7px', background: groupExpanded ? equip.color : 'var(--surface-strong)',
+              color: groupExpanded ? activeEquipText : equip.color,
               borderRadius: '2px', fontSize: '9px', fontWeight: 900, letterSpacing: '0.04em',
               display: 'flex', alignItems: 'center', gap: '3px',
             }}
@@ -3860,12 +4038,12 @@ function ExercisePickerRow({ exercise, selected, revealed = false, groupExpanded
             />
           </button>
         )}
-        <SourceInfoButton exercise={exercise} size={14} color={selected ? '#333' : '#666'} activeColor={equip.color} />
+        <SourceInfoButton exercise={exercise} size={14} color={selected ? selectedText : 'var(--subtle)'} activeColor={equip.color} />
         {exercise.custom && (
           <button
             type="button"
             onClick={onRemoveCustom}
-            style={{ padding: '4px', opacity: 0.5, color: selected ? '#0A0A0A' : '#F5F1E8' }}
+            style={{ padding: '4px', opacity: 0.5, color: selected ? selectedText : 'var(--fg)' }}
           >
             <X size={14} />
           </button>
@@ -3938,7 +4116,7 @@ function ModeScreen({ mode, setMode, modeConfig, setModeConfig, exercises, setEx
     <div className="slide-in" style={{ minHeight: '100dvh', display: 'flex', flexDirection: 'column', position: 'relative', zIndex: 2 }}>
       <Header step={3} total={4} title="FORMAT" onBack={onBack} />
       <div style={{ padding: '0 24px 24px', flex: 1, overflowY: 'auto' }}>
-        <div className="mono" style={{ fontSize: '12px', color: '#666', marginBottom: '16px' }}>
+        <div className="mono" style={{ fontSize: '12px', color: 'var(--subtle)', marginBottom: '16px' }}>
           // HOW DO YOU WANT TO RUN IT
         </div>
         <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginBottom: '24px' }}>
@@ -3950,8 +4128,8 @@ function ModeScreen({ mode, setMode, modeConfig, setModeConfig, exercises, setEx
                 key={m.key}
                 onClick={() => setMode(m.key)}
                 style={{
-                  padding: '14px 16px', textAlign: 'left', background: on ? 'var(--accent)' : '#121212',
-                  color: on ? '#0A0A0A' : '#F5F1E8', border: `2px solid ${on ? 'var(--accent)' : '#222'}`,
+                  padding: '14px 16px', textAlign: 'left', background: on ? 'var(--accent)' : 'var(--surface)',
+                  color: on ? 'var(--on-accent)' : 'var(--fg)', border: `2px solid ${on ? 'var(--accent)' : 'var(--border)'}`,
                   borderRadius: '2px', display: 'flex', gap: '14px', alignItems: 'flex-start',
                 }}
               >
@@ -3966,7 +4144,7 @@ function ModeScreen({ mode, setMode, modeConfig, setModeConfig, exercises, setEx
         </div>
 
         {mode && mode !== 'manual' && (
-          <div style={{ padding: '16px', border: '1px solid #222', borderRadius: '2px', marginBottom: '16px' }}>
+          <div style={{ padding: '16px', border: '1px solid var(--border)', borderRadius: '2px', marginBottom: '16px' }}>
             <div className="mono" style={{ fontSize: '11px', color: 'var(--accent)', marginBottom: '12px' }}>// CONFIG</div>
             {(mode === 'focus' || mode === 'circuit') && (
               <NumberField
@@ -3993,7 +4171,7 @@ function ModeScreen({ mode, setMode, modeConfig, setModeConfig, exercises, setEx
               </>
             )}
             {mode === 'addon' && (
-              <div className="mono" style={{ fontSize: '11px', color: '#888', lineHeight: 1.5 }}>
+              <div className="mono" style={{ fontSize: '11px', color: 'var(--muted)', lineHeight: 1.5 }}>
                 Round 1: exercise 1. Round 2: exercises 1, 2. Round 3: 1, 2, 3. And so on, until all {exercises.length} are hit in the final round.
               </div>
             )}
@@ -4010,7 +4188,7 @@ function ModeScreen({ mode, setMode, modeConfig, setModeConfig, exercises, setEx
         )}
 
         {mode && mode !== 'manual' && (
-          <div style={{ padding: '16px', border: '1px solid #222', borderRadius: '2px' }}>
+          <div style={{ padding: '16px', border: '1px solid var(--border)', borderRadius: '2px' }}>
             <div className="mono" style={{ fontSize: '11px', color: 'var(--accent)', marginBottom: '16px' }}>// REPS PER EXERCISE</div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '18px' }}>
               {exercises.map(ex => (
@@ -4142,12 +4320,12 @@ function OrderList({ exercises, setExercises, mode, supersetSize = 2 }) {
   }, [dragState ? dragState.srcIdx : null, exercises]);
 
   return (
-    <div style={{ padding: '16px', border: '1px solid #222', borderRadius: '2px', marginBottom: '16px' }}>
+    <div style={{ padding: '16px', border: '1px solid var(--border)', borderRadius: '2px', marginBottom: '16px' }}>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '12px' }}>
         <div className="mono" style={{ fontSize: '11px', color: 'var(--accent)' }}>
           // ORDER ({exercises.length})
         </div>
-        <div className="mono" style={{ fontSize: '10px', color: '#666' }}>
+        <div className="mono" style={{ fontSize: '10px', color: 'var(--subtle)' }}>
           HOLD HANDLE TO DRAG
         </div>
       </div>
@@ -4159,7 +4337,7 @@ function OrderList({ exercises, setExercises, mode, supersetSize = 2 }) {
             key={opt.key}
             onClick={() => doShuffle(opt.key)}
             style={{
-              padding: '10px 12px', background: '#0F0F0F', border: '1px solid #222',
+              padding: '10px 12px', background: 'var(--surface)', border: '1px solid var(--border)',
               borderRadius: '2px', display: 'flex', alignItems: 'center', justifyContent: 'space-between',
               textAlign: 'left',
             }}
@@ -4168,7 +4346,7 @@ function OrderList({ exercises, setExercises, mode, supersetSize = 2 }) {
               <Shuffle size={14} color="var(--accent)" />
               <div>
                 <div className="stencil" style={{ fontSize: '14px', color: 'var(--fg)', lineHeight: 1 }}>{opt.label}</div>
-                <div className="mono" style={{ fontSize: '9px', color: '#666', marginTop: '2px' }}>{opt.desc}</div>
+                <div className="mono" style={{ fontSize: '9px', color: 'var(--subtle)', marginTop: '2px' }}>{opt.desc}</div>
               </div>
             </div>
             <div className="mono" style={{ fontSize: '10px', color: 'var(--accent)', fontWeight: 700 }}>ROLL →</div>
@@ -4210,8 +4388,8 @@ function OrderList({ exercises, setExercises, mode, supersetSize = 2 }) {
                 data-row
                 style={{
                   padding: '10px 0', display: 'flex', alignItems: 'center', gap: '8px',
-                  borderBottom: isGroupEnd ? 'none' : '1px solid #1A1A1A',
-                  background: isDragging ? '#1A1A1A' : 'transparent',
+                  borderBottom: isGroupEnd ? 'none' : '1px solid var(--border)',
+                  background: isDragging ? 'var(--surface-muted)' : 'transparent',
                   opacity: isDragging ? 0.55 : 1,
                   boxShadow: isDropTarget ? `inset 0 -2px 0 0 var(--accent)` : 'none',
                   transition: dragState ? 'none' : 'background 0.15s',
@@ -4220,14 +4398,14 @@ function OrderList({ exercises, setExercises, mode, supersetSize = 2 }) {
                 }}
               >
                 <div className="mono" style={{
-                  fontSize: '10px', color: '#666', width: '22px', flexShrink: 0,
+                  fontSize: '10px', color: 'var(--subtle)', width: '22px', flexShrink: 0,
                 }}>{String(displayIdx + 1).padStart(2, '0')}</div>
                 <div style={{
                   width: '3px', height: '28px', background: catColor(ex.category),
                   borderRadius: '2px', flexShrink: 0,
                 }} />
                 <span className="mono" style={{
-                  fontSize: '9px', padding: '2px 5px', background: equip.color + '22',
+                  fontSize: '9px', padding: '2px 5px', background: alphaColorToken(equip.color, '22'),
                   color: equip.color, borderRadius: '2px', fontWeight: 700, flexShrink: 0,
                 }}>{equip.label}</span>
                 <div style={{
@@ -4245,8 +4423,8 @@ function OrderList({ exercises, setExercises, mode, supersetSize = 2 }) {
                   style={{
                     width: '44px', height: '40px', display: 'flex', alignItems: 'center',
                     justifyContent: 'center', cursor: 'grab', touchAction: 'none',
-                    color: isDragging ? 'var(--accent)' : '#666',
-                    background: isDragging ? '#0A0A0A' : 'transparent',
+                    color: isDragging ? 'var(--accent)' : 'var(--subtle)',
+                    background: isDragging ? 'var(--bg)' : 'transparent',
                     borderRadius: '2px', flexShrink: 0,
                   }}
                 >
@@ -4280,14 +4458,14 @@ function RepSlider({ exercise, value, onChange }) {
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '6px', minWidth: 0, flex: 1 }}>
           <span className="mono" style={{
-            fontSize: '9px', padding: '2px 5px', background: equip.color + '22',
+            fontSize: '9px', padding: '2px 5px', background: alphaColorToken(equip.color, '22'),
             color: equip.color, borderRadius: '2px', fontWeight: 700, flexShrink: 0,
           }}>{equip.label}</span>
           <div style={{ fontSize: '13px', fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{exercise.name}</div>
-          <SourceInfoButton exercise={exercise} size={12} color="#555" activeColor={equip.color} />
+          <SourceInfoButton exercise={exercise} size={12} color="var(--subtle)" activeColor={equip.color} />
         </div>
         <div className="display" style={{ fontSize: '20px', color: 'var(--accent)', lineHeight: 1, flexShrink: 0, marginLeft: '8px' }}>
-          {currentValue}<span className="mono" style={{ fontSize: '10px', color: '#666', marginLeft: '3px', fontWeight: 400 }}>{exercise.unit}</span>
+          {currentValue}<span className="mono" style={{ fontSize: '10px', color: 'var(--subtle)', marginLeft: '3px', fontWeight: 400 }}>{exercise.unit}</span>
         </div>
       </div>
       <input
@@ -4301,8 +4479,8 @@ function RepSlider({ exercise, value, onChange }) {
       <div style={{ display: 'flex', gap: '4px' }}>
         {presets.map((v, i) => (
           <button key={v + '-' + i} onClick={() => onChange(v)} style={{
-            flex: 1, padding: '5px 4px', background: currentValue === v ? 'var(--accent)' : '#0F0F0F',
-            color: currentValue === v ? '#0A0A0A' : '#888', fontSize: '10px', borderRadius: '2px',
+            flex: 1, padding: '5px 4px', background: currentValue === v ? 'var(--accent)' : 'var(--surface)',
+            color: currentValue === v ? 'var(--on-accent)' : 'var(--muted)', fontSize: '10px', borderRadius: '2px',
             fontWeight: 700, fontFamily: 'JetBrains Mono, monospace',
           }}>{v}</button>
         ))}
@@ -4316,18 +4494,18 @@ function NumberField({ label, value, onChange, min = 1, max = 99 }) {
   const atMax = value >= max;
   return (
     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '10px' }}>
-      <div className="mono" style={{ fontSize: '11px', color: '#AAA' }}>{label}</div>
+      <div className="mono" style={{ fontSize: '11px', color: 'var(--muted-strong)' }}>{label}</div>
       <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
         {atMin ? (
           <div style={{ width: '32px', height: '32px' }} />
         ) : (
-          <button onClick={() => onChange(Math.max(min, value - 1))} style={{ width: '32px', height: '32px', background: '#1A1A1A', borderRadius: '2px' }}><Minus size={14} /></button>
+          <button onClick={() => onChange(Math.max(min, value - 1))} style={{ width: '32px', height: '32px', background: 'var(--surface-muted)', borderRadius: '2px' }}><Minus size={14} /></button>
         )}
         <div className="display" style={{ minWidth: '40px', textAlign: 'center', fontSize: '20px', color: 'var(--accent)' }}>{value}</div>
         {atMax ? (
           <div style={{ width: '32px', height: '32px' }} />
         ) : (
-          <button onClick={() => onChange(Math.min(max, value + 1))} style={{ width: '32px', height: '32px', background: '#1A1A1A', borderRadius: '2px' }}><Plus size={14} /></button>
+          <button onClick={() => onChange(Math.min(max, value + 1))} style={{ width: '32px', height: '32px', background: 'var(--surface-muted)', borderRadius: '2px' }}><Plus size={14} /></button>
         )}
       </div>
     </div>
@@ -4365,7 +4543,7 @@ function ManualBuilder({ exercises, queue, setQueue }) {
   };
 
   return (
-    <div style={{ padding: '16px', border: '1px solid #222', borderRadius: '2px' }}>
+    <div style={{ padding: '16px', border: '1px solid var(--border)', borderRadius: '2px' }}>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '12px' }}>
         <div className="mono" style={{ fontSize: '11px', color: 'var(--accent)' }}>
           // QUEUE ({queue.length} ITEMS)
@@ -4384,9 +4562,9 @@ function ManualBuilder({ exercises, queue, setQueue }) {
             className="mono"
             style={{
               fontSize: '10px',
-              color: confirmReset ? 'var(--accent)' : '#666',
+              color: confirmReset ? 'var(--accent)' : 'var(--subtle)',
               padding: '4px 8px',
-              border: `1px solid ${confirmReset ? 'var(--accent)' : '#333'}`,
+              border: `1px solid ${confirmReset ? 'var(--accent)' : 'var(--border-strong)'}`,
               borderRadius: '2px',
               letterSpacing: '0.05em',
             }}
@@ -4396,23 +4574,23 @@ function ManualBuilder({ exercises, queue, setQueue }) {
         )}
       </div>
       {queue.length === 0 && (
-        <div className="mono" style={{ fontSize: '11px', color: '#666', padding: '20px 0', textAlign: 'center' }}>
+        <div className="mono" style={{ fontSize: '11px', color: 'var(--subtle)', padding: '20px 0', textAlign: 'center' }}>
           Empty queue. Add exercises below.
         </div>
       )}
       {queue.map((item, i) => {
         const equip = EQUIP[item.equipment] || EQUIP.bodyweight;
         return (
-          <div key={item.id} style={{ padding: '10px 0', borderBottom: '1px solid #1A1A1A' }}>
+          <div key={item.id} style={{ padding: '10px 0', borderBottom: '1px solid var(--border)' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '6px' }}>
-              <div className="mono" style={{ fontSize: '10px', color: '#666', width: '22px' }}>{String(i + 1).padStart(2, '0')}</div>
+              <div className="mono" style={{ fontSize: '10px', color: 'var(--subtle)', width: '22px' }}>{String(i + 1).padStart(2, '0')}</div>
               <span className="mono" style={{
-                fontSize: '9px', padding: '2px 5px', background: equip.color + '22',
+                fontSize: '9px', padding: '2px 5px', background: alphaColorToken(equip.color, '22'),
                 color: equip.color, borderRadius: '2px', fontWeight: 700,
               }}>{equip.label}</span>
               <div style={{ flex: 1, fontSize: '13px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{item.name}</div>
-              <button onClick={() => move(i, -1)} disabled={i === 0} style={{ opacity: i === 0 ? 0.3 : 1, padding: '4px', color: '#888' }}>↑</button>
-              <button onClick={() => move(i, 1)} disabled={i === queue.length - 1} style={{ opacity: i === queue.length - 1 ? 0.3 : 1, padding: '4px', color: '#888' }}>↓</button>
+              <button onClick={() => move(i, -1)} disabled={i === 0} style={{ opacity: i === 0 ? 0.3 : 1, padding: '4px', color: 'var(--muted)' }}>↑</button>
+              <button onClick={() => move(i, 1)} disabled={i === queue.length - 1} style={{ opacity: i === queue.length - 1 ? 0.3 : 1, padding: '4px', color: 'var(--muted)' }}>↓</button>
               <button onClick={() => removeAt(i)} style={{ padding: '4px', color: 'var(--accent)' }}><X size={14} /></button>
             </div>
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px', paddingLeft: '30px' }}>
@@ -4431,7 +4609,7 @@ function ManualBuilder({ exercises, queue, setQueue }) {
       })}
       <button
         onClick={() => setPickerOpen(true)}
-        style={{ marginTop: '12px', width: '100%', padding: '12px', background: 'var(--accent)', color: '#0A0A0A', fontWeight: 700, borderRadius: '2px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}
+        style={{ marginTop: '12px', width: '100%', padding: '12px', background: 'var(--accent)', color: 'var(--on-accent)', fontWeight: 700, borderRadius: '2px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}
       >
         <Plus size={16} /> ADD TO QUEUE
       </button>
@@ -4448,16 +4626,16 @@ function ManualBuilder({ exercises, queue, setQueue }) {
               return (
                 <button key={ex.id} onClick={() => addItem(ex)} style={{
                   display: 'flex', alignItems: 'center', gap: '10px', width: '100%', padding: '12px',
-                  textAlign: 'left', color: 'var(--fg)', background: 'var(--bg)', border: '1px solid #222',
+                  textAlign: 'left', color: 'var(--fg)', background: 'var(--bg)', border: '1px solid var(--border)',
                   borderRadius: '2px', marginBottom: '6px',
                 }}>
                   <span className="mono" style={{
-                    fontSize: '9px', padding: '2px 5px', background: equip.color + '22',
+                    fontSize: '9px', padding: '2px 5px', background: alphaColorToken(equip.color, '22'),
                     color: equip.color, borderRadius: '2px', fontWeight: 700,
                   }}>{equip.label}</span>
                   <div style={{ flex: 1 }}>
                     <div style={{ fontWeight: 600, fontSize: '14px' }}>{ex.name}</div>
-                    <div className="mono" style={{ fontSize: '10px', color: '#888' }}>{ex.default || ex.defaultReps} {ex.unit}</div>
+                    <div className="mono" style={{ fontSize: '10px', color: 'var(--muted)' }}>{ex.default || ex.defaultReps} {ex.unit}</div>
                   </div>
                 </button>
               );
@@ -4474,7 +4652,7 @@ function RestScreen({ restConfig, setRestConfig, onBack, onNext, editingCurrentW
     <div className="slide-in" style={{ minHeight: '100dvh', display: 'flex', flexDirection: 'column', position: 'relative', zIndex: 2 }}>
       <Header step={4} total={4} title="REST" onBack={onBack} />
       <div style={{ padding: '0 24px 24px', flex: 1, overflowY: 'auto' }}>
-        <div className="mono" style={{ fontSize: '12px', color: '#666', marginBottom: '20px' }}>
+        <div className="mono" style={{ fontSize: '12px', color: 'var(--subtle)', marginBottom: '20px' }}>
           // HOW MUCH BREATHER BETWEEN SETS
         </div>
 
@@ -4487,8 +4665,8 @@ function RestScreen({ restConfig, setRestConfig, onBack, onNext, editingCurrentW
             const on = restConfig.type === t.k;
             return (
               <button key={t.k} onClick={() => setRestConfig(p => ({ ...p, type: t.k }))} style={{
-                flex: 1, padding: '14px 8px', background: on ? 'var(--accent)' : '#121212',
-                color: on ? '#0A0A0A' : '#F5F1E8', border: `2px solid ${on ? 'var(--accent)' : '#222'}`,
+                flex: 1, padding: '14px 8px', background: on ? 'var(--accent)' : 'var(--surface)',
+                color: on ? 'var(--on-accent)' : 'var(--fg)', border: `2px solid ${on ? 'var(--accent)' : 'var(--border)'}`,
                 borderRadius: '2px', fontWeight: 700, fontSize: '11px',
               }}>{t.l}</button>
             );
@@ -4496,7 +4674,7 @@ function RestScreen({ restConfig, setRestConfig, onBack, onNext, editingCurrentW
         </div>
 
         {restConfig.type !== 'none' && (
-          <div style={{ padding: '20px', border: '1px solid #222', borderRadius: '2px', marginBottom: '16px' }}>
+          <div style={{ padding: '20px', border: '1px solid var(--border)', borderRadius: '2px', marginBottom: '16px' }}>
             <TimeField
               label="REST BETWEEN SETS"
               value={restConfig.short}
@@ -4504,7 +4682,7 @@ function RestScreen({ restConfig, setRestConfig, onBack, onNext, editingCurrentW
             />
             {restConfig.type === 'interval' && (
               <>
-                <div style={{ height: '1px', background: '#222', margin: '16px 0' }} />
+                <div style={{ height: '1px', background: 'var(--surface-strong)', margin: '16px 0' }} />
                 <TimeField
                   label="LONG REST"
                   value={restConfig.long}
@@ -4521,7 +4699,7 @@ function RestScreen({ restConfig, setRestConfig, onBack, onNext, editingCurrentW
           </div>
         )}
 
-        <div className="mono" style={{ fontSize: '11px', color: '#666', padding: '12px', background: 'var(--surface)', borderRadius: '2px', lineHeight: 1.6 }}>
+        <div className="mono" style={{ fontSize: '11px', color: 'var(--subtle)', padding: '12px', background: 'var(--surface)', borderRadius: '2px', lineHeight: 1.6 }}>
           TIP: You can always hit DONE to skip the rest timer early, or hit +15 to extend.
         </div>
       </div>
@@ -4536,23 +4714,23 @@ function RestScreen({ restConfig, setRestConfig, onBack, onNext, editingCurrentW
 
 function EditWorkoutActionBar({ onContinue, onStartOver }) {
   return (
-    <div style={{ padding: '16px 24px 24px', borderTop: '1px solid #1A1A1A', background: 'var(--bg)', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
+    <div style={{ padding: '16px 24px 24px', borderTop: '1px solid var(--border)', background: 'var(--bg)', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
       <button
         onClick={onStartOver}
         style={{
-          padding: '18px 12px', background: '#1A1A1A', color: '#AAA',
+          padding: '18px 12px', background: 'var(--surface-muted)', color: 'var(--muted-strong)',
           fontSize: '13px', fontWeight: 900, fontFamily: 'Archivo Black, sans-serif',
           letterSpacing: '0.02em', borderRadius: '2px', display: 'flex',
           alignItems: 'center', justifyContent: 'center', gap: '8px',
         }}
       >
-        <Play size={16} fill="#AAA" />
+        <Play size={16} fill="var(--muted-strong)" />
         START OVER
       </button>
       <button
         onClick={onContinue}
         style={{
-          padding: '18px 12px', background: 'var(--accent2)', color: '#0A0A0A',
+          padding: '18px 12px', background: 'var(--accent2)', color: 'var(--on-accent2)',
           fontSize: '13px', fontWeight: 900, fontFamily: 'Archivo Black, sans-serif',
           letterSpacing: '0.02em', borderRadius: '2px', display: 'flex',
           alignItems: 'center', justifyContent: 'center', gap: '8px',
@@ -4587,11 +4765,11 @@ function TimeField({ label, value, onChange }) {
 
   return (
     <div style={{ marginBottom: '10px' }}>
-      <div className="mono" style={{ fontSize: '11px', color: '#AAA', marginBottom: '8px' }}>{label}</div>
+      <div className="mono" style={{ fontSize: '11px', color: 'var(--muted-strong)', marginBottom: '8px' }}>{label}</div>
 
       {/* Big value display */}
       <div className="display" style={{ textAlign: 'center', fontSize: '32px', color: 'var(--accent)', marginBottom: '10px' }}>
-        {value}<span style={{ fontSize: '14px', color: '#888', marginLeft: '4px' }}>sec</span>
+        {value}<span style={{ fontSize: '14px', color: 'var(--muted)', marginLeft: '4px' }}>sec</span>
       </div>
 
       {/* Slider - steps of 1 second for fine control */}
@@ -4605,8 +4783,8 @@ function TimeField({ label, value, onChange }) {
         style={{ width: '100%', marginBottom: '6px' }}
       />
       <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '10px' }}>
-        <div className="mono" style={{ fontSize: '9px', color: '#555' }}>{sliderMin}s</div>
-        <div className="mono" style={{ fontSize: '9px', color: isOverMax ? 'var(--accent)' : '#555' }}>
+        <div className="mono" style={{ fontSize: '9px', color: 'var(--subtle)' }}>{sliderMin}s</div>
+        <div className="mono" style={{ fontSize: '9px', color: isOverMax ? 'var(--accent)' : 'var(--subtle)' }}>
           {isOverMax ? `${value}s (CUSTOM)` : `${sliderMax}s`}
         </div>
       </div>
@@ -4615,8 +4793,8 @@ function TimeField({ label, value, onChange }) {
       <div style={{ display: 'flex', gap: '4px' }}>
         {presets.map(v => (
           <button key={v} onClick={() => onChange(v)} style={{
-            flex: 1, padding: '6px 2px', background: value === v ? 'var(--accent)' : '#0F0F0F',
-            color: value === v ? '#0A0A0A' : '#888', fontSize: '10px', borderRadius: '2px', fontWeight: 700,
+            flex: 1, padding: '6px 2px', background: value === v ? 'var(--accent)' : 'var(--surface)',
+            color: value === v ? 'var(--on-accent)' : 'var(--muted)', fontSize: '10px', borderRadius: '2px', fontWeight: 700,
             fontFamily: 'JetBrains Mono, monospace',
           }}>{v}</button>
         ))}
@@ -4624,8 +4802,8 @@ function TimeField({ label, value, onChange }) {
           onClick={() => { setCustomInput(String(value)); setCustomOpen(true); }}
           style={{
             flex: 1.2, padding: '6px 2px',
-            background: isOverMax ? 'var(--accent)' : '#0F0F0F',
-            color: isOverMax ? '#0A0A0A' : '#FF4D2E',
+            background: isOverMax ? 'var(--accent)' : 'var(--surface)',
+            color: isOverMax ? 'var(--on-accent)' : 'var(--accent)',
             fontSize: '9px', borderRadius: '2px', fontWeight: 700,
             fontFamily: 'JetBrains Mono, monospace',
             border: isOverMax ? 'none' : '1px solid #FF4D2E44',
@@ -4649,7 +4827,7 @@ function TimeField({ label, value, onChange }) {
             <div className="stencil" style={{ fontSize: '22px', color: 'var(--accent)', marginBottom: '10px' }}>
               CUSTOM REST
             </div>
-            <div className="mono" style={{ fontSize: '11px', color: '#888', marginBottom: '14px', lineHeight: 1.5 }}>
+            <div className="mono" style={{ fontSize: '11px', color: 'var(--muted)', marginBottom: '14px', lineHeight: 1.5 }}>
               Enter rest time in seconds.
             </div>
             <div style={{ display: 'flex', alignItems: 'baseline', gap: '8px', marginBottom: '16px' }}>
@@ -4662,20 +4840,20 @@ function TimeField({ label, value, onChange }) {
                 onChange={e => setCustomInput(e.target.value)}
                 onKeyDown={e => { if (e.key === 'Enter') saveCustom(); }}
                 style={{
-                  flex: 1, padding: '14px', background: '#000', color: 'var(--fg)',
-                  border: '1px solid #333', fontFamily: 'inherit', fontSize: '24px',
+                  flex: 1, padding: '14px', background: 'var(--field-bg)', color: 'var(--fg)',
+                  border: '1px solid var(--border-strong)', fontFamily: 'inherit', fontSize: '24px',
                   borderRadius: '2px', textAlign: 'center', fontWeight: 700,
                 }}
               />
-              <div className="mono" style={{ fontSize: '14px', color: '#888' }}>sec</div>
+              <div className="mono" style={{ fontSize: '14px', color: 'var(--muted)' }}>sec</div>
             </div>
             <div style={{ display: 'flex', gap: '8px' }}>
               <button onClick={() => setCustomOpen(false)} style={{
-                flex: 1, padding: '14px', background: '#1A1A1A', color: '#888',
+                flex: 1, padding: '14px', background: 'var(--surface-muted)', color: 'var(--muted)',
                 fontFamily: 'Archivo Black, sans-serif', fontSize: '13px', borderRadius: '2px',
               }}>CANCEL</button>
               <button onClick={saveCustom} style={{
-                flex: 2, padding: '14px', background: 'var(--accent)', color: '#0A0A0A',
+                flex: 2, padding: '14px', background: 'var(--accent)', color: 'var(--on-accent)',
                 fontFamily: 'Archivo Black, sans-serif', fontSize: '13px', borderRadius: '2px',
               }}>SET</button>
             </div>
@@ -4800,33 +4978,33 @@ function WorkoutMenu({ onClose, currentEntry, findMatchingFavorite, onFavoriteTo
       <div
         onClick={e => e.stopPropagation()}
         style={{
-          background: 'var(--surface)', border: '1px solid #333', borderRadius: '2px',
+          background: 'var(--surface)', border: '1px solid var(--border-strong)', borderRadius: '2px',
           minWidth: '240px', overflow: 'hidden',
           boxShadow: '0 8px 24px rgba(0,0,0,0.5)',
         }}
       >
         <div style={{
-          padding: '10px 14px', borderBottom: '1px solid #222',
+          padding: '10px 14px', borderBottom: '1px solid var(--border)',
           display: 'flex', alignItems: 'center', justifyContent: 'space-between',
         }}>
-          <div className="mono" style={{ fontSize: '10px', color: '#666', letterSpacing: '0.1em' }}>// MENU</div>
-          <button onClick={onClose} style={{ color: '#666', padding: '2px' }}><X size={14} /></button>
+          <div className="mono" style={{ fontSize: '10px', color: 'var(--subtle)', letterSpacing: '0.1em' }}>// MENU</div>
+          <button onClick={onClose} style={{ color: 'var(--subtle)', padding: '2px' }}><X size={14} /></button>
         </div>
 
         <button
           onClick={onFavoriteToggle}
           style={{
             width: '100%', padding: '14px', display: 'flex', alignItems: 'center', gap: '12px',
-            color: isFavorited ? '#FFB800' : 'var(--fg)', textAlign: 'left',
-            borderBottom: '1px solid #1A1A1A',
+            color: isFavorited ? 'var(--favorite)' : 'var(--fg)', textAlign: 'left',
+            borderBottom: '1px solid var(--border)',
           }}
         >
-          <Star size={18} fill={isFavorited ? '#FFB800' : 'transparent'} color={isFavorited ? '#FFB800' : '#AAA'} />
+          <Star size={18} fill={isFavorited ? 'var(--favorite)' : 'transparent'} color={isFavorited ? 'var(--favorite)' : 'var(--muted-strong)'} />
           <div>
             <div style={{ fontSize: '14px', fontWeight: 600 }}>
               {isFavorited ? 'Unfavorite' : 'Favorite workout'}
             </div>
-            <div className="mono" style={{ fontSize: '10px', color: '#666', marginTop: '2px' }}>
+            <div className="mono" style={{ fontSize: '10px', color: 'var(--subtle)', marginTop: '2px' }}>
               {isFavorited ? 'Remove from favorites' : 'Save this one for later'}
             </div>
           </div>
@@ -4838,7 +5016,7 @@ function WorkoutMenu({ onClose, currentEntry, findMatchingFavorite, onFavoriteTo
             style={{
               width: '100%', padding: '14px', display: 'flex', alignItems: 'center', gap: '12px',
               color: 'var(--fg)', textAlign: 'left',
-              borderBottom: '1px solid #1A1A1A',
+              borderBottom: '1px solid var(--border)',
             }}
           >
             <Pencil size={18} color="var(--accent)" />
@@ -4846,7 +5024,7 @@ function WorkoutMenu({ onClose, currentEntry, findMatchingFavorite, onFavoriteTo
               <div style={{ fontSize: '14px', fontWeight: 600 }}>
                 Edit current workout
               </div>
-              <div className="mono" style={{ fontSize: '10px', color: '#666', marginTop: '2px' }}>
+              <div className="mono" style={{ fontSize: '10px', color: 'var(--subtle)', marginTop: '2px' }}>
                 Change exercises, format, or rest
               </div>
             </div>
@@ -4854,7 +5032,7 @@ function WorkoutMenu({ onClose, currentEntry, findMatchingFavorite, onFavoriteTo
         )}
 
         <div style={{ padding: '10px 14px' }}>
-          <div className="mono" style={{ fontSize: '9px', color: '#444', letterSpacing: '0.05em' }}>
+          <div className="mono" style={{ fontSize: '9px', color: 'var(--subtle)', letterSpacing: '0.05em' }}>
             More options coming soon
           </div>
         </div>
@@ -4972,19 +5150,19 @@ function ActiveWorkout({ queue, idx, setIdx, restConfig, initialElapsed = 0, ini
   return (
     <div className="active-workout-screen" style={{ minHeight: '100dvh', display: 'flex', flexDirection: 'column', position: 'relative', zIndex: 2 }}>
       <div style={{ padding: `${SAFE_TOP_16} 20px 16px`, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-        <button onClick={quitWorkout} style={{ padding: '8px', color: '#888', display: 'flex', alignItems: 'center', gap: '4px' }}>
+        <button onClick={quitWorkout} style={{ padding: '8px', color: 'var(--muted)', display: 'flex', alignItems: 'center', gap: '4px' }}>
           <X size={18} />
           <span className="mono" style={{ fontSize: '11px' }}>QUIT</span>
         </button>
         <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-          <div className="mono" style={{ fontSize: 'var(--active-header-meta-size)', color: '#888' }}>
+          <div className="mono" style={{ fontSize: 'var(--active-header-meta-size)', color: 'var(--muted)' }}>
             {idx + 1} / {queue.length} · {fmtTime(elapsed)}
           </div>
           <button
             onClick={() => setMenuOpen(true)}
             style={{
               width: '34px', height: '34px', display: 'flex', alignItems: 'center', justifyContent: 'center',
-              background: 'var(--surface)', border: '1px solid #222', borderRadius: '2px', color: '#AAA',
+              background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '2px', color: 'var(--muted-strong)',
             }}
           >
             <Settings size={16} />
@@ -5036,7 +5214,7 @@ function ActiveWorkout({ queue, idx, setIdx, restConfig, initialElapsed = 0, ini
           onClick={completeSet}
           style={{
             width: '100%', padding: '28px', background: phase === 'rest' ? 'var(--accent2)' : 'var(--accent)',
-            color: '#0A0A0A', fontSize: '28px', fontWeight: 900, fontFamily: 'Archivo Black, sans-serif',
+            color: phase === 'rest' ? 'var(--on-accent2)' : 'var(--on-accent)', fontSize: '28px', fontWeight: 900, fontFamily: 'Archivo Black, sans-serif',
             letterSpacing: '0.02em', borderRadius: '2px', display: 'flex', alignItems: 'center',
             justifyContent: 'center', gap: '10px',
           }}
@@ -5048,21 +5226,21 @@ function ActiveWorkout({ queue, idx, setIdx, restConfig, initialElapsed = 0, ini
 
       <div style={{ padding: '16px 24px 24px' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
-          <button onClick={skipBack} disabled={idx === 0} style={{ padding: '10px 14px', opacity: idx === 0 ? 0.3 : 1, color: '#888', display: 'flex', alignItems: 'center', gap: '4px' }}>
+          <button onClick={skipBack} disabled={idx === 0} style={{ padding: '10px 14px', opacity: idx === 0 ? 0.3 : 1, color: 'var(--muted)', display: 'flex', alignItems: 'center', gap: '4px' }}>
             <SkipBack size={16} />
             <span className="mono" style={{ fontSize: '10px' }}>BACK</span>
           </button>
           {phase === 'rest' && (
-            <button onClick={() => addRest(15)} style={{ padding: '10px 14px', background: '#1A1A1A', color: 'var(--accent2)', borderRadius: '2px', fontSize: '11px', fontWeight: 700 }}>
+            <button onClick={() => addRest(15)} style={{ padding: '10px 14px', background: 'var(--surface-muted)', color: 'var(--accent2)', borderRadius: '2px', fontSize: '11px', fontWeight: 700 }}>
               +15s
             </button>
           )}
-          <button onClick={skipForward} disabled={idx >= queue.length - 1} style={{ padding: '10px 14px', opacity: idx >= queue.length - 1 ? 0.3 : 1, color: '#888', display: 'flex', alignItems: 'center', gap: '4px' }}>
+          <button onClick={skipForward} disabled={idx >= queue.length - 1} style={{ padding: '10px 14px', opacity: idx >= queue.length - 1 ? 0.3 : 1, color: 'var(--muted)', display: 'flex', alignItems: 'center', gap: '4px' }}>
             <span className="mono" style={{ fontSize: '10px' }}>SKIP</span>
             <SkipForward size={16} />
           </button>
         </div>
-        <div style={{ height: '3px', background: '#1A1A1A', borderRadius: '2px', overflow: 'hidden' }}>
+        <div style={{ height: '3px', background: 'var(--surface-muted)', borderRadius: '2px', overflow: 'hidden' }}>
           <div style={{ height: '100%', width: progress + '%', background: 'var(--accent)', transition: 'width 0.3s' }} />
         </div>
       </div>
@@ -5129,15 +5307,15 @@ function ExerciseView({ current, next, upcomingItems = [], contentRef }) {
           // NOW {current.positionLabel ? '· ' + current.positionLabel : ''}
         </div>
         <span className="mono" style={{
-          fontSize: 'var(--active-equip-size)', padding: '2px 7px', background: equip.color + '22',
+          fontSize: 'var(--active-equip-size)', padding: '2px 7px', background: alphaColorToken(equip.color, '22'),
           color: equip.color, borderRadius: '2px', fontWeight: 700, letterSpacing: '0.05em',
         }}>{equip.label}</span>
         <SourceInfoButton
           exercise={current}
           size={16}
-          color="#666"
+          color="var(--subtle)"
           activeColor={equip.color}
-          style={{ background: 'var(--surface)', border: '1px solid #222' }}
+          style={{ background: 'var(--surface)', border: '1px solid var(--border)' }}
         />
       </div>
       <div className="display" style={{
@@ -5161,7 +5339,7 @@ function ExerciseView({ current, next, upcomingItems = [], contentRef }) {
           <div className="display" style={{ fontSize: 'var(--active-rep-size)', color: 'var(--accent)', lineHeight: 0.9 }}>
             {current.reps}
           </div>
-          <div className="stencil" style={{ fontSize: 'var(--active-unit-size)', color: '#888' }}>
+          <div className="stencil" style={{ fontSize: 'var(--active-unit-size)', color: 'var(--muted)' }}>
             {current.unit.toUpperCase()}
           </div>
         </div>
@@ -5172,9 +5350,9 @@ function ExerciseView({ current, next, upcomingItems = [], contentRef }) {
         upcomingItems={upcomingItems}
         contentRef={contentRef}
         label="// UP NEXT"
-        labelColor="#666"
-        borderColor="#222"
-        nameColor="#AAA"
+        labelColor="var(--subtle)"
+        borderColor="var(--border)"
+        nameColor="var(--muted-strong)"
       />
     </>
   );
@@ -5259,7 +5437,7 @@ function UpNextStack({ next, upcomingItems = [], contentRef, label, labelColor, 
         <div className="mono" style={{ fontSize: '10px', color: labelColor, marginBottom: '4px' }}>{label}</div>
         <div style={{ display: 'grid', gridTemplateColumns: primaryGridColumns, alignItems: 'center', columnGap: '8px', width: 'fit-content', maxWidth: '100%' }}>
           <span className="mono" style={{
-            width: '100%', fontSize: '9px', padding: '2px 5px', background: nextEquip.color + '22',
+            width: '100%', fontSize: '9px', padding: '2px 5px', background: alphaColorToken(nextEquip.color, '22'),
             color: nextEquip.color, borderRadius: '2px', fontWeight: 700, textAlign: 'center',
           }}>{nextEquip.label}</span>
           <div style={{ fontSize: '14px', color: nameColor, fontWeight: nameWeight, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{next.name}</div>
@@ -5291,18 +5469,18 @@ function UpNextStack({ next, upcomingItems = [], contentRef, label, labelColor, 
                 display: 'grid', gridTemplateColumns: previewGridColumns, alignItems: 'center', columnGap: '6px', width: 'fit-content', maxWidth: '100%',
                 padding: '3px 12px', opacity,
               }}>
-                <span className="mono" style={{ fontSize: '9px', color: '#666', width: '14px', flexShrink: 0 }}>
+                <span className="mono" style={{ fontSize: '9px', color: 'var(--subtle)', width: '14px', flexShrink: 0 }}>
                   {i + 2}
                 </span>
                 <span className="mono" style={{
-                  width: '100%', fontSize: '8px', padding: '1px 4px', background: isRest ? 'rgba(255,255,255,0.06)' : tagColor + '22',
+                  width: '100%', fontSize: '8px', padding: '1px 4px', background: isRest ? alphaColorToken('var(--fg)', '10') : alphaColorToken(tagColor, '22'),
                   color: tagColor, borderRadius: '2px', fontWeight: 700, textAlign: 'center',
                 }}>{isRest ? 'REST' : eq.label}</span>
                 <div style={{
-                  fontSize: '11px', color: isRest ? 'var(--accent2)' : '#888', minWidth: 0,
+                  fontSize: '11px', color: isRest ? 'var(--accent2)' : 'var(--muted)', minWidth: 0,
                   overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
                 }}>{isRest ? 'Long rest' : item.name}</div>
-                <div className="mono" style={{ fontSize: '10px', color: '#666', textAlign: 'right', whiteSpace: 'nowrap' }}>
+                <div className="mono" style={{ fontSize: '10px', color: 'var(--subtle)', textAlign: 'right', whiteSpace: 'nowrap' }}>
                   {isRest ? formatPreviewDuration(upcoming.duration) : `${item.reps} ${item.unit}`}
                 </div>
               </div>
@@ -5323,15 +5501,15 @@ function TimedDisplay({ phase, prepValue, timerValue, target, onStart }) {
           <div className="display" style={{ fontSize: 'var(--active-timer-target-size)', color: 'var(--accent)', lineHeight: 0.9 }}>
             {target}
           </div>
-          <div className="stencil" style={{ fontSize: 'var(--active-timer-unit-size)', color: '#888' }}>SEC</div>
+          <div className="stencil" style={{ fontSize: 'var(--active-timer-unit-size)', color: 'var(--muted)' }}>SEC</div>
         </div>
         <button onClick={onStart} style={{
-          width: '100%', padding: '16px', background: '#7C5CFF', color: '#0A0A0A',
+          width: '100%', padding: '16px', background: 'var(--accent2)', color: 'var(--on-accent2)',
           fontSize: 'var(--active-timer-button-font)', fontWeight: 900, fontFamily: 'Archivo Black, sans-serif',
           letterSpacing: '0.02em', borderRadius: '2px', display: 'flex',
           alignItems: 'center', justifyContent: 'center', gap: '10px',
         }}>
-          <Play size={18} fill="#0A0A0A" /> START TIMER
+          <Play size={18} fill="var(--on-accent2)" /> START TIMER
         </button>
       </div>
     );
@@ -5340,9 +5518,9 @@ function TimedDisplay({ phase, prepValue, timerValue, target, onStart }) {
   if (phase === 'prep') {
     return (
       <div style={{ marginBottom: '40px', textAlign: 'center' }}>
-        <div className="mono" style={{ fontSize: 'var(--active-timer-prep-label-size)', color: '#7C5CFF', marginBottom: '8px' }}>// GET READY</div>
+        <div className="mono" style={{ fontSize: 'var(--active-timer-prep-label-size)', color: 'var(--accent2)', marginBottom: '8px' }}>// GET READY</div>
         <div className="display" style={{
-          fontSize: 'var(--active-timer-prep-size)', color: '#7C5CFF', lineHeight: 1,
+          fontSize: 'var(--active-timer-prep-size)', color: 'var(--accent2)', lineHeight: 1,
         }}>
           {prepValue === 0 ? 'GO' : prepValue}
         </div>
@@ -5360,7 +5538,7 @@ function TimedDisplay({ phase, prepValue, timerValue, target, onStart }) {
           }}>
             {timerValue}
           </div>
-          <div className="stencil" style={{ fontSize: 'var(--active-timer-running-unit-size)', color: '#888' }}>SEC</div>
+          <div className="stencil" style={{ fontSize: 'var(--active-timer-running-unit-size)', color: 'var(--muted)' }}>SEC</div>
         </div>
       </div>
     );
@@ -5376,7 +5554,7 @@ function TimedDisplay({ phase, prepValue, timerValue, target, onStart }) {
         </div>
         <div className="stencil" style={{ fontSize: 'var(--active-timer-overtime-unit-size)', color: 'var(--accent2)', opacity: 0.7 }}>SEC</div>
       </div>
-      <div className="mono" style={{ fontSize: 'var(--active-timer-note-size)', color: '#666', marginTop: '6px' }}>
+      <div className="mono" style={{ fontSize: 'var(--active-timer-note-size)', color: 'var(--subtle)', marginTop: '6px' }}>
         TARGET {target}s HIT · BONUS TIME
       </div>
     </div>
@@ -5392,7 +5570,7 @@ function RestView({ remaining, next, upcomingItems = [], contentRef, isLongRest 
       <div className="mono" style={{ fontSize: 'var(--active-rest-label-size)', color: 'var(--accent2)', marginBottom: '12px' }}>
         // {isLongRest ? 'LONG REST' : 'REST'}
       </div>
-      <div className="display" style={{ fontSize: 'var(--active-rest-title-size)', lineHeight: 0.9, color: '#888', marginBottom: '24px' }}>
+      <div className="display" style={{ fontSize: 'var(--active-rest-title-size)', lineHeight: 0.9, color: 'var(--muted)', marginBottom: '24px' }}>
         BREATHER
       </div>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: '40px', position: 'relative' }}>
@@ -5460,12 +5638,12 @@ function DoneScreen({ onHome, queueLen }) {
             {variant.bottom}
           </div>
         </div>
-        <div key={`done-tag-${nonce}`} className="mono fade-in" style={{ fontSize: '14px', color: '#888', marginTop: '20px' }}>
+        <div key={`done-tag-${nonce}`} className="mono fade-in" style={{ fontSize: '14px', color: 'var(--muted)', marginTop: '20px' }}>
           {queueLen} sets logged. {variant.tag}
         </div>
       </div>
       <button onClick={onHome} style={{
-        padding: '24px', background: '#F5F1E8', color: '#0A0A0A', fontSize: '18px', fontWeight: 900,
+        padding: '24px', background: 'var(--fg)', color: 'var(--bg)', fontSize: '18px', fontWeight: 900,
         fontFamily: 'Archivo Black, sans-serif', borderRadius: '2px',
       }}>
         HOME
@@ -5478,18 +5656,18 @@ function Header({ step, total, title, onBack }) {
   return (
     <div style={{ padding: `${SAFE_TOP_20} 24px 12px` }}>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px' }}>
-        <button onClick={onBack} style={{ display: 'flex', alignItems: 'center', gap: '6px', color: '#888', padding: '4px 0' }}>
+        <button onClick={onBack} style={{ display: 'flex', alignItems: 'center', gap: '6px', color: 'var(--muted)', padding: '4px 0' }}>
           <ChevronLeft size={18} />
           <span className="mono" style={{ fontSize: '11px' }}>BACK</span>
         </button>
-        <div className="mono" style={{ fontSize: '11px', color: '#666' }}>STEP {step} / {total}</div>
+        <div className="mono" style={{ fontSize: '11px', color: 'var(--subtle)' }}>STEP {step} / {total}</div>
       </div>
       <div className="display" style={{ fontSize: 'clamp(36px, 10vw, 56px)', lineHeight: 0.9, color: 'var(--fg)' }}>
         {title}
       </div>
       <div style={{ display: 'flex', gap: '4px', marginTop: '12px' }}>
         {Array.from({ length: total }).map((_, i) => (
-          <div key={i} style={{ flex: 1, height: '3px', background: i < step ? 'var(--accent)' : '#222', borderRadius: '2px' }} />
+          <div key={i} style={{ flex: 1, height: '3px', background: i < step ? 'var(--accent)' : 'var(--surface-strong)', borderRadius: '2px' }} />
         ))}
       </div>
     </div>
@@ -5543,15 +5721,15 @@ function BottomBar({ disabled, onNext, label, primary }) {
     };
   }, [disabled]);
 
-  const bgColor = disabled ? '#1A1A1A' : (primary ? 'var(--accent2)' : 'var(--accent)');
-  const fgColor = disabled ? '#444' : '#0A0A0A';
+  const bgColor = disabled ? 'var(--surface-muted)' : (primary ? 'var(--accent2)' : 'var(--accent)');
+  const fgColor = disabled ? 'var(--subtle)' : (primary ? 'var(--on-accent2)' : 'var(--on-accent)');
   // Show FAB when user has scrolled up (not at bottom) AND button is enabled
   const showFab = !atBottom && !disabled;
 
   return (
     <>
       {/* Docked bar — always present at bottom of viewport */}
-      <div ref={dockRef} style={{ padding: '16px 24px 24px', borderTop: '1px solid #1A1A1A', background: 'var(--bg)' }}>
+      <div ref={dockRef} style={{ padding: '16px 24px 24px', borderTop: '1px solid var(--border)', background: 'var(--bg)' }}>
         <button
           onClick={onNext}
           disabled={disabled}
