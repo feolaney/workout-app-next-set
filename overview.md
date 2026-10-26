@@ -131,7 +131,7 @@ Default exercises with details show a small info icon in selection, setup detail
 
 Settings includes an iOS-only Add to Home Screen guide that imports `support files/Images/ios_how_to_add_to_homescreen.gif` as a Vite asset and shows it in a full-screen walkthrough. A one-time iOS/mobile welcome prompt points users to the Settings button and stores its dismissed state as `homeScreenPromptSeen` inside the persisted `settings` object. The guide also links to an optional iOS Shortcut for custom Home Screen bookmark images and explains the Safari share-sheet flow for running that shortcut before adding the bookmark. Android users are directed to their own browser/device install instructions.
 
-The Format step includes a draggable exercise order list. While dragging, the current replacement target is shown with a full-row accent outline and glow rather than only a divider line.
+The Format step includes a draggable exercise order list. While dragging, the current replacement target is shown with a full-row accent outline and glow rather than only a divider line. Each non-manual exercise value control shows a small pencil icon beside its reps or seconds readout; it opens a custom-value dialog for a positive whole-number override, including values outside the slider range.
 
 The selected mode determines how `buildQueue(exercises, mode, cfg)` expands selected exercises into active workout items:
 
