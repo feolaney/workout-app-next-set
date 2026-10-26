@@ -206,9 +206,18 @@ const RAINBOW_CONFETTI_PIECES = Array.from({ length: RAINBOW_CONFETTI_COUNT }, (
 });
 const RAINBOW_CONFETTI_REST_REPEL = RAINBOW_CONFETTI_PIECES.map(() => ({ x: 0, y: 0, rotation: 0 }));
 
-const APP_VERSION = '2.41';
+const APP_VERSION = '2.42';
 
 const APP_VERSION_HISTORY = [
+  {
+    version: '2.42',
+    date: '2026-10-26',
+    type: 'Feature / UI',
+    changes: [
+      'Added pencil controls beside exercise reps and time values in the Format step.',
+      'Added custom positive whole-number value dialogs that support reps or seconds beyond slider limits.',
+    ],
+  },
   {
     version: '2.41',
     date: '2026-04-26',
