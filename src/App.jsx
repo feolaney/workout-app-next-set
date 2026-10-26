@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { ChevronLeft, ChevronDown, ChevronRight, Play, SkipForward, SkipBack, Check, Plus, Minus, X, Dumbbell, Hexagon, GripVertical, History, Shuffle, Target, Layers, TrendingUp, Info, Weight, ArrowUpToLine, Star, Settings, Palette, Trash2, Pencil, Smartphone, ExternalLink, Image as ImageIcon, Mail, Copy } from 'lucide-react';
 import WORKOUT_EXERCISE_LIBRARY_CSV from '../support files/workout_exercise_library.csv?raw';
 import IOS_HOME_SCREEN_GIF from '../support files/Images/ios_how_to_add_to_homescreen.gif';
+import { parseCustomWorkoutValue } from './customWorkoutValue.js';
 
 // ============ EQUIPMENT TAGS ============
 const EQUIP = {
@@ -205,9 +206,18 @@ const RAINBOW_CONFETTI_PIECES = Array.from({ length: RAINBOW_CONFETTI_COUNT }, (
 });
 const RAINBOW_CONFETTI_REST_REPEL = RAINBOW_CONFETTI_PIECES.map(() => ({ x: 0, y: 0, rotation: 0 }));
 
-const APP_VERSION = '2.41';
+const APP_VERSION = '2.42';
 
 const APP_VERSION_HISTORY = [
+  {
+    version: '2.42',
+    date: '2026-10-26',
+    type: 'Feature / UI',
+    changes: [
+      'Added pencil controls beside exercise reps and time values in the Format step.',
+      'Added custom positive whole-number value dialogs that support reps or seconds beyond slider limits.',
+    ],
+  },
   {
     version: '2.41',
     date: '2026-04-26',
@@ -5250,6 +5260,29 @@ function RepSlider({ exercise, value, onChange }) {
   const span = max - min;
   const presets = [min, Math.round(min + span / 3), Math.round(min + (2 * span) / 3), max];
   const currentValue = value || exercise.default || min;
+  const [customOpen, setCustomOpen] = useState(false);
+  const [customInput, setCustomInput] = useState(String(currentValue));
+  const customValue = parseCustomWorkoutValue(customInput);
+
+  const openCustomInput = () => {
+    setCustomInput(String(currentValue));
+    setCustomOpen(true);
+  };
+
+  const saveCustomValue = () => {
+    if (customValue === null) return;
+    onChange(customValue);
+    setCustomOpen(false);
+  };
+
+  useEffect(() => {
+    if (!customOpen) return undefined;
+    const closeOnEscape = (event) => {
+      if (event.key === 'Escape') setCustomOpen(false);
+    };
+    window.addEventListener('keydown', closeOnEscape);
+    return () => window.removeEventListener('keydown', closeOnEscape);
+  }, [customOpen]);
 
   return (
     <div>
@@ -5262,8 +5295,19 @@ function RepSlider({ exercise, value, onChange }) {
           <div style={{ fontSize: '13px', fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{exercise.name}</div>
           <SourceInfoButton exercise={exercise} size={12} color="var(--subtle)" activeColor={equip.color} />
         </div>
-        <div className="display" style={{ fontSize: '20px', color: 'var(--accent)', lineHeight: 1, flexShrink: 0, marginLeft: '8px' }}>
-          {currentValue}<span className="mono" style={{ fontSize: '10px', color: 'var(--subtle)', marginLeft: '3px', fontWeight: 400 }}>{exercise.unit}</span>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '3px', flexShrink: 0, marginLeft: '8px' }}>
+          <div className="display" style={{ fontSize: '20px', color: 'var(--accent)', lineHeight: 1 }}>
+            {currentValue}<span className="mono" style={{ fontSize: '10px', color: 'var(--subtle)', marginLeft: '3px', fontWeight: 400 }}>{exercise.unit}</span>
+          </div>
+          <button
+            type="button"
+            onClick={openCustomInput}
+            aria-label={`Set custom ${exercise.unit === 'sec' ? 'time' : 'reps'} for ${exercise.name}`}
+            title={`Set custom ${exercise.unit === 'sec' ? 'time' : 'reps'}`}
+            style={{ padding: '4px', display: 'flex', color: 'var(--subtle)' }}
+          >
+            <Pencil size={14} />
+          </button>
         </div>
       </div>
       <input
@@ -5283,6 +5327,43 @@ function RepSlider({ exercise, value, onChange }) {
           }}>{v}</button>
         ))}
       </div>
+      {customOpen && (
+        <div
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby={`custom-value-title-${exercise.id}`}
+          style={{ position: 'fixed', inset: 0, zIndex: 200, background: 'rgba(0,0,0,0.72)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '24px' }}
+        >
+          <div style={{ width: '100%', maxWidth: '360px', background: 'var(--surface)', border: '2px solid var(--accent)', borderRadius: '2px', padding: '20px' }}>
+            <div id={`custom-value-title-${exercise.id}`} className="stencil" style={{ fontSize: '22px', color: 'var(--accent)', marginBottom: '10px' }}>
+              CUSTOM {exercise.unit === 'sec' ? 'TIME' : 'REPS'}
+            </div>
+            <div className="mono" style={{ fontSize: '11px', color: 'var(--muted)', marginBottom: '14px', lineHeight: 1.5 }}>
+              Enter a custom positive number for {exercise.name}.
+            </div>
+            <div style={{ display: 'flex', alignItems: 'baseline', gap: '8px', marginBottom: '8px' }}>
+              <input
+                autoFocus
+                type="number"
+                min={1}
+                step={1}
+                inputMode="numeric"
+                aria-label={`Custom ${exercise.unit === 'sec' ? 'time' : 'reps'} for ${exercise.name}`}
+                value={customInput}
+                onChange={e => setCustomInput(e.target.value)}
+                onKeyDown={e => { if (e.key === 'Enter') saveCustomValue(); }}
+                style={{ flex: 1, padding: '14px', background: 'var(--field-bg)', color: 'var(--fg)', border: '1px solid var(--border-strong)', fontFamily: 'inherit', fontSize: '24px', borderRadius: '2px', textAlign: 'center', fontWeight: 700 }}
+              />
+              <div className="mono" style={{ fontSize: '14px', color: 'var(--muted)' }}>{exercise.unit}</div>
+            </div>
+            {customInput && customValue === null && <div className="mono" style={{ fontSize: '10px', color: 'var(--warn)', marginBottom: '12px' }}>ENTER A POSITIVE WHOLE NUMBER</div>}
+            <div style={{ display: 'flex', gap: '8px', marginTop: customInput && customValue === null ? 0 : '16px' }}>
+              <button type="button" onClick={() => setCustomOpen(false)} style={{ flex: 1, padding: '14px', background: 'var(--surface-muted)', color: 'var(--muted)', fontFamily: 'Archivo Black, sans-serif', fontSize: '13px', borderRadius: '2px' }}>CANCEL</button>
+              <button type="button" onClick={saveCustomValue} disabled={customValue === null} style={{ flex: 2, padding: '14px', background: 'var(--accent)', color: 'var(--on-accent)', fontFamily: 'Archivo Black, sans-serif', fontSize: '13px', borderRadius: '2px', opacity: customValue === null ? 0.45 : 1 }}>SET</button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
