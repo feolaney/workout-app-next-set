@@ -2187,7 +2187,7 @@ function ImportScreen({ importCSV, setImportCSV, importResult, setImportResult, 
             ) : importResult ? (
               <div>
                 <div style={{ color: 'var(--accent)', fontSize: '14px', fontWeight: 700, marginBottom: '8px' }}>
-                  PREVIEW: {importResult.workout.name} ({importResult.workout.queue.length} actions)
+                  PREVIEW: {importResult.workout.name} ({importResult.workout.mode}) ({importResult.workout.queue.length} actions)
                 </div>
                 <div
                   role="region"
