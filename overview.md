@@ -169,8 +169,18 @@ The active workout screen keeps the exercise value control intentionally subtle:
 - `restRemaining`: countdown time during rest
 - `elapsed`: total elapsed workout time
 - `menuOpen`: active workout menu state
+- `browseIdx`: scroll navigation state (null = live position, number = browsing to that queue index)
 
 Completing a set either advances immediately, starts a rest timer, or finishes the workout depending on position and `restConfig`.
+
+Up Next scroll navigation:
+- The timeline preview is vertically scrollable with mobile momentum and scroll snapping
+- Click any upcoming item to browse it: the timeline scrolls to show that destination highlighted
+- While browsing, the progress bar shows a preview color matching the destination exercise's equipment color
+- Two buttons appear: CANCEL (returns to live position with rubber-band animation) and JUMP HERE (jumps to that queue position)
+- Jumping to an exercise enters exercise phase at that position
+- Jumping to a long rest enters that long rest phase at its queue position
+- Browsing state clears after jumping or canceling
 
 Editing a current workout opens the normal setup stages with the current selections intact. The app records the active queue position and elapsed time before leaving the active screen. At the rest-settings step, `Continue` rebuilds the queue and resumes at the saved position, clamped to the rebuilt queue length, while preserving elapsed time. `Start Over` rebuilds the edited workout from the beginning with a fresh timer.
 

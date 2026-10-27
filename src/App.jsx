@@ -2406,8 +2406,10 @@ function GlobalStyles() {
         60% { transform: translate3d(-1px, 0, 0) rotate(-0.25deg); }
         80% { transform: translate3d(1px, 0, 0) rotate(0.2deg); }
       }
+      @keyframes bounce-back { 0% { transform: translateY(0); } 30% { transform: translateY(-20px); } 60% { transform: translateY(8px); } 100% { transform: translateY(0); } }
       .slide-in { animation: slide-up 0.4s ease-out both; }
       .fade-in { animation: fade-in 0.25s ease-out both; }
+      .bounce-back { animation: bounce-back 0.3s ease-out; }
       .title-slide-top { animation: title-in-top 0.55s cubic-bezier(0.22, 1, 0.36, 1) both; }
       .title-slide-bottom { animation: title-in-bottom 0.55s cubic-bezier(0.22, 1, 0.36, 1) 0.08s both; }
       .home-title-tap-shake { animation: home-title-tap-shake 180ms ease-in-out both; }
@@ -6320,6 +6322,20 @@ function getRestDurationAfterIndex(queue, queueIndex, restConfig) {
 
 function buildUpcomingTimeline(queue, startIdx, restConfig) {
   const items = [];
+  
+  // FIX: Check if there's a long rest IMMEDIATELY before startIdx (i.e., after completing queue[startIdx-1]).
+  // This handles the critical case where the current exercise completion leads to a long rest.
+  // When showing Up Next at idx, we call buildUpcomingTimeline(queue, idx+1, ...) for preview.
+  // Without this fix, the long rest after completing queue[idx] would never appear in the Up Next view.
+  if (startIdx > 0 && startIdx < queue.length) {
+    const prevIdx = startIdx - 1;
+    const restAfterPrev = getRestDurationAfterIndex(queue, prevIdx, restConfig);
+    if (restAfterPrev > 0 && isLongRestForIndex(queue, prevIdx, restConfig)) {
+      items.push({ type: 'longRest', duration: restAfterPrev, queueIndex: prevIdx, key: `rest-after-prev-${prevIdx}` });
+    }
+  }
+  
+  // Build the rest of the timeline starting from startIdx
   for (let i = startIdx; i < queue.length; i++) {
     items.push({ type: 'exercise', item: queue[i], queueIndex: i, key: `exercise-${i}` });
     const restDuration = getRestDurationAfterIndex(queue, i, restConfig);
@@ -6415,13 +6431,18 @@ function ActiveWorkout({ queue, idx, setIdx, restConfig, initialElapsed = 0, ini
   const [elapsed, setElapsed] = useState(initialElapsed);
   const [menuOpen, setMenuOpen] = useState(false);
   const [namingEntry, setNamingEntry] = useState(null);
+  // Browse state for Up Next scroll navigation
+  const [browseIdx, setBrowseIdx] = useState(null); // null = live position, number = browsing to that queue index
+  const browseAnimRef = useRef(null);
   const startRef = useRef(Date.now() - initialElapsed * 1000);
   const intervalRef = useRef(null);
   const contentRef = useRef(null);
 
   const current = queue[idx];
   const next = queue[idx + 1];
-  const upcomingAfterNext = buildUpcomingTimeline(queue, idx + 1, restConfig).slice(1);
+  // When browsing, show timeline from browseIdx; otherwise from idx+1
+  const browseStartIdx = browseIdx !== null ? browseIdx : idx + 1;
+  const upcomingAfterNext = buildUpcomingTimeline(queue, browseStartIdx, restConfig).slice(browseIdx !== null ? 1 : 0);
   // Is the current/pending rest a long rest?
   const isLongRest = isLongRestForIndex(queue, idx, restConfig);
 
@@ -6509,6 +6530,38 @@ function ActiveWorkout({ queue, idx, setIdx, restConfig, initialElapsed = 0, ini
 
   const addRest = (s) => setRestRemaining(r => Math.max(0, r + s));
 
+  // Jump to a destination in the upcoming timeline
+  const jumpTo = (destIdx) => {
+    if (intervalRef.current) clearInterval(intervalRef.current);
+    if (browseAnimRef.current) {
+      cancelAnimationFrame(browseAnimRef.current);
+      browseAnimRef.current = null;
+    }
+    // Jump to the destination queue index
+    setIdx(destIdx);
+    setPhase('exercise');
+    setRestRemaining(0);
+    // Clear browse state
+    setBrowseIdx(null);
+  };
+
+  // Cancel browsing and return to live position with rubber-band animation
+  const cancelBrowse = () => {
+    if (browseAnimRef.current) {
+      cancelAnimationFrame(browseAnimRef.current);
+      browseAnimRef.current = null;
+    }
+    // CSS animation is always applied to the content div, just clear browse state after animation
+    setTimeout(() => {
+      setBrowseIdx(null);
+    }, 300);
+  };
+
+  // Handle clicking on an upcoming item to start browsing
+  const handleBrowse = (destIdx) => {
+    setBrowseIdx(destIdx);
+  };
+
   if (!current) return null;
 
   const quitWorkout = () => {
@@ -6523,6 +6576,13 @@ function ActiveWorkout({ queue, idx, setIdx, restConfig, initialElapsed = 0, ini
   };
 
   const progress = ((idx + (phase === 'rest' ? 1 : 0)) / queue.length) * 100;
+  // When browsing, show preview progress to browseIdx instead of actual idx
+  const browseProgress = browseIdx !== null 
+    ? ((browseIdx + 1) / queue.length) * 100 
+    : progress;
+  const progressColor = browseIdx !== null 
+    ? (EQUIP[queue[browseIdx]?.equipment]?.color || 'var(--accent)') 
+    : 'var(--accent)';
 
   return (
     <div className="active-workout-screen" style={{ minHeight: '100dvh', display: 'flex', flexDirection: 'column', position: 'relative', zIndex: 2 }}>
@@ -6578,11 +6638,11 @@ function ActiveWorkout({ queue, idx, setIdx, restConfig, initialElapsed = 0, ini
         />
       )}
 
-      <div ref={contentRef} style={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center', padding: 'var(--active-content-y) var(--active-content-x)', position: 'relative' }}>
+      <div ref={contentRef} style={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center', padding: 'var(--active-content-y) var(--active-content-x)', position: 'relative', transition: 'transform 0.3s ease' }} className="bounce-back">
         {phase === 'exercise' ? (
-          <ExerciseView current={current} next={next} upcomingItems={upcomingAfterNext} contentRef={contentRef} onValueChange={onExerciseValueChange} />
+          <ExerciseView current={current} next={next} upcomingItems={upcomingAfterNext} contentRef={contentRef} onValueChange={onExerciseValueChange} browseIdx={browseIdx} onBrowse={handleBrowse} onJump={jumpTo} onCancelBrowse={cancelBrowse} />
         ) : (
-          <RestView remaining={restRemaining} next={next} upcomingItems={upcomingAfterNext} contentRef={contentRef} isLongRest={isLongRest} />
+          <RestView remaining={restRemaining} next={next} upcomingItems={upcomingAfterNext} contentRef={contentRef} isLongRest={isLongRest} browseIdx={browseIdx} onBrowse={handleBrowse} onJump={jumpTo} onCancelBrowse={cancelBrowse} />
         )}
       </div>
 
@@ -6618,14 +6678,14 @@ function ActiveWorkout({ queue, idx, setIdx, restConfig, initialElapsed = 0, ini
           </button>
         </div>
         <div style={{ height: '3px', background: 'var(--surface-muted)', borderRadius: '2px', overflow: 'hidden' }}>
-          <div style={{ height: '100%', width: progress + '%', background: 'var(--accent)', transition: 'width 0.3s' }} />
+          <div style={{ height: '100%', width: browseProgress + '%', background: progressColor, transition: 'width 0.3s' }} />
         </div>
       </div>
     </div>
   );
 }
 
-function ExerciseView({ current, next, upcomingItems = [], contentRef, onValueChange }) {
+function ExerciseView({ current, next, upcomingItems = [], contentRef, onValueChange, browseIdx, onBrowse, onJump, onCancelBrowse }) {
   const equip = EQUIP[current.equipment] || EQUIP.bodyweight;
   const isTimed = current.unit === 'sec';
 
@@ -6733,7 +6793,36 @@ function ExerciseView({ current, next, upcomingItems = [], contentRef, onValueCh
         labelColor="var(--subtle)"
         borderColor="var(--border)"
         nameColor="var(--muted-strong)"
+        browseIdx={browseIdx}
+        onBrowse={onBrowse}
+        queueIdx={current.queueIndex !== undefined ? current.queueIndex : null}
       />
+      {browseIdx !== null && (
+        <div style={{ position: 'absolute', bottom: '24px', left: '50%', transform: 'translateX(-50%)', display: 'flex', gap: '12px', zIndex: 10 }}>
+          <button
+            type="button"
+            onClick={() => onCancelBrowse?.()}
+            style={{
+              padding: '12px 18px', background: 'var(--surface)', border: '1px solid var(--border)',
+              color: 'var(--muted-strong)', fontSize: '13px', fontWeight: 700, fontFamily: 'Archivo Black, sans-serif',
+              borderRadius: '2px', cursor: 'pointer'
+            }}
+          >
+            CANCEL
+          </button>
+          <button
+            type="button"
+            onClick={() => onJump?.(browseIdx)}
+            style={{
+              padding: '12px 18px', background: 'var(--accent)', border: 'none',
+              color: 'var(--on-accent)', fontSize: '13px', fontWeight: 700, fontFamily: 'Archivo Black, sans-serif',
+              borderRadius: '2px', cursor: 'pointer'
+            }}
+          >
+            JUMP HERE
+          </button>
+        </div>
+      )}
     </>
   );
 }
@@ -6745,10 +6834,12 @@ function formatPreviewDuration(totalSeconds) {
   return mins > 0 ? `${mins}:${String(secs).padStart(2, '0')}` : `${secs}s`;
 }
 
-function UpNextStack({ next, upcomingItems = [], contentRef, label, labelColor, borderColor, nameColor, nameWeight = 400 }) {
+function UpNextStack({ next, upcomingItems = [], contentRef, label, labelColor, borderColor, nameColor, nameWeight = 400, browseIdx, onBrowse, queueIdx }) {
   const cardRef = React.useRef(null);
   const [layout, setLayout] = React.useState({ top: 0, left: 0, width: 0, count: 0 });
   const nextEquip = next ? (EQUIP[next.equipment] || EQUIP.bodyweight) : EQUIP.bodyweight;
+  const isBrowsing = browseIdx !== null;
+  const scrollRef = React.useRef(null);
 
   const measureLayout = React.useCallback(() => {
     const card = cardRef.current;
@@ -6781,6 +6872,16 @@ function UpNextStack({ next, upcomingItems = [], contentRef, label, labelColor, 
 
   React.useLayoutEffect(() => {
     measureLayout();
+    // Scroll to browseIdx when entering browse mode
+    if (isBrowsing && browseIdx !== null && scrollRef.current) {
+      const timelineIdx = upcomingItems.findIndex(item => item.queueIndex === browseIdx);
+      if (timelineIdx >= 0 && timelineIdx < layout.count) {
+        scrollRef.current.scrollTo({
+          top: timelineIdx * UPCOMING_PREVIEW_ROW_HEIGHT,
+          behavior: 'smooth'
+        });
+      }
+    }
   });
 
   React.useEffect(() => {
@@ -6827,28 +6928,44 @@ function UpNextStack({ next, upcomingItems = [], contentRef, label, labelColor, 
 
       {visibleItems.length > 0 && layout.width > 0 && (
         <div
+          ref={scrollRef}
           style={{
             position: 'absolute',
             top: `${layout.top}px`,
             left: `${layout.left}px`,
             width: `${layout.width}px`,
-            height: `${visibleItems.length * UPCOMING_PREVIEW_ROW_HEIGHT}px`,
-            overflow: 'hidden',
-            pointerEvents: 'none',
+            height: `${upcomingItems.length * UPCOMING_PREVIEW_ROW_HEIGHT}px`,
+            overflowY: 'auto',
+            overscrollBehavior: 'contain',
+            scrollBehavior: 'smooth',
+            WebkitOverflowScrolling: 'touch',
+            scrollbarWidth: 'none',
+            msOverflowStyle: 'none',
           }}
         >
-          {visibleItems.map((upcoming, i) => {
+          {upcomingItems.map((upcoming, i) => {
             const isRest = upcoming.type === 'longRest';
             const item = upcoming.item;
             const eq = item ? (EQUIP[item.equipment] || EQUIP.bodyweight) : null;
             const tagColor = isRest ? 'var(--accent2)' : eq.color;
             const opacity = Math.max(0.18, 0.56 - i * 0.07);
+            const isBrowsedItem = isBrowsing && browseIdx === upcoming.queueIndex;
+            const snapClass = isBrowsedItem ? 'up-next-snap-target' : '';
             return (
-              <div key={upcoming.key} style={{
-                height: `${UPCOMING_PREVIEW_ROW_HEIGHT}px`,
-                display: 'grid', gridTemplateColumns: previewGridColumns, alignItems: 'center', columnGap: '6px', width: 'fit-content', maxWidth: '100%',
-                padding: '3px 12px', opacity,
-              }}>
+              <div
+                key={upcoming.key}
+                onClick={() => !isBrowsing && onBrowse?.(upcoming.queueIndex)}
+                style={{
+                  height: `${UPCOMING_PREVIEW_ROW_HEIGHT}px`,
+                  display: 'grid', gridTemplateColumns: previewGridColumns, alignItems: 'center', columnGap: '6px', width: 'fit-content', maxWidth: '100%',
+                  padding: '3px 12px', opacity,
+                  cursor: isBrowsing ? 'default' : 'pointer',
+                  background: isBrowsedItem ? alphaColorToken(tagColor, '10') : 'transparent',
+                  borderLeft: isBrowsedItem ? `3px solid ${tagColor}` : '3px solid transparent',
+                  transition: 'background 0.2s, border-color 0.2s',
+                }}
+                className={snapClass}
+              >
                 <span className="mono" style={{ fontSize: '9px', color: 'var(--subtle)', width: '14px', flexShrink: 0 }}>
                   {i + 2}
                 </span>
@@ -6994,7 +7111,7 @@ function TimedDisplay({ phase, prepValue, timerValue, target, onStart, onValueCh
   );
 }
 
-function RestView({ remaining, next, upcomingItems = [], contentRef, isLongRest = false }) {
+function RestView({ remaining, next, upcomingItems = [], contentRef, isLongRest = false, browseIdx, onBrowse, onJump, onCancelBrowse }) {
   const mins = Math.floor(remaining / 60);
   const secs = remaining % 60;
 
@@ -7024,7 +7141,36 @@ function RestView({ remaining, next, upcomingItems = [], contentRef, isLongRest 
         borderColor="var(--accent2)"
         nameColor="var(--fg)"
         nameWeight={600}
+        browseIdx={browseIdx}
+        onBrowse={onBrowse}
+        queueIdx={null}
       />
+      {browseIdx !== null && (
+        <div style={{ position: 'absolute', bottom: '24px', left: '50%', transform: 'translateX(-50%)', display: 'flex', gap: '12px', zIndex: 10 }}>
+          <button
+            type="button"
+            onClick={() => onCancelBrowse?.()}
+            style={{
+              padding: '12px 18px', background: 'var(--surface)', border: '1px solid var(--border)',
+              color: 'var(--muted-strong)', fontSize: '13px', fontWeight: 700, fontFamily: 'Archivo Black, sans-serif',
+              borderRadius: '2px', cursor: 'pointer'
+            }}
+          >
+            CANCEL
+          </button>
+          <button
+            type="button"
+            onClick={() => onJump?.(browseIdx)}
+            style={{
+              padding: '12px 18px', background: 'var(--accent2)', border: 'none',
+              color: 'var(--on-accent2)', fontSize: '13px', fontWeight: 700, fontFamily: 'Archivo Black, sans-serif',
+              borderRadius: '2px', cursor: 'pointer'
+            }}
+          >
+            JUMP HERE
+          </button>
+        </div>
+      )}
     </>
   );
 }
