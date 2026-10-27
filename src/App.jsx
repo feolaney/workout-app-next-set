@@ -3,6 +3,7 @@ import { ChevronLeft, ChevronDown, ChevronRight, Play, SkipForward, SkipBack, Ch
 import WORKOUT_EXERCISE_LIBRARY_CSV from '../support files/workout_exercise_library.csv?raw';
 import IOS_HOME_SCREEN_GIF from '../support files/Images/ios_how_to_add_to_homescreen.gif';
 import { parseCustomWorkoutValue } from './customWorkoutValue.js';
+import { updateFutureExerciseValues } from './workoutQueueOverrides.js';
 
 // ============ EQUIPMENT TAGS ============
 const EQUIP = {
@@ -1460,7 +1461,13 @@ export default function WorkoutApp() {
   const startWorkoutFromEntry = (entry, { continuePartial = false } = {}) => {
     const hydratedExercises = enrichExercisesWithLibrary(entry.exercises || [], library);
     const hydratedModeConfig = enrichModeConfigWithExercises(entry.modeConfig, hydratedExercises);
-    const q = buildQueue(hydratedExercises, entry.mode, hydratedModeConfig);
+    const q = entry.queue?.length
+      ? entry.queue.map(item => ({
+        ...enrichExerciseFromLibrary(item, library),
+        reps: item.reps,
+        unit: item.unit,
+      }))
+      : buildQueue(hydratedExercises, entry.mode, hydratedModeConfig);
     const resume = continuePartial && isPartialHistoryEntry(entry) ? getPartialResumeState(entry, q.length) : null;
     setEditResume(null);
     setSelectedCategories(entry.categories || []);
@@ -1578,6 +1585,7 @@ export default function WorkoutApp() {
       categories: selectedCategories,
       modifiers: selectedModifiers,
       exercises: selectedExercises,
+      queue,
       totalItems: queue.length,
     };
     const partialKey = makeHistoryWorkoutKey(baseEntry);
@@ -1765,6 +1773,7 @@ export default function WorkoutApp() {
           initialElapsed={activeInitialElapsed}
           initialPhase={activeInitialPhase}
           initialRestRemaining={activeInitialRestRemaining}
+          onExerciseValueChange={(value) => setQueue(prev => updateFutureExerciseValues(prev, queueIdx, value))}
           onExit={savePartialWorkoutAndExit}
           onEdit={startEditingActiveWorkout}
           currentEntry={currentWorkoutAsEntry()}
@@ -1773,13 +1782,14 @@ export default function WorkoutApp() {
           removeFavorite={removeFavorite}
           onComplete={() => {
             const entry = {
-              date: Date.now(),
-              mode,
-              modeConfig,
-              categories: selectedCategories,
-              modifiers: selectedModifiers,
-              exercises: selectedExercises,
-              totalItems: queue.length,
+            date: Date.now(),
+            mode,
+            modeConfig,
+            categories: selectedCategories,
+            modifiers: selectedModifiers,
+            exercises: selectedExercises,
+            queue,
+            totalItems: queue.length,
             };
             setHistory(prev => [entry, ...removeMatchingPartialHistory(prev, entry)].slice(0, 100));
             setScreen('done');
@@ -5920,7 +5930,7 @@ function WorkoutMenu({ onClose, currentEntry, findMatchingFavorite, onFavoriteTo
   );
 }
 
-function ActiveWorkout({ queue, idx, setIdx, restConfig, initialElapsed = 0, initialPhase = 'exercise', initialRestRemaining = 0, onExit, onEdit, onComplete, currentEntry, findMatchingFavorite, addFavorite, removeFavorite }) {
+function ActiveWorkout({ queue, idx, setIdx, restConfig, initialElapsed = 0, initialPhase = 'exercise', initialRestRemaining = 0, onExerciseValueChange, onExit, onEdit, onComplete, currentEntry, findMatchingFavorite, addFavorite, removeFavorite }) {
   const safeInitialRestRemaining = Math.max(0, Number(initialRestRemaining) || 0);
   const safeInitialPhase = initialPhase === 'rest' && safeInitialRestRemaining > 0 ? 'rest' : 'exercise';
   const [phase, setPhase] = useState(safeInitialPhase);
@@ -6082,7 +6092,7 @@ function ActiveWorkout({ queue, idx, setIdx, restConfig, initialElapsed = 0, ini
 
       <div ref={contentRef} style={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center', padding: 'var(--active-content-y) var(--active-content-x)', position: 'relative' }}>
         {phase === 'exercise' ? (
-          <ExerciseView current={current} next={next} upcomingItems={upcomingAfterNext} contentRef={contentRef} />
+          <ExerciseView current={current} next={next} upcomingItems={upcomingAfterNext} contentRef={contentRef} onValueChange={onExerciseValueChange} />
         ) : (
           <RestView remaining={restRemaining} next={next} upcomingItems={upcomingAfterNext} contentRef={contentRef} isLongRest={isLongRest} />
         )}
@@ -6127,7 +6137,7 @@ function ActiveWorkout({ queue, idx, setIdx, restConfig, initialElapsed = 0, ini
   );
 }
 
-function ExerciseView({ current, next, upcomingItems = [], contentRef }) {
+function ExerciseView({ current, next, upcomingItems = [], contentRef, onValueChange }) {
   const equip = EQUIP[current.equipment] || EQUIP.bodyweight;
   const isTimed = current.unit === 'sec';
 
@@ -6212,12 +6222,15 @@ function ExerciseView({ current, next, upcomingItems = [], contentRef }) {
           timerValue={timerValue}
           target={current.reps}
           onStart={startTimer}
+          onValueChange={onValueChange}
+          exerciseName={current.name}
         />
       ) : (
         <div style={{ display: 'flex', alignItems: 'baseline', gap: '12px', marginBottom: 'var(--active-rep-margin)' }}>
           <div className="display" style={{ fontSize: 'var(--active-rep-size)', color: 'var(--accent)', lineHeight: 0.9 }}>
             {current.reps}
           </div>
+          <ActiveValueEditor value={current.reps} unit={current.unit} exerciseName={current.name} onChange={onValueChange} />
           <div className="stencil" style={{ fontSize: 'var(--active-unit-size)', color: 'var(--muted)' }}>
             {current.unit.toUpperCase()}
           </div>
@@ -6371,7 +6384,59 @@ function UpNextStack({ next, upcomingItems = [], contentRef, label, labelColor, 
   );
 }
 
-function TimedDisplay({ phase, prepValue, timerValue, target, onStart }) {
+function ActiveValueEditor({ value, unit, exerciseName, onChange }) {
+  const [open, setOpen] = useState(false);
+  const [input, setInput] = useState(String(value));
+  const parsedValue = parseCustomWorkoutValue(input);
+
+  useEffect(() => {
+    if (!open) return undefined;
+    const closeOnEscape = (event) => {
+      if (event.key === 'Escape') setOpen(false);
+    };
+    window.addEventListener('keydown', closeOnEscape);
+    return () => window.removeEventListener('keydown', closeOnEscape);
+  }, [open]);
+
+  const save = () => {
+    if (parsedValue === null) return;
+    onChange?.(parsedValue);
+    setOpen(false);
+  };
+
+  return (
+    <>
+      <button
+        type="button"
+        onClick={() => { setInput(String(value)); setOpen(true); }}
+        aria-label={`Change ${unit === 'sec' ? 'time' : 'reps'} for ${exerciseName}`}
+        title="Change value"
+        style={{ padding: '4px', color: 'var(--subtle)', opacity: 0.55, display: 'flex', alignSelf: 'center' }}
+      >
+        <Pencil size={13} />
+      </button>
+      {open && (
+        <div role="dialog" aria-modal="true" aria-label={`Change value for ${exerciseName}`} style={{ position: 'fixed', inset: 0, zIndex: 220, background: 'rgba(0,0,0,0.78)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '24px' }}>
+          <div style={{ width: '100%', maxWidth: '340px', background: 'var(--surface)', border: '1px solid var(--border-strong)', borderRadius: '2px', padding: '18px' }}>
+            <div className="stencil" style={{ fontSize: '19px', color: 'var(--accent)', marginBottom: '8px' }}>CHANGE {unit === 'sec' ? 'TIME' : 'REPS'}</div>
+            <div className="mono" style={{ fontSize: '10px', color: 'var(--muted)', marginBottom: '12px' }}>{exerciseName}</div>
+            <div style={{ display: 'flex', alignItems: 'baseline', gap: '8px', marginBottom: '8px' }}>
+              <input autoFocus type="number" min={1} step={1} inputMode="numeric" value={input} onChange={event => setInput(event.target.value)} onKeyDown={event => { if (event.key === 'Enter') save(); }} aria-label={`New ${unit === 'sec' ? 'time' : 'reps'} value`} style={{ flex: 1, padding: '12px', background: 'var(--field-bg)', color: 'var(--fg)', border: '1px solid var(--border-strong)', fontFamily: 'inherit', fontSize: '22px', borderRadius: '2px', textAlign: 'center', fontWeight: 700 }} />
+              <span className="mono" style={{ fontSize: '12px', color: 'var(--muted)' }}>{unit}</span>
+            </div>
+            {input && parsedValue === null && <div className="mono" style={{ fontSize: '9px', color: 'var(--warn)', marginBottom: '10px' }}>ENTER A POSITIVE WHOLE NUMBER</div>}
+            <div style={{ display: 'flex', gap: '8px', marginTop: input && parsedValue === null ? 0 : '14px' }}>
+              <button type="button" onClick={() => setOpen(false)} style={{ flex: 1, padding: '12px', background: 'var(--surface-muted)', color: 'var(--muted)', fontFamily: 'Archivo Black, sans-serif', fontSize: '11px', borderRadius: '2px' }}>CANCEL</button>
+              <button type="button" onClick={save} disabled={parsedValue === null} style={{ flex: 2, padding: '12px', background: 'var(--accent)', color: 'var(--on-accent)', fontFamily: 'Archivo Black, sans-serif', fontSize: '11px', borderRadius: '2px', opacity: parsedValue === null ? 0.45 : 1 }}>SET FOR THIS AND NEXT</button>
+            </div>
+          </div>
+        </div>
+      )}
+    </>
+  );
+}
+
+function TimedDisplay({ phase, prepValue, timerValue, target, onStart, onValueChange, exerciseName }) {
   if (phase === 'idle') {
     // Show target + START TIMER button
     return (
@@ -6380,6 +6445,7 @@ function TimedDisplay({ phase, prepValue, timerValue, target, onStart }) {
           <div className="display" style={{ fontSize: 'var(--active-timer-target-size)', color: 'var(--accent)', lineHeight: 0.9 }}>
             {target}
           </div>
+          <ActiveValueEditor value={target} unit="sec" exerciseName={exerciseName} onChange={onValueChange} />
           <div className="stencil" style={{ fontSize: 'var(--active-timer-unit-size)', color: 'var(--muted)' }}>SEC</div>
         </div>
         <button onClick={onStart} style={{

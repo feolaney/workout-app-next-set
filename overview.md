@@ -145,9 +145,9 @@ Each queue item carries enough display data for the active workout: exercise id/
 
 The active workout preview derives an upcoming timeline from the queue at render time. The persisted queue remains exercise-only, but the preview inserts long-rest markers for interval workouts when the rest would occur after a future exercise. Short rests are intentionally omitted from this preview.
 
-## Active Workout Behavior
+The active workout screen keeps the exercise value control intentionally subtle: a low-opacity pencil sits beside the current reps or seconds value. Editing applies to the current queue item and later queue items for that same exercise, while earlier completed items remain unchanged. Completed and partial history entries persist the per-queue-item values so rerunning or continuing a saved workout preserves those changes.
 
-`ActiveWorkout` owns the live workout phase:
+## Active Workout Behavior
 
 - `phase`: `exercise` or `rest`
 - `restRemaining`: countdown time during rest
