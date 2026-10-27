@@ -1,9 +1,10 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { ChevronLeft, ChevronDown, ChevronRight, Play, SkipForward, SkipBack, Check, Plus, Minus, X, Dumbbell, Hexagon, GripVertical, History, Shuffle, Target, Layers, TrendingUp, Info, Weight, ArrowUpToLine, Star, Settings, Palette, Trash2, Pencil, Smartphone, ExternalLink, Image as ImageIcon, Mail, Copy } from 'lucide-react';
+import { ChevronLeft, ChevronDown, ChevronRight, Play, SkipForward, SkipBack, Check, Plus, Minus, X, Dumbbell, Hexagon, GripVertical, History, Shuffle, Target, Layers, TrendingUp, Info, Weight, ArrowUpToLine, Star, Settings, Palette, Trash2, Pencil, Smartphone, ExternalLink, Image as ImageIcon, Mail, Copy, ArrowUpToLine as Upload } from 'lucide-react';
 import WORKOUT_EXERCISE_LIBRARY_CSV from '../support files/workout_exercise_library.csv?raw';
 import IOS_HOME_SCREEN_GIF from '../support files/Images/ios_how_to_add_to_homescreen.gif';
 import { parseCustomWorkoutValue } from './customWorkoutValue.js';
 import { updateFutureExerciseValues } from './workoutQueueOverrides.js';
+import { parseImportedWorkout, generateTemplateCSV, isRunnableImportedWorkout } from './workoutImporter.js';
 
 // ============ EQUIPMENT TAGS ============
 const EQUIP = {
@@ -1323,6 +1324,11 @@ export default function WorkoutApp() {
   const [favCollapsed, setFavCollapsed] = useState(true);
   const [recentCollapsed, setRecentCollapsed] = useState(true);
   const [collapseHydrated, setCollapseHydrated] = useState(false);
+  // Import screen state
+  const [importScreenOpen, setImportScreenOpen] = useState(false);
+  const [importCSV, setImportCSV] = useState('');
+  const [importResult, setImportResult] = useState(null);
+  const [importErrors, setImportErrors] = useState([]);
   // App-wide settings
   const [settings, setSettings] = useState(DEFAULT_SETTINGS);
   const [settingsHydrated, setSettingsHydrated] = useState(false);
@@ -1681,6 +1687,12 @@ export default function WorkoutApp() {
             setActiveInitialRestRemaining(0);
             setScreen('categories');
           }}
+          onImportWorkout={() => {
+            setImportCSV(generateTemplateCSV({ defaultMode: 'all', defaultRest: 30 }));
+            setImportResult(null);
+            setImportErrors([]);
+            setScreen('import');
+          }}
           onHistory={() => setScreen('history')}
           onFavorites={() => setScreen('favorites')}
           onColorSettings={() => setScreen('colorSettings')}
@@ -1806,6 +1818,427 @@ export default function WorkoutApp() {
         />
       )}
       {screen === 'done' && <DoneScreen onHome={goHome} queueLen={queue.length} />}
+      {screen === 'import' && (
+        <ImportScreen
+          importCSV={importCSV}
+          setImportCSV={setImportCSV}
+          importResult={importResult}
+          setImportResult={setImportResult}
+          importErrors={importErrors}
+          setImportErrors={setImportErrors}
+          onBack={goHome}
+          onImport={() => {
+            if (!importResult || !importResult.success) return;
+            // Extract workout from CSV and start it
+            const workout = importResult.workout;
+            // Generate queue from imported workout data
+            const importedQueue = workout.queue.map((item, i) => ({
+              exId: item.exId,
+              name: item.name,
+              unit: item.unit,
+              reps: item.value,
+              equipment: item.equipment,
+              sourceUrl: item.sourceUrl || '',
+              description: item.description || '',
+              difficulty: item.difficulty || 1,
+              exerciseGroup: item.exerciseGroup || '',
+              round: item.round || 1,
+              setNum: i + 1,
+              totalSets: workout.queue.length,
+              positionLabel: `SET ${i + 1}/${workout.queue.length}`,
+              restSeconds: item.restSeconds !== undefined ? item.restSeconds : null,
+              restType: item.restType || 'normal',
+              isCustom: item.isCustom || false,
+            }));
+
+            const importedExercises = workout.queue.reduce((items, item) => {
+              if (items.some(exercise => exercise.id === item.exId)) return items;
+              items.push({
+                id: item.exId,
+                name: item.name,
+                category: 'core',
+                equipment: item.equipment || 'bodyweight',
+                unit: item.unit,
+                default: item.value,
+                description: item.description || '',
+                custom: true,
+              });
+              return items;
+            }, []);
+            setSelectedCategories([]);
+            setSelectedModifiers([]);
+            setSelectedExercises(importedExercises);
+            setMode(workout.mode || 'manual');
+            setModeConfig({ imported: true, workoutName: workout.name, description: workout.description || '' });
+            setRestConfig(workout.restConfig || { type: 'none', short: 0, long: 0, longEvery: 0 });
+            setQueue(importedQueue);
+            // Start with first item, exercise phase
+            setQueueIdx(0);
+            setActiveInitialElapsed(0);
+            setActiveInitialPhase('exercise');
+            setActiveInitialRestRemaining(0);
+            setScreen('active');
+          }}
+        />
+      )}
+    </div>
+  );
+}
+
+// ============ IMPORT SCREEN COMPONENT ============
+function ImportScreen({ importCSV, setImportCSV, importResult, setImportResult, importErrors, setImportErrors, onBack, onImport }) {
+  const [templateMode, setTemplateMode] = useState('all');
+  const [templateRest, setTemplateRest] = useState(30);
+  const [templateRestType, setTemplateRestType] = useState('normal');
+  const [templateLongRest, setTemplateLongRest] = useState(90);
+  const [templateLongEvery, setTemplateLongEvery] = useState(3);
+  const [fileUploadError, setFileUploadError] = useState('');
+  const canStartImport = isRunnableImportedWorkout(importResult);
+  const isMixedModeReference = Boolean(
+    importResult?.success && importResult.workout?.queue?.length > 0 && !canStartImport
+  );
+
+  // Handle CSV parse when importCSV changes
+  useEffect(() => {
+    if (!importCSV.trim()) {
+      setImportResult(null);
+      setImportErrors([]);
+      return;
+    }
+
+    const result = parseImportedWorkout(importCSV);
+    setImportResult(result);
+    setImportErrors(result.success ? [] : result.errors);
+  }, [importCSV, parseImportedWorkout, setImportResult, setImportErrors]);
+
+  // Generate template CSV
+  const handleGenerateTemplate = () => {
+    const template = generateTemplateCSV({
+      defaultMode: templateMode,
+      defaultRest: templateRest,
+      defaultRestType: templateRestType,
+      defaultLongRest: templateLongRest,
+      defaultLongEvery: templateLongEvery,
+    });
+    setImportCSV(template);
+  };
+
+  // Handle file upload
+  const handleFileChange = (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (!file.name.toLowerCase().endsWith('.csv')) {
+      setFileUploadError('Please select a .csv file');
+      return;
+    }
+
+    setFileUploadError('');
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      const text = event.target?.result;
+      if (typeof text === 'string') {
+        setImportCSV(text);
+      }
+    };
+    reader.readAsText(file);
+  };
+
+  // Copy CSV to clipboard
+  const handleCopyCSV = async () => {
+    if (!importCSV) return;
+    try {
+      await navigator.clipboard.writeText(importCSV);
+      alert('CSV copied to clipboard');
+    } catch (err) {
+      alert('Failed to copy to clipboard');
+    }
+  };
+
+  // Download CSV
+  const handleDownloadCSV = () => {
+    if (!importCSV) return;
+    const blob = new Blob([importCSV], { type: 'text/csv' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'workout_import.csv';
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  };
+
+  return (
+    <div className="slide-in" style={{ minHeight: '100dvh', display: 'flex', flexDirection: 'column', position: 'relative', zIndex: 2 }}>
+      {/* Header */}
+      <div style={{ padding: `${SAFE_TOP_20} 24px 16px` }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px' }}>
+          <button onClick={onBack} style={{ display: 'flex', alignItems: 'center', gap: '6px', color: 'var(--muted)', padding: '4px 0' }}>
+            <ChevronLeft size={18} />
+            <span className="mono" style={{ fontSize: '11px' }}>BACK</span>
+          </button>
+        </div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+          <Upload size={28} color="var(--accent)" />
+          <div className="display" style={{ fontSize: 'clamp(36px, 10vw, 56px)', lineHeight: 0.9, color: 'var(--fg)' }}>
+            IMPORT WORKOUT
+          </div>
+        </div>
+        <div className="mono" style={{ fontSize: '11px', color: 'var(--subtle)', marginTop: '8px' }}>
+          Upload or paste CSV to start a workout immediately
+        </div>
+      </div>
+
+      {/* Import options */}
+      <div style={{ padding: '0 24px 24px', flex: 1, display: 'flex', flexDirection: 'column', gap: '16px' }}>
+        {/* Template generator */}
+        <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '2px', padding: '16px' }}>
+          <div className="mono" style={{ fontSize: '10px', color: 'var(--accent)', marginBottom: '12px', letterSpacing: '0.08em' }}>
+            // TEMPLATE OPTIONS
+          </div>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: '12px' }}>
+            <div>
+              <label style={{ display: 'block', fontSize: '11px', color: 'var(--muted)', marginBottom: '4px' }}>Mode</label>
+              <select
+                value={templateMode}
+                onChange={(e) => setTemplateMode(e.target.value)}
+                style={{
+                  width: '100%', padding: '8px', background: 'var(--field-bg)', color: 'var(--fg)',
+                  border: '1px solid var(--border)', borderRadius: '2px', fontSize: '12px',
+                }}
+              >
+                <option value="all">All modes</option>
+                <option value="focus">Focus</option>
+                <option value="circuit">Circuit</option>
+                <option value="superset">Superset</option>
+                <option value="addon">Add-on</option>
+                <option value="manual">Manual</option>
+              </select>
+            </div>
+            <div>
+              <label style={{ display: 'block', fontSize: '11px', color: 'var(--muted)', marginBottom: '4px' }}>Rest Plan</label>
+              <select
+                aria-label="Rest plan"
+                value={templateRestType}
+                onChange={(e) => setTemplateRestType(e.target.value)}
+                style={{
+                  width: '100%', padding: '8px', background: 'var(--field-bg)', color: 'var(--fg)',
+                  border: '1px solid var(--border)', borderRadius: '2px', fontSize: '12px',
+                }}
+              >
+                <option value="normal">Normal rest</option>
+                <option value="interval">Normal + periodic long</option>
+                <option value="none">No rest</option>
+              </select>
+            </div>
+            <div>
+              <label style={{ display: 'block', fontSize: '11px', color: 'var(--muted)', marginBottom: '4px' }}>Default Rest (sec)</label>
+              <select
+                aria-label="Default rest duration"
+                value={templateRest}
+                onChange={(e) => setTemplateRest(Number(e.target.value))}
+                style={{
+                  width: '100%', padding: '8px', background: 'var(--field-bg)', color: 'var(--fg)',
+                  border: '1px solid var(--border)', borderRadius: '2px', fontSize: '12px',
+                }}
+              >
+                <option value="0">No rest</option>
+                <option value="15">15 seconds</option>
+                <option value="30">30 seconds</option>
+                <option value="60">60 seconds</option>
+                <option value="90">90 seconds</option>
+              </select>
+            </div>
+          </div>
+          {templateRestType === 'interval' && (
+            <div
+              style={{
+                display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: '12px',
+                padding: '10px', border: '1px solid var(--border)', background: 'var(--surface-muted)', borderRadius: '2px',
+              }}
+            >
+              <div>
+                <label style={{ display: 'block', fontSize: '11px', color: 'var(--muted)', marginBottom: '4px' }}>
+                  Long Rest (sec)
+                </label>
+                <select
+                  aria-label="Long rest duration"
+                  value={templateLongRest}
+                  onChange={(e) => setTemplateLongRest(Number(e.target.value))}
+                  style={{
+                    width: '100%', padding: '8px', background: 'var(--field-bg)', color: 'var(--fg)',
+                    border: '1px solid var(--border)', borderRadius: '2px', fontSize: '12px',
+                  }}
+                >
+                  <option value="60">60 seconds</option>
+                  <option value="90">90 seconds</option>
+                  <option value="120">120 seconds</option>
+                  <option value="180">180 seconds</option>
+                </select>
+              </div>
+              <div>
+                <label style={{ display: 'block', fontSize: '11px', color: 'var(--muted)', marginBottom: '4px' }}>
+                  Long Rest Every
+                </label>
+                <select
+                  aria-label="Long rest frequency"
+                  value={templateLongEvery}
+                  onChange={(e) => setTemplateLongEvery(Number(e.target.value))}
+                  style={{
+                    width: '100%', padding: '8px', background: 'var(--field-bg)', color: 'var(--fg)',
+                    border: '1px solid var(--border)', borderRadius: '2px', fontSize: '12px',
+                  }}
+                >
+                  <option value="2">Every 2 actions</option>
+                  <option value="3">Every 3 actions</option>
+                  <option value="4">Every 4 actions</option>
+                  <option value="5">Every 5 actions</option>
+                </select>
+              </div>
+              <div className="mono" style={{ gridColumn: '1 / -1', fontSize: '10px', color: 'var(--subtle)' }}>
+                Generated interval rows use these values for periodic long rests.
+              </div>
+            </div>
+          )}
+          <button
+            onClick={handleGenerateTemplate}
+            style={{
+              width: '100%', padding: '12px', background: 'var(--surface-muted)', color: 'var(--fg)',
+              border: '1px solid var(--border-strong)', borderRadius: '2px', fontSize: '12px', fontWeight: 700,
+            }}
+          >
+            GENERATE TEMPLATE
+          </button>
+        </div>
+
+        {/* CSV Editor */}
+        <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '2px', padding: '16px', flex: 1, display: 'flex', flexDirection: 'column' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
+            <div className="mono" style={{ fontSize: '10px', color: 'var(--accent)', letterSpacing: '0.08em' }}>
+              // CSV EDITOR
+            </div>
+            <div style={{ display: 'flex', gap: '8px' }}>
+              <button
+                onClick={handleCopyCSV}
+                disabled={!importCSV}
+                style={{
+                  padding: '6px 10px', background: 'var(--surface-muted)', color: 'var(--fg)',
+                  border: '1px solid var(--border)', borderRadius: '2px', fontSize: '10px', fontWeight: 700, opacity: importCSV ? 1 : 0.5,
+                }}
+              >
+                <Copy size={12} style={{ verticalAlign: 'middle' }} /> COPY
+              </button>
+              <button
+                onClick={handleDownloadCSV}
+                disabled={!importCSV}
+                style={{
+                  padding: '6px 10px', background: 'var(--surface-muted)', color: 'var(--fg)',
+                  border: '1px solid var(--border)', borderRadius: '2px', fontSize: '10px', fontWeight: 700, opacity: importCSV ? 1 : 0.5,
+                }}
+              >
+                DOWNLOAD
+              </button>
+            </div>
+          </div>
+
+          <textarea
+            value={importCSV}
+            onChange={(e) => setImportCSV(e.target.value)}
+            placeholder="Paste your CSV here or upload a file..."
+            style={{
+              flex: 1, minHeight: '200px', padding: '12px', background: 'var(--field-bg)', color: 'var(--fg)',
+              border: '1px solid var(--border)', borderRadius: '2px', fontSize: '11px', fontFamily: 'JetBrains Mono, monospace',
+              resize: 'none', lineHeight: 1.4,
+            }}
+          />
+
+          {/* File upload */}
+          <div style={{ marginTop: '12px' }}>
+            <label style={{
+              display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px',
+              padding: '12px', background: 'var(--surface-muted)', border: '2px dashed var(--border-strong)',
+              borderRadius: '2px', cursor: 'pointer', color: 'var(--muted-strong)', fontSize: '12px',
+            }}>
+              <Upload size={16} />
+              <span>CLICK TO UPLOAD CSV</span>
+              <input type="file" accept=".csv" onChange={handleFileChange} style={{ display: 'none' }} />
+            </label>
+            {fileUploadError && (
+              <div style={{ marginTop: '8px', color: 'var(--warn)', fontSize: '11px' }}>
+                {fileUploadError}
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Preview / Errors */}
+        {(importResult || importErrors.length > 0) && (
+          <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '2px', padding: '16px' }}>
+            {importErrors.length > 0 ? (
+              <div>
+                <div style={{ color: 'var(--warn)', fontSize: '14px', fontWeight: 700, marginBottom: '8px' }}>
+                  IMPORT ERRORS:
+                </div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                  {importErrors.map((err, i) => (
+                    <div key={i} style={{ fontSize: '11px', color: 'var(--muted-strong)', padding: '4px 8px', background: 'rgba(255, 77, 143, 0.1)', borderRadius: '2px' }}>
+                      {err}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ) : isMixedModeReference ? (
+              <div>
+                <div style={{ color: 'var(--accent)', fontSize: '14px', fontWeight: 700, marginBottom: '8px' }}>
+                  ALL MODES REFERENCE
+                </div>
+                <div style={{ fontSize: '11px', color: 'var(--muted-strong)', lineHeight: 1.5 }}>
+                  This template contains examples for multiple workout modes and cannot be started as one workout.
+                  Select a specific mode and generate a template, or edit the CSV so every row uses one mode.
+                </div>
+              </div>
+            ) : importResult ? (
+              <div>
+                <div style={{ color: 'var(--accent)', fontSize: '14px', fontWeight: 700, marginBottom: '8px' }}>
+                  PREVIEW: {importResult.workout.name} ({importResult.workout.mode}) ({importResult.workout.queue.length} actions)
+                </div>
+                <div
+                  role="region"
+                  aria-label="Imported action preview"
+                  tabIndex={0}
+                  style={{
+                    display: 'flex', flexDirection: 'column', gap: '4px', maxHeight: '240px',
+                    overflowY: 'auto', paddingRight: '4px', overscrollBehavior: 'contain',
+                  }}
+                >
+                  {importResult.workout.queue.map((item, i) => (
+                    <div key={i} style={{ fontSize: '11px', color: 'var(--muted-strong)', display: 'flex', justifyContent: 'space-between', padding: '4px 8px', background: 'var(--surface-muted)', borderRadius: '2px' }}>
+                      <span>{item.name}</span>
+                      <span>{item.value} {item.unit}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ) : null}
+          </div>
+        )}
+
+        {/* Import action */}
+        <button
+          onClick={onImport}
+          disabled={!canStartImport}
+          style={{
+            width: '100%', padding: '20px', background: canStartImport ? 'var(--accent)' : 'var(--surface-muted)',
+            color: canStartImport ? 'var(--on-accent)' : 'var(--muted)',
+            fontSize: '18px', fontWeight: 900, letterSpacing: '0.02em', borderRadius: '2px',
+            fontFamily: 'Archivo Black, sans-serif', border: 'none', cursor: canStartImport ? 'pointer' : 'not-allowed',
+          }}
+        >
+          <Play size={20} style={{ verticalAlign: 'middle', marginRight: '8px' }} fill={canStartImport ? 'var(--on-accent)' : 'currentColor'} />
+          START IMPORTED WORKOUT
+        </button>
+      </div>
     </div>
   );
 }
@@ -2747,7 +3180,7 @@ function ColorPickerModal({ slot, value, palette, onChange, onClose }) {
   );
 }
 
-function HomeScreen({ onStart, onHistory, onFavorites, onColorSettings, onRerun, history, favorites, findMatchingFavorite, addFavorite, removeFavorite, favCollapsed, setFavCollapsed, recentCollapsed, setRecentCollapsed, settings, settingsHydrated, setSettings, library, rainbowModeActive, onRainbowModeActivate, onRainbowModeDeactivate }) {
+function HomeScreen({ onStart, onImportWorkout, onHistory, onFavorites, onColorSettings, onRerun, history, favorites, findMatchingFavorite, addFavorite, removeFavorite, favCollapsed, setFavCollapsed, recentCollapsed, setRecentCollapsed, settings, settingsHydrated, setSettings, library, rainbowModeActive, onRainbowModeActivate, onRainbowModeDeactivate }) {
   const [infoFor, setInfoFor] = useState(null);
   const [namingEntry, setNamingEntry] = useState(null); // entry being named for favoriting
   const [settingsOpen, setSettingsOpen] = useState(false);
@@ -3032,14 +3465,27 @@ function HomeScreen({ onStart, onHistory, onFavorites, onColorSettings, onRerun,
         </div>
       )}
 
-      <button onClick={onStart} style={{
-        padding: '24px', background: 'var(--accent)', color: 'var(--on-accent)', fontSize: '20px', fontWeight: 900,
-        letterSpacing: '0.02em', display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-        borderRadius: '2px', fontFamily: 'Archivo Black, sans-serif',
-      }}>
-        <span>BUILD NEW WORKOUT</span>
-        <Play size={24} fill="var(--on-accent)" />
-      </button>
+      <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) auto', gap: '10px', alignItems: 'stretch' }}>
+        <button onClick={onStart} style={{
+          padding: '24px', background: 'var(--accent)', color: 'var(--on-accent)', fontSize: '20px', fontWeight: 900,
+          letterSpacing: '0.02em', display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+          borderRadius: '2px', fontFamily: 'Archivo Black, sans-serif',
+        }}>
+          <span>BUILD NEW WORKOUT</span>
+          <Play size={24} fill="var(--on-accent)" />
+        </button>
+
+        {onImportWorkout && (
+          <button onClick={onImportWorkout} style={{
+            minWidth: '118px', padding: '10px 10px', background: 'var(--surface-muted)', color: 'var(--muted)', fontSize: '10px', fontWeight: 700,
+            letterSpacing: '0.04em', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '5px',
+            borderRadius: '2px', fontFamily: 'var(--font-mono, monospace)', border: '1px solid var(--border)',
+          }}>
+            <Upload size={16} color="var(--muted)" />
+            <span>IMPORT WORKOUT</span>
+          </button>
+        )}
+      </div>
 
       {infoFor && <WorkoutInfoModal entry={infoFor} library={library} onClose={() => setInfoFor(null)} onRun={() => { onRerun(infoFor); setInfoFor(null); }} />}
       {namingEntry && (
@@ -5853,12 +6299,34 @@ function isLongRestAfterIndex(queueIndex, queueLength, restConfig) {
   );
 }
 
+function isLongRestForIndex(queue, queueIndex, restConfig) {
+  return queue?.[queueIndex]?.restType === 'long'
+    || isLongRestAfterIndex(queueIndex, queue?.length || 0, restConfig);
+}
+
+function getRestDurationAfterIndex(queue, queueIndex, restConfig) {
+  const item = queue?.[queueIndex];
+  if (item?.restType === 'none') return 0;
+  // Interval rows use the workout-level short/long schedule rather than a
+  // per-row duration, so periodic long rests are not masked by restSeconds.
+  if (item?.restType !== 'interval' && item && item.restSeconds !== undefined && item.restSeconds !== null) {
+    return Math.max(0, Number(item.restSeconds) || 0);
+  }
+  if (restConfig?.type === 'none') return 0;
+  return isLongRestForIndex(queue, queueIndex, restConfig)
+    ? Math.max(0, Number(restConfig.long) || 0)
+    : Math.max(0, Number(restConfig.short) || 0);
+}
+
 function buildUpcomingTimeline(queue, startIdx, restConfig) {
   const items = [];
   for (let i = startIdx; i < queue.length; i++) {
     items.push({ type: 'exercise', item: queue[i], queueIndex: i, key: `exercise-${i}` });
-    if (isLongRestAfterIndex(i, queue.length, restConfig)) {
-      items.push({ type: 'longRest', duration: restConfig.long, queueIndex: i, key: `long-rest-${i}` });
+    const restDuration = getRestDurationAfterIndex(queue, i, restConfig);
+    const isImportedLongRest = queue[i]?.restType === 'long';
+    // Only show explicit imported long rests or periodic interval long rests.
+    if (i < queue.length - 1 && restDuration > 0 && (isImportedLongRest || isLongRestAfterIndex(i, queue.length, restConfig))) {
+      items.push({ type: 'longRest', duration: restDuration, queueIndex: i, key: `rest-${i}` });
     }
   }
   return items;
@@ -5955,7 +6423,7 @@ function ActiveWorkout({ queue, idx, setIdx, restConfig, initialElapsed = 0, ini
   const next = queue[idx + 1];
   const upcomingAfterNext = buildUpcomingTimeline(queue, idx + 1, restConfig).slice(1);
   // Is the current/pending rest a long rest?
-  const isLongRest = isLongRestAfterIndex(idx, queue.length, restConfig);
+  const isLongRest = isLongRestForIndex(queue, idx, restConfig);
 
   useEffect(() => {
     const t = setInterval(() => setElapsed(Math.floor((Date.now() - startRef.current) / 1000)), 1000);
@@ -6000,12 +6468,23 @@ function ActiveWorkout({ queue, idx, setIdx, restConfig, initialElapsed = 0, ini
       onComplete();
       return;
     }
-    if (restConfig.type === 'none') {
+    // Imported rows carry a rest type. Interval rows use the workout-level
+    // schedule; normal/long/none rows use their own explicit value.
+    if (current.restType !== 'interval' && current.restSeconds !== undefined && current.restSeconds !== null) {
+      const importedRest = getRestDurationAfterIndex(queue, idx, restConfig);
+      if (importedRest === 0) {
+        advance();
+        return;
+      }
+      setRestRemaining(importedRest);
+      setPhase('rest');
+      return;
+    }
+    const duration = getRestDurationAfterIndex(queue, idx, restConfig);
+    if (duration <= 0) {
       advance();
       return;
     }
-    const isLong = isLongRestAfterIndex(idx, queue.length, restConfig);
-    const duration = isLong ? restConfig.long : restConfig.short;
     setRestRemaining(duration);
     setPhase('rest');
   };

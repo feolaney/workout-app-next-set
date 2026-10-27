@@ -29,7 +29,10 @@ Use this document as the first orientation point for future sessions. Keep it cu
 ├── vite.config.js
 └── src
     ├── App.jsx
-    └── main.jsx
+    ├── customWorkoutValue.js
+    ├── main.jsx
+    ├── workoutImporter.js
+    └── workoutQueueOverrides.js
 ```
 
 `src/main.jsx` imports `App.jsx` and renders it into `#root`.
@@ -59,13 +62,21 @@ Primary flow:
 6. `active`
 7. `done`
 
+Alternative flow (CSV import):
+
+1. `home`
+2. `import`
+3. `active`
+4. `done`
+
 Secondary screens:
 
 - `history`
 - `favorites`
 - `colorSettings`
+- `import`
 
-The home screen can start a new workout, rerun recent workouts, rerun favorites, open history, open favorites, and open settings/color controls. On first launch for iOS or ambiguous mobile devices, the home screen shows a one-time blurred welcome prompt that points users to Settings for Home Screen bookmark setup.
+The `import` screen accepts a CSV template, validates it as the user edits or uploads a file, previews the parsed actions, and starts a valid imported queue directly in the active workout screen. The home screen can also start a normal workout, rerun recent workouts/favorites, open history, favorites, and settings/color controls. On first launch for iOS or ambiguous mobile devices, it shows a one-time welcome prompt that points users to Settings for Home Screen bookmark setup. The Home screen exposes the import flow as an `IMPORT WORKOUT` action beside the normal builder.
 
 Rainbow Mode is activated by a hidden secret action on the home title. Each tap on that title gives the words a slight tactile shake. Activation fades in `Kikis, this is for you`, waits for that message to fade away, then shows an oversized `RAINBOW MODE ACTIVATED` message as the animated rainbow background starts; the same hidden secret action disables it and fades in `rainbow mode deactivated`. This mode is intentionally separate from palette selection and has no visible control.
 
@@ -91,6 +102,9 @@ Top-level state in `WorkoutApp` is the app's source of truth during a session:
 - `settings`: app settings, currently `rememberSectionState` and `homeScreenPromptSeen`
 - `activePaletteId` and `customPalettes`: palette selection and custom palette data
 - `rainbowModeActive`: hidden animated rainbow background mode, toggled from the home title
+- `importCSV`: user-provided CSV content for import
+- `importResult`: parsed import result with workout queue or null
+- `importErrors`: array of validation errors from CSV parsing
 
 Most child components receive state and callbacks through props rather than owning shared app state themselves.
 
@@ -133,6 +147,8 @@ Settings includes an iOS-only Add to Home Screen guide that imports `support fil
 
 The Format step includes a draggable exercise order list. While dragging, the current replacement target is shown with a full-row accent outline and glow rather than only a divider line. Each non-manual exercise value control shows a small pencil icon beside its reps or seconds readout; it opens a custom-value dialog for a positive whole-number override, including values outside the slider range.
 
+The `import` screen uses `src/workoutImporter.js` for a dependency-free CSV parser, template generator, and row validation. The canonical columns are `workout_name`, `description`, `mode`, `round`, `group`, `exercise`, `exercise_description`, `unit`, `value`, and `rest_seconds`. Each data row is one ordered exercise/action; `mode` accepts `focus`, `circuit`, `superset`, `addon`, or `manual` (plus common aliases), `unit` is `reps` or `sec`, `value` is a positive whole number, and `rest_seconds` is an optional non-negative whole number applied after that row. Blank/help lines beginning with `#` or `-` are ignored. Valid rows become transient custom queue items, so exercises do not need to exist in the picker. Imported rows carry their own rest values into the active workout and the same existing history/favorite entry structures.
+
 The selected mode determines how `buildQueue(exercises, mode, cfg)` expands selected exercises into active workout items:
 
 - `focus`: complete all sets of one exercise before moving to the next
@@ -169,6 +185,78 @@ Quitting an active workout writes or updates a partial entry in `history` with t
 Completing the final item writes a completed workout entry into `history` and moves to `done`.
 
 Exercise, short-rest, and long-rest views all show the primary next exercise plus a smaller upcoming preview when space allows. The smaller rows are measured against the remaining active content area so they fill available space without making the screen scroll. Up-next rows use a compact grid with fixed tag and value columns so reps and rest times stay near the names and line up vertically on wide screens.
+
+## CSV Import Workflow
+
+The Home screen has an `IMPORT WORKOUT` button alongside the `BUILD NEW WORKOUT` button. Clicking it opens the Import screen.
+
+### Import Screen Features
+
+- **Template generator**: Set default workout mode (`focus`, `circuit`, `superset`, `addon`, `manual`) and rest plan (normal, normal plus periodic long rest, or none), then generate a template CSV with example actions
+- **CSV editor**: Edit the CSV directly in a textarea
+- **Copy CSV**: Copy current CSV to clipboard
+- **Download CSV**: Download current CSV as a file
+- **Upload CSV**: Replace textarea content by uploading a .csv file
+- **Validation errors**: Shows row-level errors (missing fields, invalid mode/unit, negative values) with row numbers
+- **Preview**: Shows parsed workout name and first 5 actions when CSV is valid
+- **Import action**: `START IMPORTED WORKOUT` button that begins the workout immediately if CSV is valid
+
+### CSV Schema
+
+The canonical CSV format uses one row per exercise/action:
+
+```csv
+workout_name,description,mode,round,group,exercise,exercise_description,unit,value,rest_seconds,rest_type,long_rest_seconds,long_rest_every
+```
+
+| Field | Required | Description |
+|-------|----------|-------------|
+| `workout_name` | Yes | Name of the workout |
+| `description` | No | Optional workout description |
+| `mode` | Yes | One of: `focus`, `circuit`, `superset`, `addon`, `manual` |
+| `round` | No | Round number for multi-round workouts |
+| `group` | No | Exercise group for supersets/circuits |
+| `exercise` | Yes | Exercise name (use from library or create custom) |
+| `exercise_description` | No | Exercise description (for custom exercises) |
+| `unit` | Yes | One of: `reps`, `sec` |
+| `value` | Yes | Positive whole number |
+| `rest_seconds` | No | Normal rest after this action, in seconds |
+| `rest_type` | No | `normal` (default), `interval` (normal rests plus a periodic long rest), `long`, or `none`. Only long rests appear in Up Next during active workouts. |
+| `long_rest_seconds` | For interval | Long-rest duration in seconds |
+| `long_rest_every` | For interval | Number of actions between periodic long rests |
+
+Mode aliases are supported: `focus`/`single`, `circuit`/`circ`, `superset`/`super`, `addon`/`add-on`.
+
+### Validated Import Behavior
+
+- CSV must have at least one data row beyond the header
+- Required fields: `workout_name`, `mode`, `exercise`, `unit`, `value`
+- `value` must be a positive whole number (no zero, negative, or fractional values)
+- `rest_seconds` if present must be a non-negative whole number
+- `rest_type` if present must be `normal`, `interval`, `long`, or `none` (defaults to `normal` when omitted)
+- `long_rest_seconds` and `long_rest_every` are required and positive for `rest_type=interval`
+- Unknown modes or units cause row validation to fail
+- Errors are collected from all rows and displayed together with row and field information
+- Valid imports create queue items with normal/long/none per-row rest behavior, or an interval rest configuration for periodic long rests
+- Custom exercises (not in library) are created as transient custom items
+- Valid imports skip the category/mode/rest setup screens and enter the active workout immediately with the exact imported queue, order, and per-row rest behavior
+- During active workouts, only long rests (either from interval mode or explicitly marked `rest_type=long`) appear in the Up Next preview
+
+### Active Workout Integration
+
+Imported workouts use the same active workout screen as builder-created workouts. `rest_type=normal` honors `rest_seconds` without adding a rest to Up Next; `rest_type=long` uses the row's duration and adds it to Up Next; `rest_type=interval` uses `rest_seconds` as the normal duration plus `long_rest_seconds` every `long_rest_every` actions; and `rest_type=none` advances immediately.
+
+History and favorites work identically for imported workouts: completing an imported workout writes a history entry, and the completed workout can be rerun or favorited.
+
+### Module Structure
+
+Import functionality lives in `src/workoutImporter.js` with:
+
+- `parseImportedWorkout(csv): { success, workout?, errors? }` - Main parser
+- `generateTemplateCSV({ defaultMode?, defaultRest?, defaultRestType?, defaultLongRest?, defaultLongEvery? }): string` - Template generator
+- CSV validation helpers: `validateRow`, `parseMode`, `parseUnit`
+
+Unit tests in `tests/workoutImporter.test.mjs` cover valid parses, error collection, mode/unit validation, quoted values, and template generation.
 
 ## Favorites And History
 
