@@ -207,9 +207,18 @@ const RAINBOW_CONFETTI_PIECES = Array.from({ length: RAINBOW_CONFETTI_COUNT }, (
 });
 const RAINBOW_CONFETTI_REST_REPEL = RAINBOW_CONFETTI_PIECES.map(() => ({ x: 0, y: 0, rotation: 0 }));
 
-const APP_VERSION = '2.42';
+const APP_VERSION = '2.43';
 
 const APP_VERSION_HISTORY = [
+  {
+    version: '2.43',
+    date: '2026-10-26',
+    type: 'Feature / UI',
+    changes: [
+      'Added subtle active-workout controls for changing reps or seconds during a workout.',
+      'Applied changes to the current and later matching sets while preserving earlier set values in workout history.',
+    ],
+  },
   {
     version: '2.42',
     date: '2026-10-26',
