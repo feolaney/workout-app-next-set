@@ -303,7 +303,7 @@ export function parseImportedWorkout(csvText) {
 /**
  * Generate a CSV template with examples and defaults
  * @param {Object} options - Template options
- * @param {string} options.defaultMode - Default mode for examples
+ * @param {string} options.defaultMode - Default mode for examples ('all' to include all modes)
  * @param {number} options.defaultRest - Default rest_seconds for examples
  * @param {string} options.defaultRestType - normal, interval, or none
  * @param {number} options.defaultLongRest - Long rest duration for interval examples
@@ -311,7 +311,7 @@ export function parseImportedWorkout(csvText) {
  * @returns {string} CSV text ready for download or editing
  */
 export function generateTemplateCSV({ defaultMode = 'focus', defaultRest = 30, defaultRestType = 'normal', defaultLongRest = 90, defaultLongEvery = 3 } = {}) {
-  const validModes = ['focus', 'circuit', 'superset', 'addon', 'manual'];
+  const validModes = ['all', 'focus', 'circuit', 'superset', 'addon', 'manual'];
   const mode = validModes.includes(defaultMode) ? defaultMode : 'focus';
   const rest = Number(defaultRest) >= 0 ? defaultRest : 30;
   const restType = ['normal', 'interval', 'none'].includes(defaultRestType) ? defaultRestType : 'normal';
@@ -324,6 +324,10 @@ export function generateTemplateCSV({ defaultMode = 'focus', defaultRest = 30, d
   };
   const fields = (seconds) => restFields(seconds);
 
+  // Determine which modes to include in examples
+  const includeAllModes = mode === 'all';
+  const exampleMode = includeAllModes ? 'focus' : mode;
+
   const lines = [
     // Header row
     'workout_name,description,mode,round,group,exercise,exercise_description,unit,value,rest_seconds,rest_type,long_rest_seconds,long_rest_every',
@@ -333,7 +337,7 @@ export function generateTemplateCSV({ defaultMode = 'focus', defaultRest = 30, d
     '- Edit the fields below with your workout details',
     '- Each row = one exercise/action in your workout',
     '- Required fields: workout_name, mode, exercise, unit, value',
-    '- mode: focus, circuit, superset, addon, or manual',
+    `- mode: ${includeAllModes ? 'focus, circuit, superset, addon, or manual (examples shown for each mode)' : mode}`,
     '- unit: reps (repetitions) or sec (seconds/timer)',
     '- value: positive whole number',
     '- rest_seconds: normal rest after this action, in seconds',
@@ -343,14 +347,14 @@ export function generateTemplateCSV({ defaultMode = 'focus', defaultRest = 30, d
     '- round and group: control workout structure and ordering',
     '',
     '# EXAMPLE WORKOUT - rep-based',
-    `My ${mode === 'focus' ? 'Strength' : 'Circuit'} Workout,${mode} day workout,${mode},1,1,Push-up,Standard bodyweight push-up,reps,10,${fields()}`,
-    `My ${mode} Workout,,${mode},1,2,Dumbbell Curl,Dumbbell bicep curl,reps,12,${fields()}`,
-    `My ${mode} Workout,,${mode},1,3,Squat,Bodyweight squat,reps,15,${fields()}`,
+    `My ${exampleMode === 'focus' ? 'Strength' : 'Circuit'} Workout,${exampleMode} day workout,${exampleMode},1,1,Push-up,Standard bodyweight push-up,reps,10,${fields()}`,
+    `My ${exampleMode} Workout,,${exampleMode},1,2,Dumbbell Curl,Dumbbell bicep curl,reps,12,${fields()}`,
+    `My ${exampleMode} Workout,,${exampleMode},1,3,Squat,Bodyweight squat,reps,15,${fields()}`,
     '',
     '# EXAMPLE WORKOUT - timed/countdown',
-    `Timed Core,basic core circuit,circuit,1,1,Plank,Core hold exercise,sec,60,${fields(15)}`,
-    `Timed Core,,circuit,1,2,Mountain Climber,Dynamic core movement,sec,45,${fields(15)}`,
-    `Timed Core,,circuit,1,3,Dead Bug,Core stability,sec,30,${fields(15)}`,
+    `Timed Core,basic core circuit,${exampleMode},1,1,Plank,Core hold exercise,sec,60,${fields(15)}`,
+    `Timed Core,,${exampleMode},1,2,Mountain Climber,Dynamic core movement,sec,45,${fields(15)}`,
+    `Timed Core,,${exampleMode},1,3,Dead Bug,Core stability,sec,30,${fields(15)}`,
     '',
     '# EXAMPLE ACTIONS - for circuits/supersets',
     `Full Body,circuit workout,circuit,1,1,Goblet Squat,Goblet style squat,reps,10,${fields(20)}`,
@@ -374,5 +378,16 @@ export function generateTemplateCSV({ defaultMode = 'focus', defaultRest = 30, d
     `Manual Demo,,manual,1,2,Plank,Second in exact order,sec,30,${fields(0)}`,
   ];
 
-  return lines.join('\n');
+  // Keep the instructional comments, but never mix example data from another
+  // mode into a mode-specific template. The default "all" option intentionally
+  // preserves the mixed example template.
+  const filteredLines = lines.filter((line, index) => {
+    const trimmed = line.trim();
+    if (includeAllModes || index === 0 || trimmed === '' || trimmed.startsWith('#') || trimmed.startsWith('-')) {
+      return true;
+    }
+    return trimmed.split(',')[2] === mode;
+  });
+
+  return filteredLines.join('\n');
 }

@@ -1887,9 +1887,11 @@ export default function WorkoutApp() {
 
 // ============ IMPORT SCREEN COMPONENT ============
 function ImportScreen({ importCSV, setImportCSV, importResult, setImportResult, importErrors, setImportErrors, onBack, onImport }) {
-  const [templateMode, setTemplateMode] = useState('focus');
+  const [templateMode, setTemplateMode] = useState('all');
   const [templateRest, setTemplateRest] = useState(30);
   const [templateRestType, setTemplateRestType] = useState('normal');
+  const [templateLongRest, setTemplateLongRest] = useState(90);
+  const [templateLongEvery, setTemplateLongEvery] = useState(3);
   const [fileUploadError, setFileUploadError] = useState('');
 
   // Handle CSV parse when importCSV changes
@@ -1907,7 +1909,13 @@ function ImportScreen({ importCSV, setImportCSV, importResult, setImportResult, 
 
   // Generate template CSV
   const handleGenerateTemplate = () => {
-    const template = generateTemplateCSV({ defaultMode: templateMode, defaultRest: templateRest, defaultRestType: templateRestType });
+    const template = generateTemplateCSV({
+      defaultMode: templateMode,
+      defaultRest: templateRest,
+      defaultRestType: templateRestType,
+      defaultLongRest: templateLongRest,
+      defaultLongEvery: templateLongEvery,
+    });
     setImportCSV(template);
   };
 
@@ -1996,6 +2004,7 @@ function ImportScreen({ importCSV, setImportCSV, importResult, setImportResult, 
                   border: '1px solid var(--border)', borderRadius: '2px', fontSize: '12px',
                 }}
               >
+                <option value="all">All modes</option>
                 <option value="focus">Focus</option>
                 <option value="circuit">Circuit</option>
                 <option value="superset">Superset</option>
@@ -2038,6 +2047,56 @@ function ImportScreen({ importCSV, setImportCSV, importResult, setImportResult, 
               </select>
             </div>
           </div>
+          {templateRestType === 'interval' && (
+            <div
+              style={{
+                display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: '12px',
+                padding: '10px', border: '1px solid var(--border)', background: 'var(--surface-muted)', borderRadius: '2px',
+              }}
+            >
+              <div>
+                <label style={{ display: 'block', fontSize: '11px', color: 'var(--muted)', marginBottom: '4px' }}>
+                  Long Rest (sec)
+                </label>
+                <select
+                  aria-label="Long rest duration"
+                  value={templateLongRest}
+                  onChange={(e) => setTemplateLongRest(Number(e.target.value))}
+                  style={{
+                    width: '100%', padding: '8px', background: 'var(--field-bg)', color: 'var(--fg)',
+                    border: '1px solid var(--border)', borderRadius: '2px', fontSize: '12px',
+                  }}
+                >
+                  <option value="60">60 seconds</option>
+                  <option value="90">90 seconds</option>
+                  <option value="120">120 seconds</option>
+                  <option value="180">180 seconds</option>
+                </select>
+              </div>
+              <div>
+                <label style={{ display: 'block', fontSize: '11px', color: 'var(--muted)', marginBottom: '4px' }}>
+                  Long Rest Every
+                </label>
+                <select
+                  aria-label="Long rest frequency"
+                  value={templateLongEvery}
+                  onChange={(e) => setTemplateLongEvery(Number(e.target.value))}
+                  style={{
+                    width: '100%', padding: '8px', background: 'var(--field-bg)', color: 'var(--fg)',
+                    border: '1px solid var(--border)', borderRadius: '2px', fontSize: '12px',
+                  }}
+                >
+                  <option value="2">Every 2 actions</option>
+                  <option value="3">Every 3 actions</option>
+                  <option value="4">Every 4 actions</option>
+                  <option value="5">Every 5 actions</option>
+                </select>
+              </div>
+              <div className="mono" style={{ gridColumn: '1 / -1', fontSize: '10px', color: 'var(--subtle)' }}>
+                Generated interval rows use these values for periodic long rests.
+              </div>
+            </div>
+          )}
           <button
             onClick={handleGenerateTemplate}
             style={{
@@ -2130,18 +2189,21 @@ function ImportScreen({ importCSV, setImportCSV, importResult, setImportResult, 
                 <div style={{ color: 'var(--accent)', fontSize: '14px', fontWeight: 700, marginBottom: '8px' }}>
                   PREVIEW: {importResult.workout.name} ({importResult.workout.queue.length} actions)
                 </div>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                  {importResult.workout.queue.slice(0, 5).map((item, i) => (
+                <div
+                  role="region"
+                  aria-label="Imported action preview"
+                  tabIndex={0}
+                  style={{
+                    display: 'flex', flexDirection: 'column', gap: '4px', maxHeight: '240px',
+                    overflowY: 'auto', paddingRight: '4px', overscrollBehavior: 'contain',
+                  }}
+                >
+                  {importResult.workout.queue.map((item, i) => (
                     <div key={i} style={{ fontSize: '11px', color: 'var(--muted-strong)', display: 'flex', justifyContent: 'space-between', padding: '4px 8px', background: 'var(--surface-muted)', borderRadius: '2px' }}>
                       <span>{item.name}</span>
                       <span>{item.value} {item.unit}</span>
                     </div>
                   ))}
-                  {importResult.workout.queue.length > 5 && (
-                    <div style={{ fontSize: '10px', color: 'var(--subtle)', textAlign: 'center' }}>
-                      +{importResult.workout.queue.length - 5} more actions
-                    </div>
-                  )}
                 </div>
               </div>
             ) : null}
