@@ -192,7 +192,7 @@ The Home screen has an `IMPORT WORKOUT` button alongside the `BUILD NEW WORKOUT`
 
 ### Import Screen Features
 
-- **Template generator**: Set default workout mode (`focus`, `circuit`, `superset`, `addon`, `manual`) and default rest duration in seconds, then generate a template CSV with example actions
+- **Template generator**: Set default workout mode (`focus`, `circuit`, `superset`, `addon`, `manual`) and rest plan (normal, normal plus periodic long rest, or none), then generate a template CSV with example actions
 - **CSV editor**: Edit the CSV directly in a textarea
 - **Copy CSV**: Copy current CSV to clipboard
 - **Download CSV**: Download current CSV as a file
@@ -206,7 +206,7 @@ The Home screen has an `IMPORT WORKOUT` button alongside the `BUILD NEW WORKOUT`
 The canonical CSV format uses one row per exercise/action:
 
 ```csv
-workout_name,description,mode,round,group,exercise,exercise_description,unit,value,rest_seconds,rest_type
+workout_name,description,mode,round,group,exercise,exercise_description,unit,value,rest_seconds,rest_type,long_rest_seconds,long_rest_every
 ```
 
 | Field | Required | Description |
@@ -220,8 +220,10 @@ workout_name,description,mode,round,group,exercise,exercise_description,unit,val
 | `exercise_description` | No | Exercise description (for custom exercises) |
 | `unit` | Yes | One of: `reps`, `sec` |
 | `value` | Yes | Positive whole number |
-| `rest_seconds` | No | Optional rest after this action in seconds |
-| `rest_type` | No | Optional rest type: `normal` (default) or `long`. Only long rests appear in Up Next during active workouts. |
+| `rest_seconds` | No | Normal rest after this action, in seconds |
+| `rest_type` | No | `normal` (default), `interval` (normal rests plus a periodic long rest), `long`, or `none`. Only long rests appear in Up Next during active workouts. |
+| `long_rest_seconds` | For interval | Long-rest duration in seconds |
+| `long_rest_every` | For interval | Number of actions between periodic long rests |
 
 Mode aliases are supported: `focus`/`single`, `circuit`/`circ`, `superset`/`super`, `addon`/`add-on`.
 
@@ -231,17 +233,18 @@ Mode aliases are supported: `focus`/`single`, `circuit`/`circ`, `superset`/`supe
 - Required fields: `workout_name`, `mode`, `exercise`, `unit`, `value`
 - `value` must be a positive whole number (no zero, negative, or fractional values)
 - `rest_seconds` if present must be a non-negative whole number
-- `rest_type` if present must be `normal` or `long` (defaults to `normal` when omitted)
+- `rest_type` if present must be `normal`, `interval`, `long`, or `none` (defaults to `normal` when omitted)
+- `long_rest_seconds` and `long_rest_every` are required and positive for `rest_type=interval`
 - Unknown modes or units cause row validation to fail
 - Errors are collected from all rows and displayed together with row and field information
-- Valid imports create queue items with `restSeconds` preserved from `rest_seconds`, and `restType` from `rest_type` (defaulting to `normal`)
+- Valid imports create queue items with normal/long/none per-row rest behavior, or an interval rest configuration for periodic long rests
 - Custom exercises (not in library) are created as transient custom items
 - Valid imports skip the category/mode/rest setup screens and enter the active workout immediately with the exact imported queue, order, and per-row rest behavior
 - During active workouts, only long rests (either from interval mode or explicitly marked `rest_type=long`) appear in the Up Next preview
 
 ### Active Workout Integration
 
-Imported workouts use the same active workout screen as builder-created workouts. The key difference is per-item `restSeconds` is honored if present, overriding the default `restConfig`. This enables imported workouts to have variable rest times (including zero rest) between specific actions.
+Imported workouts use the same active workout screen as builder-created workouts. `rest_type=normal` honors `rest_seconds` without adding a rest to Up Next; `rest_type=long` uses the row's duration and adds it to Up Next; `rest_type=interval` uses `rest_seconds` as the normal duration plus `long_rest_seconds` every `long_rest_every` actions; and `rest_type=none` advances immediately.
 
 History and favorites work identically for imported workouts: completing an imported workout writes a history entry, and the completed workout can be rerun or favorited.
 
@@ -250,7 +253,7 @@ History and favorites work identically for imported workouts: completing an impo
 Import functionality lives in `src/workoutImporter.js` with:
 
 - `parseImportedWorkout(csv): { success, workout?, errors? }` - Main parser
-- `generateTemplateCSV({ defaultMode?, defaultRest? }): string` - Template generator
+- `generateTemplateCSV({ defaultMode?, defaultRest?, defaultRestType?, defaultLongRest?, defaultLongEvery? }): string` - Template generator
 - CSV validation helpers: `validateRow`, `parseMode`, `parseUnit`
 
 Unit tests in `tests/workoutImporter.test.mjs` cover valid parses, error collection, mode/unit validation, quoted values, and template generation.

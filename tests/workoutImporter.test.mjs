@@ -59,6 +59,12 @@ test('parseRestType rejects invalid types', () => {
   assert.equal(parseRestType('medium'), null);
 });
 
+test('parseRestType accepts interval and none', () => {
+  assert.equal(parseRestType('interval'), 'interval');
+  assert.equal(parseRestType('periodic long'), 'interval');
+  assert.equal(parseRestType('none'), 'none');
+});
+
 // ============ ROW VALIDATION ============
 test('validateRow accepts a valid row with all required fields', () => {
   const validRow = {
@@ -299,15 +305,29 @@ Bad,focus,Push-up,reps,10.5,20x`;
   assert.ok(result.errors.some(error => error.includes("Field 'rest_seconds'")));
 });
 
-test('parseImportedWorkout parses rest_type correctly', () => {
+test('template rest plan controls normal, interval, and no-rest output', () => {
+  const normal = parseImportedWorkout(generateTemplateCSV({ defaultRest: 15, defaultRestType: 'normal' }));
+  assert.equal(normal.success, true);
+  assert.equal(normal.workout.restConfig.type, 'none');
+  assert.ok(normal.workout.queue.every(item => item.restType === 'normal'));
+
+  const interval = parseImportedWorkout(generateTemplateCSV({ defaultRest: 15, defaultRestType: 'interval' }));
+  assert.equal(interval.success, true);
+  assert.deepEqual(interval.workout.restConfig, { type: 'interval', short: 15, long: 90, longEvery: 3 });
+
+  const none = parseImportedWorkout(generateTemplateCSV({ defaultRestType: 'none' }));
+  assert.equal(none.success, true);
+  assert.ok(none.workout.queue.every(item => item.restType === 'none' && item.restSeconds === 0));
+});
+
+test('parseImportedWorkout preserves explicit normal and long rests', () => {
   const csv = `workout_name,mode,exercise,unit,value,rest_seconds,rest_type
-Workout,focus,Push-up,reps,10,15,normal
+Workout,focus,Push-up,reps,15,15,normal
 Workout,focus,Plank,sec,60,90,long`;
   const result = parseImportedWorkout(csv);
   assert.equal(result.success, true);
   if (result.success) {
     assert.equal(result.workout.queue[0].restType, 'normal');
-    assert.equal(result.workout.queue[0].restSeconds, 15);
     assert.equal(result.workout.queue[1].restType, 'long');
     assert.equal(result.workout.queue[1].restSeconds, 90);
   }
