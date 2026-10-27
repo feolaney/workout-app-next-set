@@ -1688,7 +1688,7 @@ export default function WorkoutApp() {
             setScreen('categories');
           }}
           onImportWorkout={() => {
-            setImportCSV(generateTemplateCSV({ defaultMode: 'focus', defaultRest: 30 }));
+            setImportCSV(generateTemplateCSV({ defaultMode: 'all', defaultRest: 30 }));
             setImportResult(null);
             setImportErrors([]);
             setScreen('import');
@@ -3463,11 +3463,11 @@ function HomeScreen({ onStart, onImportWorkout, onHistory, onFavorites, onColorS
 
         {onImportWorkout && (
           <button onClick={onImportWorkout} style={{
-            minWidth: '160px', padding: '16px 18px', background: 'var(--surface-strong)', color: 'var(--fg)', fontSize: '13px', fontWeight: 700,
-            letterSpacing: '0.02em', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '8px',
-            borderRadius: '2px', fontFamily: 'Archivo Black, sans-serif', border: '1px solid var(--border-strong)',
+            minWidth: '118px', padding: '10px 10px', background: 'var(--surface-muted)', color: 'var(--muted)', fontSize: '10px', fontWeight: 700,
+            letterSpacing: '0.04em', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '5px',
+            borderRadius: '2px', fontFamily: 'var(--font-mono, monospace)', border: '1px solid var(--border)',
           }}>
-            <Upload size={22} color="var(--accent)" />
+            <Upload size={16} color="var(--muted)" />
             <span>IMPORT WORKOUT</span>
           </button>
         )}

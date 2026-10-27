@@ -381,8 +381,18 @@ export function generateTemplateCSV({ defaultMode = 'focus', defaultRest = 30, d
   // Keep the instructional comments, but never mix example data from another
   // mode into a mode-specific template. The default "all" option intentionally
   // preserves the mixed example template.
+  const relevantExampleComment = (trimmed) => {
+    if (includeAllModes) return true;
+    if (trimmed === '# EXAMPLE ACTIONS - for circuits/supersets') return ['circuit', 'superset'].includes(mode);
+    if (trimmed === '# EXAMPLE SUPERSET') return mode === 'superset';
+    if (trimmed === '# EXAMPLE ADD-ON') return mode === 'addon';
+    if (trimmed === '# EXAMPLE MANUAL ORDER') return mode === 'manual';
+    return true;
+  };
+
   const filteredLines = lines.filter((line, index) => {
     const trimmed = line.trim();
+    if (!relevantExampleComment(trimmed)) return false;
     if (includeAllModes || index === 0 || trimmed === '' || trimmed.startsWith('#') || trimmed.startsWith('-')) {
       return true;
     }

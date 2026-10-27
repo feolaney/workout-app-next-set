@@ -32,7 +32,16 @@ test('generateTemplateCSV includes all modes when mode=all is passed', () => {
   assert.ok(lines.some(line => line.includes(',manual,')), 'Should include manual mode examples');
 });
 
-// ============ INTERVAL REST CONTROLS TESTS ============
+test('mode-specific templates omit unrelated example sections', () => {
+  const template = generateTemplateCSV({ defaultMode: 'focus' });
+  assert.ok(template.includes('# EXAMPLE WORKOUT - rep-based'));
+  assert.ok(template.includes('# EXAMPLE WORKOUT - timed/countdown'));
+  assert.ok(!template.includes('# EXAMPLE ACTIONS - for circuits/supersets'));
+  assert.ok(!template.includes('# EXAMPLE SUPERSET'));
+  assert.ok(!template.includes('# EXAMPLE ADD-ON'));
+  assert.ok(!template.includes('# EXAMPLE MANUAL ORDER'));
+});
+
 test('generateTemplateCSV includes long_rest_seconds and long_rest_every for interval mode', () => {
   const template = generateTemplateCSV({ 
     defaultMode: 'focus', 
