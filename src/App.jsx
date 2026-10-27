@@ -1847,6 +1847,7 @@ export default function WorkoutApp() {
               totalSets: workout.queue.length,
               positionLabel: `SET ${i + 1}/${workout.queue.length}`,
               restSeconds: item.restSeconds !== undefined ? item.restSeconds : null,
+              restType: item.restType || 'normal',
               isCustom: item.isCustom || false,
             }));
 
@@ -1869,7 +1870,7 @@ export default function WorkoutApp() {
             setSelectedExercises(importedExercises);
             setMode(workout.mode || 'manual');
             setModeConfig({ imported: true, workoutName: workout.name, description: workout.description || '' });
-            setRestConfig({ type: 'none', short: 0, long: 0, longEvery: 0 });
+            setRestConfig(workout.restConfig || { type: 'none', short: 0, long: 0, longEvery: 0 });
             setQueue(importedQueue);
             // Start with first item, exercise phase
             setQueueIdx(0);
@@ -1888,6 +1889,7 @@ export default function WorkoutApp() {
 function ImportScreen({ importCSV, setImportCSV, importResult, setImportResult, importErrors, setImportErrors, onBack, onImport }) {
   const [templateMode, setTemplateMode] = useState('focus');
   const [templateRest, setTemplateRest] = useState(30);
+  const [templateRestType, setTemplateRestType] = useState('normal');
   const [fileUploadError, setFileUploadError] = useState('');
 
   // Handle CSV parse when importCSV changes
@@ -1905,7 +1907,7 @@ function ImportScreen({ importCSV, setImportCSV, importResult, setImportResult, 
 
   // Generate template CSV
   const handleGenerateTemplate = () => {
-    const template = generateTemplateCSV({ defaultMode: templateMode, defaultRest: templateRest });
+    const template = generateTemplateCSV({ defaultMode: templateMode, defaultRest: templateRest, defaultRestType: templateRestType });
     setImportCSV(template);
   };
 
@@ -1999,6 +2001,22 @@ function ImportScreen({ importCSV, setImportCSV, importResult, setImportResult, 
                 <option value="superset">Superset</option>
                 <option value="addon">Add-on</option>
                 <option value="manual">Manual</option>
+              </select>
+            </div>
+            <div>
+              <label style={{ display: 'block', fontSize: '11px', color: 'var(--muted)', marginBottom: '4px' }}>Rest Plan</label>
+              <select
+                aria-label="Rest plan"
+                value={templateRestType}
+                onChange={(e) => setTemplateRestType(e.target.value)}
+                style={{
+                  width: '100%', padding: '8px', background: 'var(--field-bg)', color: 'var(--fg)',
+                  border: '1px solid var(--border)', borderRadius: '2px', fontSize: '12px',
+                }}
+              >
+                <option value="normal">Normal rest</option>
+                <option value="interval">Normal + periodic long</option>
+                <option value="none">No rest</option>
               </select>
             </div>
             <div>
@@ -6205,13 +6223,21 @@ function isLongRestAfterIndex(queueIndex, queueLength, restConfig) {
   );
 }
 
+function isLongRestForIndex(queue, queueIndex, restConfig) {
+  return queue?.[queueIndex]?.restType === 'long'
+    || isLongRestAfterIndex(queueIndex, queue?.length || 0, restConfig);
+}
+
 function getRestDurationAfterIndex(queue, queueIndex, restConfig) {
   const item = queue?.[queueIndex];
-  if (item && item.restSeconds !== undefined && item.restSeconds !== null) {
+  if (item?.restType === 'none') return 0;
+  // Interval rows use the workout-level short/long schedule rather than a
+  // per-row duration, so periodic long rests are not masked by restSeconds.
+  if (item?.restType !== 'interval' && item && item.restSeconds !== undefined && item.restSeconds !== null) {
     return Math.max(0, Number(item.restSeconds) || 0);
   }
   if (restConfig?.type === 'none') return 0;
-  return isLongRestAfterIndex(queueIndex, queue?.length || 0, restConfig)
+  return isLongRestForIndex(queue, queueIndex, restConfig)
     ? Math.max(0, Number(restConfig.long) || 0)
     : Math.max(0, Number(restConfig.short) || 0);
 }
@@ -6221,9 +6247,8 @@ function buildUpcomingTimeline(queue, startIdx, restConfig) {
   for (let i = startIdx; i < queue.length; i++) {
     items.push({ type: 'exercise', item: queue[i], queueIndex: i, key: `exercise-${i}` });
     const restDuration = getRestDurationAfterIndex(queue, i, restConfig);
-    const hasImportedRest = queue[i]?.restSeconds !== undefined && queue[i]?.restSeconds !== null;
-    const isImportedLongRest = hasImportedRest && queue[i]?.restType === 'long';
-    // Only show imported rests that are explicitly long, or builder long rests from interval mode
+    const isImportedLongRest = queue[i]?.restType === 'long';
+    // Only show explicit imported long rests or periodic interval long rests.
     if (i < queue.length - 1 && restDuration > 0 && (isImportedLongRest || isLongRestAfterIndex(i, queue.length, restConfig))) {
       items.push({ type: 'longRest', duration: restDuration, queueIndex: i, key: `rest-${i}` });
     }
@@ -6322,7 +6347,7 @@ function ActiveWorkout({ queue, idx, setIdx, restConfig, initialElapsed = 0, ini
   const next = queue[idx + 1];
   const upcomingAfterNext = buildUpcomingTimeline(queue, idx + 1, restConfig).slice(1);
   // Is the current/pending rest a long rest?
-  const isLongRest = isLongRestAfterIndex(idx, queue.length, restConfig);
+  const isLongRest = isLongRestForIndex(queue, idx, restConfig);
 
   useEffect(() => {
     const t = setInterval(() => setElapsed(Math.floor((Date.now() - startRef.current) / 1000)), 1000);
@@ -6367,9 +6392,10 @@ function ActiveWorkout({ queue, idx, setIdx, restConfig, initialElapsed = 0, ini
       onComplete();
       return;
     }
-    // Imported rows carry their own rest value. A zero value means advance immediately.
-    if (current.restSeconds !== undefined && current.restSeconds !== null) {
-      const importedRest = Math.max(0, Number(current.restSeconds) || 0);
+    // Imported rows carry a rest type. Interval rows use the workout-level
+    // schedule; normal/long/none rows use their own explicit value.
+    if (current.restType !== 'interval' && current.restSeconds !== undefined && current.restSeconds !== null) {
+      const importedRest = getRestDurationAfterIndex(queue, idx, restConfig);
       if (importedRest === 0) {
         advance();
         return;
@@ -6378,12 +6404,11 @@ function ActiveWorkout({ queue, idx, setIdx, restConfig, initialElapsed = 0, ini
       setPhase('rest');
       return;
     }
-    if (restConfig.type === 'none') {
+    const duration = getRestDurationAfterIndex(queue, idx, restConfig);
+    if (duration <= 0) {
       advance();
       return;
     }
-    const isLong = isLongRestAfterIndex(idx, queue.length, restConfig);
-    const duration = isLong ? restConfig.long : restConfig.short;
     setRestRemaining(duration);
     setPhase('rest');
   };
