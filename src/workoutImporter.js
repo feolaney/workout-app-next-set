@@ -298,6 +298,12 @@ export function parseImportedWorkout(csvText) {
   };
 }
 
+export function isRunnableImportedWorkout(result) {
+  if (!result?.success || !result.workout?.queue?.length) return false;
+  const modes = new Set(result.workout.queue.map((item) => item.mode));
+  return modes.size === 1;
+}
+
 // ============ TEMPLATE GENERATION ============
 
 /**
@@ -326,7 +332,65 @@ export function generateTemplateCSV({ defaultMode = 'focus', defaultRest = 30, d
 
   // Determine which modes to include in examples
   const includeAllModes = mode === 'all';
-  const exampleMode = includeAllModes ? 'focus' : mode;
+
+  // Mode-specific workout names for coherent templates
+  const modeWorkoutNames = {
+    'focus': 'My Focus Workout',
+    'circuit': 'My Circuit Workout',
+    'superset': 'My Superset Workout',
+    'addon': 'My Add-on Workout',
+    'manual': 'My Manual Workout'
+  };
+
+  // Generate mode-specific coherent templates
+  const generateFocusTemplate = () => [
+    '',
+    '# EXAMPLE FOCUS WORKOUT - strength and endurance focus',
+    `${modeWorkoutNames.focus},focus on strength and core,focus,1,1,Push-up,Standard bodyweight push-up,reps,10,${fields()}`,
+    `${modeWorkoutNames.focus},,focus,1,2,Plank,Core hold,sec,45,${fields(15)}`,
+    `${modeWorkoutNames.focus},,focus,1,3,Dumbbell Curl,Bicep focus,reps,12,${fields()}`,
+    `${modeWorkoutNames.focus},,focus,1,4,Squat,Leg focus,reps,15,${fields(15)}`
+  ];
+
+  const generateCircuitTemplate = () => [
+    '',
+    '# EXAMPLE CIRCUIT WORKOUT - repeat circuit rounds',
+    `${modeWorkoutNames.circuit},full body circuit,circuit,1,1,Goblet Squat,Round one exercise one,reps,10,${fields(20)}`,
+    `${modeWorkoutNames.circuit},,circuit,1,2,Push-up,Round one exercise two,reps,8,${fields(20)}`,
+    `${modeWorkoutNames.circuit},,circuit,1,3,Dumbbell Row,Round one exercise three,reps,10,${fields(20)}`,
+    `${modeWorkoutNames.circuit},,circuit,2,1,Goblet Squat,Round two repeats order,reps,10,${fields(20)}`,
+    `${modeWorkoutNames.circuit},,circuit,2,2,Push-up,Round two continues,reps,8,${fields(20)}`,
+    `${modeWorkoutNames.circuit},,circuit,2,3,Dumbbell Row,Round two completes,reps,10,${fields(20)}`
+  ];
+
+  const generateSupersetTemplate = () => [
+    '',
+    '# EXAMPLE SUPERSET WORKOUT - paired exercises in same group',
+    `${modeWorkoutNames.superset},upper body supersets,superset,1,1,Push-up,Superset pair A,reps,10,${fields(0)}`,
+    `${modeWorkoutNames.superset},,superset,1,1,Dumbbell Row,Superset pair B - rest after pair,reps,10,${fields(30)}`,
+    `${modeWorkoutNames.superset},,superset,1,2,Overhead Press,Superset pair C,reps,8,${fields(0)}`,
+    `${modeWorkoutNames.superset},,superset,1,2,Face Pull,Superset pair D - rest after pair,reps,12,${fields(30)}`
+  ];
+
+  const generateAddonTemplate = () => [
+    '',
+    '# EXAMPLE ADD-ON WORKOUT - progressive rounds, one action at a time',
+    `${modeWorkoutNames.addon},progressive add-on structure,addon,1,1,Squat,Round one single action,reps,12,${fields(15)}`,
+    `${modeWorkoutNames.addon},,addon,2,1,Squat,Round two repeats and adds,reps,12,${fields(0)}`,
+    `${modeWorkoutNames.addon},,addon,2,2,Plank,Round two new exercise,sec,30,${fields(30)}`,
+    `${modeWorkoutNames.addon},,addon,3,1,Squat,Round three repeats existing,reps,12,${fields(0)}`,
+    `${modeWorkoutNames.addon},,addon,3,2,Plank,Round three existing,sec,30,${fields(0)}`,
+    `${modeWorkoutNames.addon},,addon,3,3,Glute Bridge,Round three new exercise,reps,15,${fields(30)}`
+  ];
+
+  const generateManualTemplate = () => [
+    '',
+    '# EXAMPLE MANUAL WORKOUT - exact order, one round',
+    `${modeWorkoutNames.manual},custom order manual,manual,1,1,Push-up,First in exact order,reps,8,${fields(20)}`,
+    `${modeWorkoutNames.manual},,manual,1,2,Dumbbell Row,Second in exact order,reps,10,${fields(15)}`,
+    `${modeWorkoutNames.manual},,manual,1,3,Squat,Third in exact order,reps,12,${fields(0)}`,
+    `${modeWorkoutNames.manual},,manual,1,4,Plank,Last in exact order,sec,45,${fields(30)}`
+  ];
 
   const lines = [
     // Header row
@@ -346,58 +410,33 @@ export function generateTemplateCSV({ defaultMode = 'focus', defaultRest = 30, d
     '- Only long rests appear in Up Next during active workouts',
     '- round and group: control workout structure and ordering',
     '',
-    '# EXAMPLE WORKOUT - rep-based',
-    `My ${exampleMode === 'focus' ? 'Strength' : 'Circuit'} Workout,${exampleMode} day workout,${exampleMode},1,1,Push-up,Standard bodyweight push-up,reps,10,${fields()}`,
-    `My ${exampleMode} Workout,,${exampleMode},1,2,Dumbbell Curl,Dumbbell bicep curl,reps,12,${fields()}`,
-    `My ${exampleMode} Workout,,${exampleMode},1,3,Squat,Bodyweight squat,reps,15,${fields()}`,
-    '',
-    '# EXAMPLE WORKOUT - timed/countdown',
-    `Timed Core,basic core circuit,${exampleMode},1,1,Plank,Core hold exercise,sec,60,${fields(15)}`,
-    `Timed Core,,${exampleMode},1,2,Mountain Climber,Dynamic core movement,sec,45,${fields(15)}`,
-    `Timed Core,,${exampleMode},1,3,Dead Bug,Core stability,sec,30,${fields(15)}`,
-    '',
-    '# EXAMPLE ACTIONS - for circuits/supersets',
-    `Full Body,circuit workout,circuit,1,1,Goblet Squat,Goblet style squat,reps,10,${fields(20)}`,
-    `Full Body,,circuit,1,2,Push-up,Chest and triceps,reps,8,${fields(20)}`,
-    `Full Body,,circuit,1,3,Dumbbell Row,Back exercise,reps,10,${fields(20)}`,
-    `Full Body,,circuit,2,1,Goblet Squat,Goblet style squat,reps,10,${fields(20)}`,
-    `Full Body,,circuit,2,2,Push-up,Chest and triceps,reps,8,${fields(20)}`,
-    `Full Body,,circuit,2,3,Dumbbell Row,Back exercise,reps,10,${fields(20)}`,
-    '',
-    '# EXAMPLE SUPERSET',
-    `Superset Demo,,superset,1,1,Push-up,First exercise,reps,10,${fields(0)}`,
-    `Superset Demo,,superset,1,1,Dumbbell Row,Second exercise,reps,10,${fields(30)}`,
-    '',
-    '# EXAMPLE ADD-ON',
-    `Add-on Demo,,addon,1,1,Squat,Round one,reps,12,${fields(15)}`,
-    `Add-on Demo,,addon,2,1,Squat,Round two existing exercise,reps,12,${fields(0)}`,
-    `Add-on Demo,,addon,2,2,Plank,Round two added exercise,sec,30,${fields(30)}`,
-    '',
-    '# EXAMPLE MANUAL ORDER',
-    `Manual Demo,,manual,1,1,Push-up,First in exact order,reps,8,${fields(20)}`,
-    `Manual Demo,,manual,1,2,Plank,Second in exact order,sec,30,${fields(0)}`,
+    includeAllModes ? '# EXAMPLE WORKOUTS FOR ALL MODES (review each section)' : '# YOUR WORKOUT'
   ];
 
-  // Keep the instructional comments, but never mix example data from another
-  // mode into a mode-specific template. The default "all" option intentionally
-  // preserves the mixed example template.
-  const relevantExampleComment = (trimmed) => {
-    if (includeAllModes) return true;
-    if (trimmed === '# EXAMPLE ACTIONS - for circuits/supersets') return ['circuit', 'superset'].includes(mode);
-    if (trimmed === '# EXAMPLE SUPERSET') return mode === 'superset';
-    if (trimmed === '# EXAMPLE ADD-ON') return mode === 'addon';
-    if (trimmed === '# EXAMPLE MANUAL ORDER') return mode === 'manual';
-    return true;
-  };
-
-  const filteredLines = lines.filter((line, index) => {
-    const trimmed = line.trim();
-    if (!relevantExampleComment(trimmed)) return false;
-    if (includeAllModes || index === 0 || trimmed === '' || trimmed.startsWith('#') || trimmed.startsWith('-')) {
-      return true;
+  // Add mode-specific content
+  if (includeAllModes) {
+    // All mode: include examples for all modes (reference template)
+    lines.push(...generateFocusTemplate(), ...generateCircuitTemplate(), ...generateSupersetTemplate(), ...generateAddonTemplate(), ...generateManualTemplate());
+  } else {
+    // Specific mode: only that mode's coherent template
+    switch (mode) {
+      case 'focus':
+        lines.push(...generateFocusTemplate());
+        break;
+      case 'circuit':
+        lines.push(...generateCircuitTemplate());
+        break;
+      case 'superset':
+        lines.push(...generateSupersetTemplate());
+        break;
+      case 'addon':
+        lines.push(...generateAddonTemplate());
+        break;
+      case 'manual':
+        lines.push(...generateManualTemplate());
+        break;
     }
-    return trimmed.split(',')[2] === mode;
-  });
+  }
 
-  return filteredLines.join('\n');
+  return lines.join('\n');
 }

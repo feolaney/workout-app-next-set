@@ -4,7 +4,7 @@ import WORKOUT_EXERCISE_LIBRARY_CSV from '../support files/workout_exercise_libr
 import IOS_HOME_SCREEN_GIF from '../support files/Images/ios_how_to_add_to_homescreen.gif';
 import { parseCustomWorkoutValue } from './customWorkoutValue.js';
 import { updateFutureExerciseValues } from './workoutQueueOverrides.js';
-import { parseImportedWorkout, generateTemplateCSV } from './workoutImporter.js';
+import { parseImportedWorkout, generateTemplateCSV, isRunnableImportedWorkout } from './workoutImporter.js';
 
 // ============ EQUIPMENT TAGS ============
 const EQUIP = {
@@ -1893,6 +1893,10 @@ function ImportScreen({ importCSV, setImportCSV, importResult, setImportResult, 
   const [templateLongRest, setTemplateLongRest] = useState(90);
   const [templateLongEvery, setTemplateLongEvery] = useState(3);
   const [fileUploadError, setFileUploadError] = useState('');
+  const canStartImport = isRunnableImportedWorkout(importResult);
+  const isMixedModeReference = Boolean(
+    importResult?.success && importResult.workout?.queue?.length > 0 && !canStartImport
+  );
 
   // Handle CSV parse when importCSV changes
   useEffect(() => {
@@ -2184,6 +2188,16 @@ function ImportScreen({ importCSV, setImportCSV, importResult, setImportResult, 
                   ))}
                 </div>
               </div>
+            ) : isMixedModeReference ? (
+              <div>
+                <div style={{ color: 'var(--accent)', fontSize: '14px', fontWeight: 700, marginBottom: '8px' }}>
+                  ALL MODES REFERENCE
+                </div>
+                <div style={{ fontSize: '11px', color: 'var(--muted-strong)', lineHeight: 1.5 }}>
+                  This template contains examples for multiple workout modes and cannot be started as one workout.
+                  Select a specific mode and generate a template, or edit the CSV so every row uses one mode.
+                </div>
+              </div>
             ) : importResult ? (
               <div>
                 <div style={{ color: 'var(--accent)', fontSize: '14px', fontWeight: 700, marginBottom: '8px' }}>
@@ -2213,15 +2227,15 @@ function ImportScreen({ importCSV, setImportCSV, importResult, setImportResult, 
         {/* Import action */}
         <button
           onClick={onImport}
-          disabled={!importResult || !importResult.success || importResult.workout.queue.length === 0}
+          disabled={!canStartImport}
           style={{
-            width: '100%', padding: '20px', background: (importResult && importResult.success && importResult.workout.queue.length > 0) ? 'var(--accent)' : 'var(--surface-muted)',
-            color: (importResult && importResult.success && importResult.workout.queue.length > 0) ? 'var(--on-accent)' : 'var(--muted)',
+            width: '100%', padding: '20px', background: canStartImport ? 'var(--accent)' : 'var(--surface-muted)',
+            color: canStartImport ? 'var(--on-accent)' : 'var(--muted)',
             fontSize: '18px', fontWeight: 900, letterSpacing: '0.02em', borderRadius: '2px',
-            fontFamily: 'Archivo Black, sans-serif', border: 'none', cursor: (importResult && importResult.success && importResult.workout.queue.length > 0) ? 'pointer' : 'not-allowed',
+            fontFamily: 'Archivo Black, sans-serif', border: 'none', cursor: canStartImport ? 'pointer' : 'not-allowed',
           }}
         >
-          <Play size={20} style={{ verticalAlign: 'middle', marginRight: '8px' }} fill={(importResult && importResult.success && importResult.workout.queue.length > 0) ? 'var(--on-accent)' : 'currentColor'} />
+          <Play size={20} style={{ verticalAlign: 'middle', marginRight: '8px' }} fill={canStartImport ? 'var(--on-accent)' : 'currentColor'} />
           START IMPORTED WORKOUT
         </button>
       </div>

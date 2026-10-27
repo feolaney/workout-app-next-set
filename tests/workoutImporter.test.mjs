@@ -273,12 +273,15 @@ test('generateTemplateCSV includes example actions', () => {
   assert.ok(template.split('\n').length > 5); // header + comments + examples
 });
 
-test('generated template is directly importable and includes the main flow examples', () => {
+test('generated superset template is directly importable with the intended paired actions', () => {
   const template = generateTemplateCSV({ defaultMode: 'superset', defaultRest: 30 });
   const result = parseImportedWorkout(template);
   assert.equal(result.success, true);
-  assert.ok(result.workout.queue.some(item => item.mode === 'superset'));
-  assert.ok(result.workout.queue.some(item => item.unit === 'sec'));
+  assert.equal(result.workout.name, 'My Superset Workout');
+  assert.deepEqual(
+    result.workout.queue.map(item => item.name),
+    ['Push-up', 'Dumbbell Row', 'Overhead Press', 'Face Pull']
+  );
 });
 
 test('parseImportedWorkout ignores blank and help lines before and between data rows', () => {
