@@ -169,18 +169,19 @@ The active workout screen keeps the exercise value control intentionally subtle:
 - `restRemaining`: countdown time during rest
 - `elapsed`: total elapsed workout time
 - `menuOpen`: active workout menu state
-- `browseIdx`: scroll navigation state (null = live position, number = browsing to that queue index)
+- `browseTarget`: browsable timeline target object with type and queueIndex; null = live position
 
 Completing a set either advances immediately, starts a rest timer, or finishes the workout depending on position and `restConfig`.
 
 Up Next scroll navigation:
 - The timeline preview is vertically scrollable with mobile momentum and scroll snapping
-- Click any upcoming item to browse it: the timeline scrolls to show that destination highlighted
-- While browsing, the progress bar shows a preview color matching the destination exercise's equipment color
-- Two buttons appear: CANCEL (returns to live position with rubber-band animation) and JUMP HERE (jumps to that queue position)
-- Jumping to an exercise enters exercise phase at that position
-- Jumping to a long rest enters that long rest phase at its queue position
-- Browsing state clears after jumping or canceling
+- The first visible row is the primary next item (exercise or long rest); tap it to browse or scroll through the upcoming list
+- Scrolling synchronizes the preview highlight to the item at the top; clicking a row selects it as the browse target
+- While browsing, the progress bar shows a preview marker at the destination's overall workout position using a palette-aware accent2 color (light blue)
+- Two buttons appear: `CANCEL` (returns to live position with a 300ms spring/rubber-band bounce animation) and `JUMP HERE` (jumps to the selected queue position and phase)
+- `JUMP HERE` for an exercise enters the exercise phase at that queue index; for a long rest it enters the rest phase with the configured duration
+- Browsing state clears after jumping or canceling; canceling resets the timeline scroll position with an animated bounce cue
+- **Fix (v1.0.0)**: Recenter effect now correctly scrolls to the primary item after progression by depending on `layout.count` and `layout.top` in the scroll effect, ensuring it re-runs when the conditionally-rendered listbox mounts.
 
 Editing a current workout opens the normal setup stages with the current selections intact. The app records the active queue position and elapsed time before leaving the active screen. At the rest-settings step, `Continue` rebuilds the queue and resumes at the saved position, clamped to the rebuilt queue length, while preserving elapsed time. `Start Over` rebuilds the edited workout from the beginning with a fresh timer.
 

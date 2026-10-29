@@ -1,193 +1,262 @@
-// Up Next Scroll Navigation Feature Tests
-// Run with: node --test tests/upNextScrollNav.test.mjs
+import test from 'node:test';
+import assert from 'node:assert/strict';
 
-import { test, describe, before, after } from 'node:test';
-import assert from 'node:assert';
+import {
+  buildUpcomingTimeline,
+  getJumpState,
+  getPreviewPercent,
+  targetKey,
+  getLiveIndexInTimeline,
+  getUpNextViewModel,
+  getTimelineAnchorIndex,
+  getTimelineTrailingSpacerRows,
+  getTimelineBrowseRow,
+  getLiveMarkerPresentation,
+} from '../src/upNextNavigation.js';
 
-/**
- * These are the pure helper functions from App.jsx extracted for testing.
- * They verify the exact behavior needed for Up Next long-rest display.
- */
+const intervalRest = { type: 'interval', short: 15, long: 120, longEvery: 2 };
+const queue = [
+  { exId: 'ex1', name: 'One', reps: 10, unit: 'reps' },
+  { exId: 'ex2', name: 'Two', reps: 10, unit: 'reps' },
+  { exId: 'ex3', name: 'Three', reps: 10, unit: 'reps' },
+  { exId: 'ex4', name: 'Four', reps: 10, unit: 'reps' },
+];
 
-const isLongRestAfterIndex = (queueIndex, queueLength, restConfig) => {
-  const longEvery = Number(restConfig?.longEvery) || 0;
-  return (
-    restConfig?.type === 'interval' &&
-    longEvery > 0 &&
-    queueIndex < queueLength - 1 &&
-    (queueIndex + 1) % longEvery === 0
+test('exercise-phase timeline includes history, live marker, and immediately due long rest', () => {
+  const timeline = buildUpcomingTimeline(queue, 1, 'exercise', intervalRest);
+
+  // Timeline includes history (ex0), live marker (at idx 1), longRest after current, then future exercises
+  assert.deepEqual(
+    timeline.map(item => [item.type, item.queueIndex]),
+    [['exercise', 0], ['liveMarker', 1], ['longRest', 1], ['exercise', 2], ['exercise', 3]],
   );
-};
+  assert.equal(timeline[2].duration, 120);
+  // Verify history is marked
+  assert.equal(timeline[0].isHistory, true);
+  // Verify live marker
+  assert.equal(timeline[1].type, 'liveMarker');
+});
 
-const isLongRestForIndex = (queue, queueIndex, restConfig) => {
-  return queue?.[queueIndex]?.restType === 'long'
-    || isLongRestAfterIndex(queueIndex, queue?.length || 0, restConfig);
-};
+test('rest-phase timeline includes history and live marker, omits active rest', () => {
+  const timeline = buildUpcomingTimeline(queue, 1, 'rest', intervalRest);
 
-const getRestDurationAfterIndex = (queue, queueIndex, restConfig) => {
-  const item = queue?.[queueIndex];
-  if (item?.restType === 'none') return 0;
-  if (item?.restType !== 'interval' && item && item.restSeconds !== undefined && item.restSeconds !== null) {
-    return Math.max(0, Number(item.restSeconds) || 0);
-  }
-  if (restConfig?.type === 'none') return 0;
-  return isLongRestForIndex(queue, queueIndex, restConfig)
-    ? Math.max(0, Number(restConfig.long) || 0)
-    : Math.max(0, Number(restConfig.short) || 0);
-};
+  // In rest phase, the active rest is omitted, but history and live marker remain
+  assert.deepEqual(
+    timeline.map(item => [item.type, item.queueIndex]),
+    [['exercise', 0], ['liveMarker', 1], ['exercise', 2], ['exercise', 3]],
+  );
+});
 
-/**
- * buildUpcomingTimeline: Build the upcoming timeline from queue[startIdx] onwards.
- * 
- * BUG FIX: When current is at queue[idx], we need to show any LONG REST that comes
- * immediately after completing current BEFORE showing queue[idx+1]. The original
- * implementation started at startIdx and only showed rests AFTER each item, but
- * missed the rest that comes from completing the item BEFORE startIdx.
- * 
- * For Up Next display where startIdx = idx + 1:
- * - If completing queue[idx] leads to a long rest, that rest should appear FIRST
- * - Then queue[idx+1], then rest after idx+1 if applicable, etc.
- */
-const buildUpcomingTimeline = (queue, startIdx, restConfig) => {
-  const items = [];
-  
-  // Check if there's a long rest IMMEDIATELY before startIdx (i.e., after completing queue[startIdx-1])
-  // This handles the case where current exercise completion leads to a long rest
-  if (startIdx > 0 && startIdx < queue.length) {
-    const prevIdx = startIdx - 1;
-    const restAfterPrev = getRestDurationAfterIndex(queue, prevIdx, restConfig);
-    if (restAfterPrev > 0 && isLongRestForIndex(queue, prevIdx, restConfig)) {
-      items.push({ type: 'longRest', duration: restAfterPrev, queueIndex: prevIdx, key: `rest-after-prev-${prevIdx}` });
-    }
-  }
-  
-  // Build the rest of the timeline starting from startIdx
-  for (let i = startIdx; i < queue.length; i++) {
-    items.push({ type: 'exercise', item: queue[i], queueIndex: i, key: `exercise-${i}` });
-    const restDuration = getRestDurationAfterIndex(queue, i, restConfig);
-    const isImportedLongRest = queue[i]?.restType === 'long';
-    if (i < queue.length - 1 && restDuration > 0 && (isImportedLongRest || isLongRestAfterIndex(i, queue.length, restConfig))) {
-      items.push({ type: 'longRest', duration: restDuration, queueIndex: i, key: `rest-${i}` });
-    }
-  }
-  return items;
-};
+test('future interval long rests remain in chronological order', () => {
+  const sixItems = Array.from({ length: 6 }, (_, index) => ({
+    exId: `ex${index + 1}`,
+    name: `Exercise ${index + 1}`,
+    reps: 10,
+    unit: 'reps',
+  }));
+  const timeline = buildUpcomingTimeline(
+    sixItems,
+    0,
+    'exercise',
+    { type: 'interval', short: 15, long: 90, longEvery: 3 },
+  );
 
-describe('Up Next Long Rest Bug Fix', () => {
-  const restConfig = { type: 'interval', short: 15, long: 120, longEvery: 2 };
+  assert.deepEqual(
+    timeline.map(item => [item.type, item.queueIndex]),
+    [
+      ['exercise', 1],
+      ['exercise', 2],
+      ['longRest', 2],
+      ['exercise', 3],
+      ['exercise', 4],
+      ['exercise', 5],
+    ],
+  );
+});
 
-  describe('Fixed buildUpcomingTimeline', () => {
-    test('at idx=0: long rest after idx=1 should show in upcoming', () => {
-      const queue = [
-        { exId: 'ex1', name: 'Current', reps: 10, unit: 'reps' },     // idx 0 (current)
-        { exId: 'ex2', name: 'Next', reps: 10, unit: 'reps' },         // idx 1
-        { exId: 'ex3', name: 'Following', reps: 10, unit: 'reps' },    // idx 2
-        { exId: 'ex4', name: 'Last', reps: 10, unit: 'reps' },         // idx 3
-      ];
-      // Up Next uses startIdx = idx + 1 = 1
-      const timeline = buildUpcomingTimeline(queue, 1, restConfig);
-      
-      console.log('Timeline from idx=1:', timeline.map(x => x.type));
-      
-      // Should be: [{longRest after ex1}, {ex2}, {ex3}, {ex4}] - but wait, long rest is after idx 1
-      // Let me re-check: long rest after idx 1 means (1+1) % 2 === 0, yes!
-      // So at startIdx=1, we check rest after startIdx-1=0: (0+1) % 2 !== 0, no long rest
-      // Then we build from i=1: add ex2, check rest after ex2: (1+1) % 2 === 0, yes! add long rest
-      
-      // Expected: [{ex2}, {longRest}, {ex3}, {ex4}]
-      assert.strictEqual(timeline.length, 4);
-      assert.strictEqual(timeline[0].type, 'exercise');
-      assert.strictEqual(timeline[1].type, 'longRest');
-    });
+test('explicit imported long rest keeps its configured duration', () => {
+  const imported = [
+    { exId: 'a', name: 'A', reps: 8, unit: 'reps', restType: 'long', restSeconds: 75 },
+    { exId: 'b', name: 'B', reps: 8, unit: 'reps' },
+  ];
+  const timeline = buildUpcomingTimeline(imported, 0, 'exercise', { type: 'normal', short: 15, long: 90 });
 
-    test('at idx=1: long rest after completing current should show FIRST', () => {
-      const queue = [
-        { exId: 'ex1', name: 'Previous', reps: 10, unit: 'reps' },     // idx 0
-        { exId: 'ex2', name: 'Current', reps: 10, unit: 'reps' },       // idx 1 (current - completing this leads to long rest)
-        { exId: 'ex3', name: 'Next', reps: 10, unit: 'reps' },          // idx 2
-        { exId: 'ex4', name: 'Following', reps: 10, unit: 'reps' },     // idx 3
-      ];
-      // Up Next uses startIdx = idx + 1 = 2
-      const timeline = buildUpcomingTimeline(queue, 2, restConfig);
-      
-      console.log('Timeline from idx=2:', timeline.map(x => x.type));
-      
-      // Check rest after startIdx-1=1: (1+1) % 2 === 0, yes! long rest after ex2
-      // Expected: [{longRest after ex2}, {ex3}, {ex4}]
-      assert.strictEqual(timeline.length, 3, 'Should have 3 items');
-      assert.strictEqual(timeline[0].type, 'longRest', 'First item should be long rest');
-      assert.strictEqual(timeline[0].queueIndex, 1, 'Long rest should be after queue index 1');
-      assert.strictEqual(timeline[1].type, 'exercise');
-      assert.strictEqual(timeline[1].item.exId, 'ex3');
-    });
+  assert.deepEqual(timeline.map(item => item.type), ['longRest', 'exercise']);
+  assert.equal(timeline[0].duration, 75);
+});
 
-    test('at idx=2: no long rest before, normal flow', () => {
-      const queue = [
-        { exId: 'ex1', name: 'A', reps: 10, unit: 'reps' },
-        { exId: 'ex2', name: 'B', reps: 10, unit: 'reps' },
-        { exId: 'ex3', name: 'C', reps: 10, unit: 'reps' },          // idx 2 (current)
-        { exId: 'ex4', name: 'D', reps: 10, unit: 'reps' },          // idx 3
-      ];
-      // Up Next uses startIdx = idx + 1 = 3
-      const timeline = buildUpcomingTimeline(queue, 3, restConfig);
-      
-      console.log('Timeline from idx=3:', timeline.map(x => x.type));
-      
-      // Check rest after startIdx-1=2: (2+1) % 2 !== 0, no long rest
-      // Expected: [{ex4}]
-      assert.strictEqual(timeline.length, 1);
-      assert.strictEqual(timeline[0].type, 'exercise');
-      assert.strictEqual(timeline[0].item.exId, 'ex4');
-    });
+test('exercise and long-rest destinations at one queue index stay distinct', () => {
+  assert.notEqual(
+    targetKey({ type: 'exercise', queueIndex: 1 }),
+    targetKey({ type: 'longRest', queueIndex: 1 }),
+  );
+});
 
-    test('interval every 3: long rest appears at correct positions', () => {
-      const restConfig3 = { type: 'interval', short: 15, long: 90, longEvery: 3 };
-      const queue = [
-        { exId: 'ex1', name: 'A', reps: 10, unit: 'reps' },     // idx 0
-        { exId: 'ex2', name: 'B', reps: 10, unit: 'reps' },     // idx 1
-        { exId: 'ex3', name: 'C', reps: 10, unit: 'reps' },     // idx 2 (completing this leads to long rest: (2+1) % 3 === 0)
-        { exId: 'ex4', name: 'D', reps: 10, unit: 'reps' },     // idx 3
-        { exId: 'ex5', name: 'E', reps: 10, unit: 'reps' },     // idx 4
-        { exId: 'ex6', name: 'F', reps: 10, unit: 'reps' },     // idx 5
-        { exId: 'ex7', name: 'G', reps: 10, unit: 'reps' },     // idx 6 (completing this leads to long rest: (5+1) % 3 === 0)
-      ];
-      // At idx=2 (current), startIdx=3
-      const timeline = buildUpcomingTimeline(queue, 3, restConfig3);
-      
-      console.log('Timeline from idx=3 (every 3):', timeline.map(t => t.type === 'longRest' ? 'LR' : t.item?.name));
-      
-      // Check rest after startIdx-1=2: (2+1) % 3 === 0, yes! long rest after ex3
-      // From i=3: ex4, (3+1) % 3 !== 0 no long rest
-      // From i=4: ex5, (4+1) % 3 !== 0 no long rest  
-      // From i=5: ex6, (5+1) % 3 === 0 yes! long rest
-      // From i=6: ex7, (6+1) % 3 !== 0 no long rest, but 6 is last so no more
-      // Expected: [{longRest after ex3}, {ex4}, {ex5}, {ex6}, {longRest}, {ex7}]
-      assert.strictEqual(timeline.length, 6);
-      assert.strictEqual(timeline[0].type, 'longRest');
-      assert.strictEqual(timeline[1].item.exId, 'ex4');
-      assert.strictEqual(timeline[3].item.exId, 'ex6');
-      assert.strictEqual(timeline[4].type, 'longRest');
-      assert.strictEqual(timeline[5].item.exId, 'ex7');
-    });
+test('exercise jump activates the destination exercise', () => {
+  assert.deepEqual(
+    getJumpState({ type: 'exercise', queueIndex: 3 }),
+    { idx: 3, phase: 'exercise', restRemaining: 0 },
+  );
+});
 
-    test('imported long rest with restType=long', () => {
-      const queue = [
-        { exId: 'ex1', name: 'A', reps: 10, unit: 'reps' },
-        { exId: 'ex2', name: 'B', reps: 10, unit: 'reps', restType: 'long' },    // idx 1 - imported long rest after this
-        { exId: 'ex3', name: 'C', reps: 10, unit: 'reps' },
-      ];
-      // At idx=0 (current), startIdx=1
-      const timeline = buildUpcomingTimeline(queue, 1, restConfig);
-      
-      console.log('Timeline with imported long rest:', timeline.map(t => t.type === 'longRest' ? 'LR' : t.item?.name));
-      
-      // Check rest after startIdx-1=0: no interval schedule (type=interval but need to check)
-      // Actually restConfig is interval type, but ex1 is not at an interval boundary (0+1) % 2 !== 0
-      // From i=1: ex2, ex2.restType === 'long' -> add long rest
-      // Expected: [{ex2}, {longRest}, {ex3}]
-      assert.strictEqual(timeline.length, 3);
-      assert.strictEqual(timeline[0].type, 'exercise');
-      assert.strictEqual(timeline[1].type, 'longRest');
-    });
+test('long-rest jump enters rest at the associated queue position', () => {
+  assert.deepEqual(
+    getJumpState({ type: 'longRest', queueIndex: 1, duration: 120 }),
+    { idx: 1, phase: 'rest', restRemaining: 120 },
+  );
+});
+
+test('preview percent marks destination without changing live progress', () => {
+  assert.equal(getPreviewPercent({ type: 'exercise', queueIndex: 2 }, 4), 75);
+  assert.equal(getPreviewPercent({ type: 'longRest', queueIndex: 1 }, 4), 50);
+  assert.equal(getPreviewPercent(null, 4), null);
+});
+
+test('live index is correctly identified in timeline', () => {
+  const timeline = buildUpcomingTimeline(queue, 2, 'exercise', intervalRest);
+  const liveIdx = getLiveIndexInTimeline(timeline, 2);
+  assert.equal(liveIdx, 2); // history ex0, liveMarker at idx 1, history ex1, liveMarker at idx 2
+  assert.equal(timeline[liveIdx].type, 'liveMarker');
+  assert.equal(timeline[liveIdx].queueIndex, 2);
+});
+
+test('getLiveIndexInTimeline returns null for missing live marker', () => {
+  const timeline = buildUpcomingTimeline(queue, 0, 'exercise', intervalRest);
+  const liveIdx = getLiveIndexInTimeline(timeline, 5);
+  assert.equal(liveIdx, -1);
+});
+
+test('history entries are correctly labeled for multiple past items', () => {
+  const timeline = buildUpcomingTimeline(queue, 3, 'exercise', intervalRest);
+  // Should show ex0, ex1, ex2 as history, live marker at 3
+  const historyItems = timeline.filter(item => item.isHistory === true);
+  assert.equal(historyItems.length, 3);
+  assert.deepEqual(historyItems.map(h => h.queueIndex), [0, 1, 2]);
+});
+
+test('target keys are unique per type and queueIndex', () => {
+  assert.notEqual(
+    targetKey({ type: 'exercise', queueIndex: 1 }),
+    targetKey({ type: 'longRest', queueIndex: 1 }),
+  );
+  assert.equal(
+    targetKey({ type: 'exercise', queueIndex: 1 }),
+    targetKey({ type: 'exercise', queueIndex: 1 }),
+  );
+});
+
+test('long-rest entry appears after completed exercise when due', () => {
+  const timeline = buildUpcomingTimeline(queue, 0, 'exercise', intervalRest);
+  // After completing ex0, the next long rest (after ex1) should appear
+  // Timeline: ex0, liveMarker, ex1, longRest(1), ex2, ex3
+  const longRestIdx = timeline.findIndex(item => item.type === 'longRest');
+  assert.notEqual(longRestIdx, -1);
+  assert.equal(timeline[longRestIdx].queueIndex, 1);
+  assert.equal(timeline[longRestIdx].duration, 120);
+});
+
+test('browsing past origin is supported by bidirectional timeline', () => {
+  // Build timeline from idx 2, should include history (0, 1), liveMarker(2), future(3)
+  const timeline = buildUpcomingTimeline(queue, 2, 'exercise', intervalRest);
+  // User can browse to history item (queueIndex 0 or 1)
+  const browseTarget = timeline.find(item => item.queueIndex === 0 && item.isHistory === true);
+  assert.notEqual(browseTarget, undefined);
+  assert.deepEqual(getJumpState(browseTarget), { idx: 0, phase: 'exercise', restRemaining: 0 });
+});
+
+test('jump to long-rest destination enters rest mode', () => {
+  const timeline = buildUpcomingTimeline(queue, 0, 'exercise', intervalRest);
+  const longRest = timeline.find(item => item.type === 'longRest');
+  assert.notEqual(longRest, undefined);
+  const jumpState = getJumpState(longRest);
+  assert.deepEqual(jumpState, { idx: 1, phase: 'rest', restRemaining: 120 });
+});
+
+test('view model keeps a live marker out of the primary Up Next card', () => {
+  const timeline = buildUpcomingTimeline(queue, 2, 'exercise', intervalRest);
+  const view = getUpNextViewModel(timeline);
+
+  assert.deepEqual([view.primary.type, view.primary.queueIndex], ['exercise', 3]);
+  assert.equal(view.rows.some(row => row.type === 'liveMarker'), true);
+  assert.equal(view.rows.every(row => row.type === 'liveMarker' || row.item || row.type === 'longRest'), true);
+});
+
+test('timeline exposes the complete exercise history rather than only three items', () => {
+  const longQueue = Array.from({ length: 8 }, (_, index) => ({
+    exId: `ex${index}`,
+    name: `Exercise ${index}`,
+    reps: 10,
+    unit: 'reps',
+  }));
+
+  const timeline = buildUpcomingTimeline(longQueue, 6, 'exercise', { type: 'none' });
+  assert.deepEqual(
+    timeline.filter(item => item.type === 'exercise' && item.isHistory).map(item => item.queueIndex),
+    [0, 1, 2, 3, 4, 5],
+  );
+});
+
+test('natural progression anchors the live marker so the position line stays visually stable', () => {
+  const timeline = buildUpcomingTimeline(queue, 2, 'exercise', intervalRest);
+  const view = getUpNextViewModel(timeline);
+
+  assert.equal(view.liveIndex, 2);
+  assert.equal(view.primaryIndex, 3);
+  assert.equal(getTimelineAnchorIndex(view), view.liveIndex);
+});
+
+test('the first set falls back to the primary row when no live marker exists', () => {
+  const timeline = buildUpcomingTimeline(queue, 0, 'exercise', intervalRest);
+  const view = getUpNextViewModel(timeline);
+
+  assert.equal(view.liveIndex, -1);
+  assert.equal(getTimelineAnchorIndex(view), view.primaryIndex);
+});
+
+test('scrolling to the automatic anchor never creates a browse selection', () => {
+  const timeline = buildUpcomingTimeline(queue, 2, 'exercise', intervalRest);
+  const view = getUpNextViewModel(timeline);
+
+  assert.equal(getTimelineBrowseRow({ rows: view.rows, scrollTop: 52, rowHeight: 26, anchorIndex: 2 }), null);
+  assert.equal(getTimelineBrowseRow({ rows: view.rows, scrollTop: 0, rowHeight: 26, anchorIndex: 2 }), view.rows[0]);
+  assert.equal(getTimelineBrowseRow({ rows: view.rows, scrollTop: 78, rowHeight: 26, anchorIndex: 2 }), view.rows[3]);
+});
+
+test('live marker stays subtle while idle and calls attention during navigation', () => {
+  assert.deepEqual(getLiveMarkerPresentation({ isScrolling: false, isBrowsing: false }), {
+    showLabel: false,
+    emphasized: false,
   });
+  assert.deepEqual(getLiveMarkerPresentation({ isScrolling: true, isBrowsing: false }), {
+    showLabel: true,
+    emphasized: true,
+  });
+  assert.deepEqual(getLiveMarkerPresentation({ isScrolling: false, isBrowsing: true }), {
+    showLabel: true,
+    emphasized: true,
+  });
+});
+
+test('timeline adds trailing space when needed to keep the live marker pinned', () => {
+  assert.equal(getTimelineTrailingSpacerRows({ viewportRows: 5, rowCount: 6, anchorIndex: 3 }), 2);
+  assert.equal(getTimelineTrailingSpacerRows({ viewportRows: 4, rowCount: 6, anchorIndex: 4 }), 2);
+  assert.equal(getTimelineTrailingSpacerRows({ viewportRows: 3, rowCount: 8, anchorIndex: 3 }), 0);
+});
+
+test('scroll reset keeps the live marker at the top after natural progression', () => {
+  const queue = Array.from({ length: 10 }, (_, index) => ({
+    exId: `ex${index}`,
+    name: `Exercise ${index}`,
+    reps: 10,
+    unit: 'reps',
+  }));
+
+  const timelineAtNewPos = buildUpcomingTimeline(queue, 5, 'exercise', { type: 'none' });
+  const view = getUpNextViewModel(timelineAtNewPos);
+
+  assert.equal(view.primary?.type, 'exercise');
+  assert.equal(view.primary?.queueIndex, 6);
+  assert.equal(view.liveIndex, 5);
+  assert.equal(view.primaryIndex, 6);
+  assert.equal(getTimelineAnchorIndex(view), 5);
 });
