@@ -5,6 +5,20 @@ import IOS_HOME_SCREEN_GIF from '../support files/Images/ios_how_to_add_to_homes
 import { parseCustomWorkoutValue } from './customWorkoutValue.js';
 import { updateFutureExerciseValues } from './workoutQueueOverrides.js';
 import { parseImportedWorkout, generateTemplateCSV, isRunnableImportedWorkout } from './workoutImporter.js';
+import {
+  buildUpcomingTimeline,
+  getJumpState,
+  getLiveIndexInTimeline,
+  getPreviewPercent,
+  getUpNextViewModel,
+  getTimelineAnchorIndex,
+  getTimelineTrailingSpacerRows,
+  getTimelineBrowseRow,
+  getLiveMarkerPresentation,
+  getRestDurationAfterIndex,
+  isLongRestForIndex,
+  targetKey,
+} from './upNextNavigation.js';
 
 // ============ EQUIPMENT TAGS ============
 const EQUIP = {
@@ -2406,8 +2420,10 @@ function GlobalStyles() {
         60% { transform: translate3d(-1px, 0, 0) rotate(-0.25deg); }
         80% { transform: translate3d(1px, 0, 0) rotate(0.2deg); }
       }
+      @keyframes bounce-back { 0% { transform: translateY(0); } 30% { transform: translateY(-20px); } 60% { transform: translateY(8px); } 100% { transform: translateY(0); } }
       .slide-in { animation: slide-up 0.4s ease-out both; }
       .fade-in { animation: fade-in 0.25s ease-out both; }
+      .bounce-back { animation: bounce-back 0.3s ease-out; }
       .title-slide-top { animation: title-in-top 0.55s cubic-bezier(0.22, 1, 0.36, 1) both; }
       .title-slide-bottom { animation: title-in-bottom 0.55s cubic-bezier(0.22, 1, 0.36, 1) 0.08s both; }
       .home-title-tap-shake { animation: home-title-tap-shake 180ms ease-in-out both; }
@@ -2420,7 +2436,8 @@ function GlobalStyles() {
           animation: none;
           opacity: 0.28;
         }
-        .home-title-tap-shake {
+        .home-title-tap-shake,
+        .bounce-back {
           animation: none;
         }
       }
@@ -6289,49 +6306,6 @@ function buildQueue(exercises, mode, cfg) {
   return q.map((item, i) => ({ ...item, totalSets: q.length }));
 }
 
-function isLongRestAfterIndex(queueIndex, queueLength, restConfig) {
-  const longEvery = Number(restConfig?.longEvery) || 0;
-  return (
-    restConfig?.type === 'interval' &&
-    longEvery > 0 &&
-    queueIndex < queueLength - 1 &&
-    (queueIndex + 1) % longEvery === 0
-  );
-}
-
-function isLongRestForIndex(queue, queueIndex, restConfig) {
-  return queue?.[queueIndex]?.restType === 'long'
-    || isLongRestAfterIndex(queueIndex, queue?.length || 0, restConfig);
-}
-
-function getRestDurationAfterIndex(queue, queueIndex, restConfig) {
-  const item = queue?.[queueIndex];
-  if (item?.restType === 'none') return 0;
-  // Interval rows use the workout-level short/long schedule rather than a
-  // per-row duration, so periodic long rests are not masked by restSeconds.
-  if (item?.restType !== 'interval' && item && item.restSeconds !== undefined && item.restSeconds !== null) {
-    return Math.max(0, Number(item.restSeconds) || 0);
-  }
-  if (restConfig?.type === 'none') return 0;
-  return isLongRestForIndex(queue, queueIndex, restConfig)
-    ? Math.max(0, Number(restConfig.long) || 0)
-    : Math.max(0, Number(restConfig.short) || 0);
-}
-
-function buildUpcomingTimeline(queue, startIdx, restConfig) {
-  const items = [];
-  for (let i = startIdx; i < queue.length; i++) {
-    items.push({ type: 'exercise', item: queue[i], queueIndex: i, key: `exercise-${i}` });
-    const restDuration = getRestDurationAfterIndex(queue, i, restConfig);
-    const isImportedLongRest = queue[i]?.restType === 'long';
-    // Only show explicit imported long rests or periodic interval long rests.
-    if (i < queue.length - 1 && restDuration > 0 && (isImportedLongRest || isLongRestAfterIndex(i, queue.length, restConfig))) {
-      items.push({ type: 'longRest', duration: restDuration, queueIndex: i, key: `rest-${i}` });
-    }
-  }
-  return items;
-}
-
 function WorkoutMenu({ onClose, currentEntry, findMatchingFavorite, onFavoriteToggle, onEdit }) {
   const isFavorited = currentEntry && findMatchingFavorite && !!findMatchingFavorite(currentEntry);
 
@@ -6415,19 +6389,28 @@ function ActiveWorkout({ queue, idx, setIdx, restConfig, initialElapsed = 0, ini
   const [elapsed, setElapsed] = useState(initialElapsed);
   const [menuOpen, setMenuOpen] = useState(false);
   const [namingEntry, setNamingEntry] = useState(null);
+  // Up Next browsing is separate from the live workout position.
+  const [browseTarget, setBrowseTarget] = useState(null);
+  const [browseResetNonce, setBrowseResetNonce] = useState(0);
+  const [isBrowseBouncingBack, setIsBrowseBouncingBack] = useState(false);
+  const browseTimerRef = useRef(null);
   const startRef = useRef(Date.now() - initialElapsed * 1000);
   const intervalRef = useRef(null);
   const contentRef = useRef(null);
 
   const current = queue[idx];
-  const next = queue[idx + 1];
-  const upcomingAfterNext = buildUpcomingTimeline(queue, idx + 1, restConfig).slice(1);
+  const upcomingTimeline = buildUpcomingTimeline(queue, idx, phase, restConfig);
+  const browseKey = targetKey(browseTarget);
   // Is the current/pending rest a long rest?
   const isLongRest = isLongRestForIndex(queue, idx, restConfig);
 
   useEffect(() => {
     const t = setInterval(() => setElapsed(Math.floor((Date.now() - startRef.current) / 1000)), 1000);
     return () => clearInterval(t);
+  }, []);
+
+  useEffect(() => () => {
+    if (browseTimerRef.current) clearTimeout(browseTimerRef.current);
   }, []);
 
   useEffect(() => {
@@ -6455,6 +6438,8 @@ function ActiveWorkout({ queue, idx, setIdx, restConfig, initialElapsed = 0, ini
     setIdx(idx + 1);
     setPhase('exercise');
     setRestRemaining(0);
+    // Recenter Up Next after natural progression
+    setBrowseResetNonce(nonce => nonce + 1);
   };
 
   const completeSet = () => {
@@ -6495,6 +6480,8 @@ function ActiveWorkout({ queue, idx, setIdx, restConfig, initialElapsed = 0, ini
       setIdx(idx - 1);
       setPhase('exercise');
       setRestRemaining(0);
+      // Recenter Up Next after manual navigation
+      setBrowseResetNonce(nonce => nonce + 1);
     }
   };
 
@@ -6504,10 +6491,40 @@ function ActiveWorkout({ queue, idx, setIdx, restConfig, initialElapsed = 0, ini
       setIdx(idx + 1);
       setPhase('exercise');
       setRestRemaining(0);
+      // Recenter Up Next after manual navigation
+      setBrowseResetNonce(nonce => nonce + 1);
     }
   };
 
   const addRest = (s) => setRestRemaining(r => Math.max(0, r + s));
+
+  // Commit a browsed exercise or long-rest destination.
+  const jumpTo = (target) => {
+    const jumpState = getJumpState(target);
+    if (!jumpState) return;
+    if (intervalRef.current) clearInterval(intervalRef.current);
+    if (browseTimerRef.current) clearTimeout(browseTimerRef.current);
+    setIdx(jumpState.idx);
+    setPhase(jumpState.phase);
+    setRestRemaining(jumpState.restRemaining);
+    setBrowseTarget(null);
+    setBrowseResetNonce(nonce => nonce + 1);
+    setIsBrowseBouncingBack(false);
+  };
+
+  // Return the preview to the live Up Next position with a short spring cue.
+  const cancelBrowse = () => {
+    if (browseTimerRef.current) clearTimeout(browseTimerRef.current);
+    setIsBrowseBouncingBack(true);
+    setBrowseResetNonce(nonce => nonce + 1);
+    browseTimerRef.current = setTimeout(() => {
+      setBrowseTarget(null);
+      setIsBrowseBouncingBack(false);
+      browseTimerRef.current = null;
+    }, 300);
+  };
+
+  const handleBrowse = (target) => setBrowseTarget(target);
 
   if (!current) return null;
 
@@ -6523,6 +6540,8 @@ function ActiveWorkout({ queue, idx, setIdx, restConfig, initialElapsed = 0, ini
   };
 
   const progress = ((idx + (phase === 'rest' ? 1 : 0)) / queue.length) * 100;
+  const previewProgress = getPreviewPercent(browseTarget, queue.length);
+  const previewMarkerColor = 'var(--accent2)';
 
   return (
     <div className="active-workout-screen" style={{ minHeight: '100dvh', display: 'flex', flexDirection: 'column', position: 'relative', zIndex: 2 }}>
@@ -6578,11 +6597,11 @@ function ActiveWorkout({ queue, idx, setIdx, restConfig, initialElapsed = 0, ini
         />
       )}
 
-      <div ref={contentRef} style={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center', padding: 'var(--active-content-y) var(--active-content-x)', position: 'relative' }}>
+      <div ref={contentRef} style={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center', padding: 'var(--active-content-y) var(--active-content-x)', position: 'relative' }} className={isBrowseBouncingBack ? 'bounce-back' : ''}>
         {phase === 'exercise' ? (
-          <ExerciseView current={current} next={next} upcomingItems={upcomingAfterNext} contentRef={contentRef} onValueChange={onExerciseValueChange} />
+          <ExerciseView current={current} timeline={upcomingTimeline} contentRef={contentRef} onValueChange={onExerciseValueChange} browseTarget={browseTarget} browseKey={browseKey} resetNonce={browseResetNonce} onBrowse={handleBrowse} onJump={jumpTo} onCancelBrowse={cancelBrowse} />
         ) : (
-          <RestView remaining={restRemaining} next={next} upcomingItems={upcomingAfterNext} contentRef={contentRef} isLongRest={isLongRest} />
+          <RestView remaining={restRemaining} timeline={upcomingTimeline} contentRef={contentRef} isLongRest={isLongRest} browseTarget={browseTarget} browseKey={browseKey} resetNonce={browseResetNonce} onBrowse={handleBrowse} onJump={jumpTo} onCancelBrowse={cancelBrowse} />
         )}
       </div>
 
@@ -6617,15 +6636,26 @@ function ActiveWorkout({ queue, idx, setIdx, restConfig, initialElapsed = 0, ini
             <SkipForward size={16} />
           </button>
         </div>
-        <div style={{ height: '3px', background: 'var(--surface-muted)', borderRadius: '2px', overflow: 'hidden' }}>
+        <div aria-label="Workout progress" style={{ height: '3px', background: 'var(--surface-muted)', borderRadius: '2px', position: 'relative' }}>
           <div style={{ height: '100%', width: progress + '%', background: 'var(--accent)', transition: 'width 0.3s' }} />
+          {previewProgress !== null && (
+            <div
+              aria-label="Browse destination preview"
+              style={{
+                position: 'absolute', left: `calc(${previewProgress}% - 2px)`, top: '-3px',
+                width: '4px', height: '9px', borderRadius: '2px',
+                background: previewMarkerColor, boxShadow: '0 0 0 1px var(--bg)',
+                transition: 'left 0.2s ease',
+              }}
+            />
+          )}
         </div>
       </div>
     </div>
   );
 }
 
-function ExerciseView({ current, next, upcomingItems = [], contentRef, onValueChange }) {
+function ExerciseView({ current, timeline = [], contentRef, onValueChange, browseTarget, browseKey, resetNonce, onBrowse, onJump, onCancelBrowse }) {
   const equip = EQUIP[current.equipment] || EQUIP.bodyweight;
   const isTimed = current.unit === 'sec';
 
@@ -6726,14 +6756,19 @@ function ExerciseView({ current, next, upcomingItems = [], contentRef, onValueCh
       )}
 
       <UpNextStack
-        next={next}
-        upcomingItems={upcomingItems}
+        timeline={timeline}
         contentRef={contentRef}
         label="// UP NEXT"
         labelColor="var(--subtle)"
         borderColor="var(--border)"
         nameColor="var(--muted-strong)"
+        browseKey={browseKey}
+        resetNonce={resetNonce}
+        onBrowse={onBrowse}
       />
+      {browseTarget && (
+        <BrowseControls target={browseTarget} onCancel={onCancelBrowse} onJump={onJump} />
+      )}
     </>
   );
 }
@@ -6745,15 +6780,62 @@ function formatPreviewDuration(totalSeconds) {
   return mins > 0 ? `${mins}:${String(secs).padStart(2, '0')}` : `${secs}s`;
 }
 
-function UpNextStack({ next, upcomingItems = [], contentRef, label, labelColor, borderColor, nameColor, nameWeight = 400 }) {
+function BrowseControls({ target, onCancel, onJump }) {
+  return (
+    <div style={{ position: 'absolute', bottom: '24px', left: '50%', transform: 'translateX(-50%)', display: 'flex', gap: '12px', zIndex: 10 }}>
+      <button
+        type="button"
+        onClick={() => onCancel?.()}
+        style={{
+          padding: '12px 18px', background: 'var(--surface)', border: '1px solid var(--border)',
+          color: 'var(--muted-strong)', fontSize: '13px', fontWeight: 700, fontFamily: 'Archivo Black, sans-serif',
+          borderRadius: '2px', cursor: 'pointer',
+        }}
+      >
+        CANCEL
+      </button>
+      <button
+        type="button"
+        onClick={() => onJump?.(target)}
+        style={{
+          padding: '12px 18px', background: 'var(--accent)', border: 'none',
+          color: 'var(--on-accent)', fontSize: '13px', fontWeight: 700, fontFamily: 'Archivo Black, sans-serif',
+          borderRadius: '2px', cursor: 'pointer',
+        }}
+      >
+        JUMP HERE
+      </button>
+    </div>
+  );
+}
+
+function UpNextStack({ timeline = [], contentRef, label, labelColor, borderColor, nameColor, nameWeight = 400, browseKey, resetNonce, onBrowse }) {
   const cardRef = React.useRef(null);
+  const scrollRef = React.useRef(null);
+  const scrollFrameRef = React.useRef(null);
+  const scrollIdleTimerRef = React.useRef(null);
+  const [isTimelineScrolling, setIsTimelineScrolling] = React.useState(false);
   const [layout, setLayout] = React.useState({ top: 0, left: 0, width: 0, count: 0 });
-  const nextEquip = next ? (EQUIP[next.equipment] || EQUIP.bodyweight) : EQUIP.bodyweight;
+  const { rows, primary, primaryIndex, liveIndex } = getUpNextViewModel(timeline);
+  const anchorIndex = getTimelineAnchorIndex({ liveIndex, primaryIndex });
+  const trailingSpacerRows = getTimelineTrailingSpacerRows({
+    viewportRows: layout.count,
+    rowCount: rows.length,
+    anchorIndex,
+  });
+  const primaryItem = primary?.item || null;
+  const primaryIsRest = primary?.type === 'longRest';
+  const nextEquip = primaryItem ? (EQUIP[primaryItem.equipment] || EQUIP.bodyweight) : EQUIP.bodyweight;
+  const isBrowsing = browseKey !== null;
+  const liveMarkerPresentation = getLiveMarkerPresentation({
+    isScrolling: isTimelineScrolling,
+    isBrowsing,
+  });
 
   const measureLayout = React.useCallback(() => {
     const card = cardRef.current;
     const content = contentRef?.current;
-    if (!card || !content || upcomingItems.length === 0) {
+    if (!card || !content || rows.length === 0) {
       setLayout(prev => prev.count === 0 ? prev : { ...prev, count: 0 });
       return;
     }
@@ -6761,7 +6843,7 @@ function UpNextStack({ next, upcomingItems = [], contentRef, label, labelColor, 
     const cardRect = card.getBoundingClientRect();
     const contentRect = content.getBoundingClientRect();
     const available = contentRect.bottom - cardRect.bottom - UPCOMING_PREVIEW_GAP - 2;
-    const count = Math.max(0, Math.min(upcomingItems.length, Math.floor(available / UPCOMING_PREVIEW_ROW_HEIGHT)));
+    const count = Math.max(0, Math.min(rows.length, Math.floor(available / UPCOMING_PREVIEW_ROW_HEIGHT)));
     const nextLayout = {
       top: Math.round(cardRect.bottom - contentRect.top + UPCOMING_PREVIEW_GAP),
       left: Math.round(cardRect.left - contentRect.left),
@@ -6777,11 +6859,16 @@ function UpNextStack({ next, upcomingItems = [], contentRef, label, labelColor, 
         ? prev
         : nextLayout
     ));
-  }, [contentRef, next?.exId, next?.setNum, next?.name, upcomingItems.length]);
+  }, [contentRef, primary?.key, rows.length]);
 
   React.useLayoutEffect(() => {
     measureLayout();
   });
+
+  React.useEffect(() => {
+    if (!scrollRef.current || anchorIndex < 0) return;
+    scrollRef.current.scrollTo({ top: anchorIndex * UPCOMING_PREVIEW_ROW_HEIGHT, behavior: 'auto' });
+  }, [resetNonce, primary?.key, anchorIndex, rows.length, layout.count, layout.top]);
 
   React.useEffect(() => {
     if (typeof window === 'undefined') return undefined;
@@ -6800,57 +6887,144 @@ function UpNextStack({ next, upcomingItems = [], contentRef, label, labelColor, 
 
     return () => {
       window.cancelAnimationFrame(frame);
+      if (scrollFrameRef.current) window.cancelAnimationFrame(scrollFrameRef.current);
+      if (scrollIdleTimerRef.current) clearTimeout(scrollIdleTimerRef.current);
       window.removeEventListener('resize', onResize);
       if (observer) observer.disconnect();
     };
   }, [contentRef, measureLayout]);
 
-  if (!next) return null;
+  if (!primary) return null;
 
-  const visibleItems = upcomingItems.slice(0, layout.count);
   const primaryGridColumns = `${UPCOMING_TAG_COL_WIDTH} minmax(0, ${UPCOMING_NAME_COL_WIDTH}) ${UPCOMING_VALUE_COL_WIDTH}`;
   const previewGridColumns = `14px ${UPCOMING_TAG_COL_WIDTH} minmax(0, ${UPCOMING_NAME_COL_WIDTH}) ${UPCOMING_VALUE_COL_WIDTH}`;
+  const primaryColor = primaryIsRest ? 'var(--accent2)' : nextEquip.color;
+  const primarySelected = browseKey === targetKey(primary);
+  const handleScroll = (event) => {
+    if (scrollFrameRef.current) window.cancelAnimationFrame(scrollFrameRef.current);
+    const scrollTop = event.currentTarget.scrollTop;
+    const anchorTop = anchorIndex * UPCOMING_PREVIEW_ROW_HEIGHT;
+    if (Math.abs(scrollTop - anchorTop) > 1 || isBrowsing) {
+      setIsTimelineScrolling(true);
+      if (scrollIdleTimerRef.current) clearTimeout(scrollIdleTimerRef.current);
+      scrollIdleTimerRef.current = setTimeout(() => {
+        setIsTimelineScrolling(false);
+        scrollIdleTimerRef.current = null;
+      }, 180);
+    }
+    scrollFrameRef.current = window.requestAnimationFrame(() => {
+      onBrowse?.(getTimelineBrowseRow({
+        rows,
+        scrollTop,
+        rowHeight: UPCOMING_PREVIEW_ROW_HEIGHT,
+        anchorIndex,
+      }));
+    });
+  };
 
   return (
     <>
-      <div ref={cardRef} style={{ padding: '14px 16px', background: 'var(--surface)', border: `1px solid ${borderColor}`, borderRadius: '2px' }}>
+      <button
+        ref={cardRef}
+        type="button"
+        onClick={() => onBrowse?.(primary)}
+        aria-label={primaryIsRest ? `Browse long rest ${formatPreviewDuration(primary.duration)}` : `Browse ${primaryItem.name}`}
+        style={{
+          width: '100%', padding: '14px 16px', background: primarySelected ? alphaColorToken(primaryColor, '10') : 'var(--surface)',
+          border: `1px solid ${primarySelected ? primaryColor : borderColor}`, borderRadius: '2px', textAlign: 'left',
+        }}
+      >
         <div className="mono" style={{ fontSize: '10px', color: labelColor, marginBottom: '4px' }}>{label}</div>
         <div style={{ display: 'grid', gridTemplateColumns: primaryGridColumns, alignItems: 'center', columnGap: '8px', width: 'fit-content', maxWidth: '100%' }}>
           <span className="mono" style={{
-            width: '100%', fontSize: '9px', padding: '2px 5px', background: alphaColorToken(nextEquip.color, '22'),
-            color: nextEquip.color, borderRadius: '2px', fontWeight: 700, textAlign: 'center',
-          }}>{nextEquip.label}</span>
-          <div style={{ fontSize: '14px', color: nameColor, fontWeight: nameWeight, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{next.name}</div>
-          <div className="mono" style={{ fontSize: '12px', color: 'var(--accent)', textAlign: 'right', whiteSpace: 'nowrap' }}>{next.reps} {next.unit}</div>
+            width: '100%', fontSize: '9px', padding: '2px 5px', background: primaryIsRest ? alphaColorToken('var(--fg)', '10') : alphaColorToken(nextEquip.color, '22'),
+            color: primaryColor, borderRadius: '2px', fontWeight: 700, textAlign: 'center',
+          }}>{primaryIsRest ? 'REST' : nextEquip.label}</span>
+          <div style={{ fontSize: '14px', color: primaryIsRest ? 'var(--accent2)' : nameColor, fontWeight: nameWeight, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+            {primaryIsRest ? 'Long rest' : primaryItem.name}
+          </div>
+          <div className="mono" style={{ fontSize: '12px', color: 'var(--accent)', textAlign: 'right', whiteSpace: 'nowrap' }}>
+            {primaryIsRest ? formatPreviewDuration(primary.duration) : `${primaryItem.reps} ${primaryItem.unit}`}
+          </div>
         </div>
-      </div>
+      </button>
 
-      {visibleItems.length > 0 && layout.width > 0 && (
+      {rows.length > 0 && layout.count > 0 && layout.width > 0 && (
         <div
+          ref={scrollRef}
+          role="listbox"
+          aria-label="Upcoming workout timeline"
+          onScroll={handleScroll}
           style={{
             position: 'absolute',
             top: `${layout.top}px`,
             left: `${layout.left}px`,
             width: `${layout.width}px`,
-            height: `${visibleItems.length * UPCOMING_PREVIEW_ROW_HEIGHT}px`,
-            overflow: 'hidden',
-            pointerEvents: 'none',
+            height: `${layout.count * UPCOMING_PREVIEW_ROW_HEIGHT}px`,
+            overflowY: 'auto',
+            overscrollBehavior: 'contain',
+            scrollSnapType: 'y proximity',
+            WebkitOverflowScrolling: 'touch',
+            scrollbarWidth: 'none',
+            msOverflowStyle: 'none',
           }}
         >
-          {visibleItems.map((upcoming, i) => {
+          {rows.map((upcoming, i) => {
+            if (upcoming.type === 'liveMarker') {
+              return (
+                <div
+                  key={upcoming.key}
+                  role="separator"
+                  aria-label="Original workout position"
+                  style={{
+                    height: `${UPCOMING_PREVIEW_ROW_HEIGHT}px`, display: 'flex', alignItems: 'center', gap: '8px',
+                    padding: '3px 12px', scrollSnapAlign: 'start',
+                    color: liveMarkerPresentation.emphasized ? 'var(--accent2)' : borderColor,
+                  }}
+                >
+                  {liveMarkerPresentation.showLabel ? (
+                    <>
+                      <span style={{ flex: 1, height: '1px', background: 'currentColor', opacity: 0.65 }} />
+                      <span className="mono" style={{ fontSize: '8px', fontWeight: 700 }}>YOU ARE HERE</span>
+                      <span style={{ flex: 1, height: '1px', background: 'currentColor', opacity: 0.65 }} />
+                    </>
+                  ) : (
+                    <span style={{ width: '100%', height: '1px', background: 'currentColor' }} />
+                  )}
+                </div>
+              );
+            }
             const isRest = upcoming.type === 'longRest';
             const item = upcoming.item;
             const eq = item ? (EQUIP[item.equipment] || EQUIP.bodyweight) : null;
             const tagColor = isRest ? 'var(--accent2)' : eq.color;
-            const opacity = Math.max(0.18, 0.56 - i * 0.07);
+            const opacity = upcoming.isHistory ? 0.48 : 0.72;
+            const isBrowsedItem = isBrowsing && browseKey === targetKey(upcoming);
+            const futureOrdinal = i >= primaryIndex
+              ? rows.slice(primaryIndex, i + 1).filter(row => row.type === 'exercise' || row.type === 'longRest').length
+              : null;
+            const positionLabel = upcoming.isHistory ? 'BACK' : (futureOrdinal === 1 ? 'UP' : futureOrdinal);
             return (
-              <div key={upcoming.key} style={{
-                height: `${UPCOMING_PREVIEW_ROW_HEIGHT}px`,
-                display: 'grid', gridTemplateColumns: previewGridColumns, alignItems: 'center', columnGap: '6px', width: 'fit-content', maxWidth: '100%',
-                padding: '3px 12px', opacity,
-              }}>
+              <button
+                key={upcoming.key}
+                type="button"
+                role="option"
+                aria-selected={isBrowsedItem}
+                aria-label={isRest ? `Browse long rest ${formatPreviewDuration(upcoming.duration)}` : `Browse ${item.name}`}
+                onClick={() => onBrowse?.(upcoming)}
+                style={{
+                  height: `${UPCOMING_PREVIEW_ROW_HEIGHT}px`,
+                  display: 'grid', gridTemplateColumns: previewGridColumns, alignItems: 'center', columnGap: '6px', width: '100%',
+                  padding: '3px 12px', opacity: isBrowsedItem ? 1 : opacity,
+                  cursor: 'pointer', textAlign: 'left', scrollSnapAlign: 'start',
+                  background: isBrowsedItem ? alphaColorToken(tagColor, '10') : 'transparent',
+                  borderLeft: isBrowsedItem ? `3px solid ${tagColor}` : '3px solid transparent',
+                  transition: 'background 0.2s, border-color 0.2s, opacity 0.2s',
+                }}
+                className={isBrowsedItem ? 'up-next-snap-target' : ''}
+              >
                 <span className="mono" style={{ fontSize: '9px', color: 'var(--subtle)', width: '14px', flexShrink: 0 }}>
-                  {i + 2}
+                  {positionLabel}
                 </span>
                 <span className="mono" style={{
                   width: '100%', fontSize: '8px', padding: '1px 4px', background: isRest ? alphaColorToken('var(--fg)', '10') : alphaColorToken(tagColor, '22'),
@@ -6863,9 +7037,15 @@ function UpNextStack({ next, upcomingItems = [], contentRef, label, labelColor, 
                 <div className="mono" style={{ fontSize: '10px', color: 'var(--subtle)', textAlign: 'right', whiteSpace: 'nowrap' }}>
                   {isRest ? formatPreviewDuration(upcoming.duration) : `${item.reps} ${item.unit}`}
                 </div>
-              </div>
+              </button>
             );
           })}
+          {trailingSpacerRows > 0 && (
+            <div
+              aria-hidden="true"
+              style={{ height: `${trailingSpacerRows * UPCOMING_PREVIEW_ROW_HEIGHT}px`, flexShrink: 0 }}
+            />
+          )}
         </div>
       )}
     </>
@@ -6994,7 +7174,7 @@ function TimedDisplay({ phase, prepValue, timerValue, target, onStart, onValueCh
   );
 }
 
-function RestView({ remaining, next, upcomingItems = [], contentRef, isLongRest = false }) {
+function RestView({ remaining, timeline = [], contentRef, isLongRest = false, browseTarget, browseKey, resetNonce, onBrowse, onJump, onCancelBrowse }) {
   const mins = Math.floor(remaining / 60);
   const secs = remaining % 60;
 
@@ -7016,15 +7196,20 @@ function RestView({ remaining, next, upcomingItems = [], contentRef, isLongRest 
         </div>
       </div>
       <UpNextStack
-        next={next}
-        upcomingItems={upcomingItems}
+        timeline={timeline}
         contentRef={contentRef}
         label="// COMING UP"
         labelColor="var(--accent2)"
         borderColor="var(--accent2)"
         nameColor="var(--fg)"
         nameWeight={600}
+        browseKey={browseKey}
+        resetNonce={resetNonce}
+        onBrowse={onBrowse}
       />
+      {browseTarget && (
+        <BrowseControls target={browseTarget} onCancel={onCancelBrowse} onJump={onJump} />
+      )}
     </>
   );
 }
