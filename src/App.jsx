@@ -222,9 +222,19 @@ const RAINBOW_CONFETTI_PIECES = Array.from({ length: RAINBOW_CONFETTI_COUNT }, (
 });
 const RAINBOW_CONFETTI_REST_REPEL = RAINBOW_CONFETTI_PIECES.map(() => ({ x: 0, y: 0, rotation: 0 }));
 
-const APP_VERSION = '2.43';
+const APP_VERSION = '2.44';
 
 const APP_VERSION_HISTORY = [
+  {
+    version: '2.44',
+    date: '2026-10-28',
+    type: 'Feature / UI / Bug fix',
+    changes: [
+      'Added bidirectional Up Next timeline browsing with Jump Here and Cancel controls.',
+      'Kept the live-position marker stable across sets and rests while making it subtle during normal workout progression.',
+      'Highlighted the “YOU ARE HERE” marker only while scrolling or choosing a new workout position.',
+    ],
+  },
   {
     version: '2.43',
     date: '2026-10-26',
