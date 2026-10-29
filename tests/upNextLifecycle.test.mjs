@@ -48,7 +48,7 @@ test('lifecycle: recenter should apply when layout becomes available after progr
     );
 
     // Verify the primary row index in the timeline matches primaryIndex
-    // This is critical: if primaryIndex = 3, the listbox.scrollTo({ top: 3 * ROW_HEIGHT }) 
+    // This is critical: if primaryIndex = 3, the listbox.scrollTo({ top: 3 * ROW_HEIGHT })
     // will show row 3 at the top.
     const primaryInTimeline = view.rows.findIndex(row => row === view.primary);
     assert.equal(
